@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read|Grep|Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"let f=JSON.parse(require('fs').readFileSync(0,'utf8')).tool_input?.file_path||''; if(/\\.env/.test(f)){console.log(JSON.stringify({hookSpecificOutput:{hookEventName:'PreToolUse',permissionDecision:'deny',permissionDecisionReason:'Never read .env files — secrets must stay secret'}}))}\"",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  }
+}

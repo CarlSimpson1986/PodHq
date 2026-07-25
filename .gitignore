@@ -17,6 +17,11 @@
 /.next/
 /out/
 
+# PWA build output (@ducanh2912/next-pwa)
+/public/sw.js
+/public/swe-worker*.js
+/public/workbox-*.js
+
 # production
 /build
 
@@ -35,6 +40,9 @@ yarn-error.log*
 
 # vercel
 .vercel
+
+# claude code local overrides (personal, not team-shared)
+.claude/settings.local.json
 
 # typescript
 *.tsbuildinfo
