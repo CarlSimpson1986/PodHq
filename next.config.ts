@@ -16,7 +16,14 @@ const securityHeaders = [
     key: "Permissions-Policy",
     value: "camera=(), microphone=(), geolocation=()",
   },
-  {
+];
+
+// CSP is production-only: Next.js's dev-mode client (hot-reload eval(),
+// the debug-channel inline bootstrap script) needs allowances that would
+// defeat the point of a strict policy, and dev never runs anywhere but
+// localhost. Production gets the real, strict policy.
+if (isProd) {
+  securityHeaders.push({
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
@@ -29,8 +36,8 @@ const securityHeaders = [
       "base-uri 'self'",
       "form-action 'self'",
     ].join("; "),
-  },
-];
+  });
+}
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
