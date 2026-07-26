@@ -28,6 +28,18 @@ const NAV_ITEMS = [
       </svg>
     ),
   },
+  {
+    href: "/members",
+    label: "Members",
+    icon: (
+      <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.5}>
+        <circle cx="7" cy="6.5" r="2.5" />
+        <path d="M2.5 16c0-2.6 2-4.2 4.5-4.2s4.5 1.6 4.5 4.2" strokeLinecap="round" />
+        <circle cx="14.5" cy="7.5" r="2" />
+        <path d="M12.7 12c1.9 0 3.3 1.4 3.3 3.6" strokeLinecap="round" />
+      </svg>
+    ),
+  },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
