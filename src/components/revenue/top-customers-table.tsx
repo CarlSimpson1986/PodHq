@@ -1,4 +1,4 @@
-import { formatGBP } from "@/lib/format";
+import { formatGBP, formatMonthLabel } from "@/lib/format";
 import type { TopCustomer } from "@/lib/data/revenue";
 
 export function TopCustomersTable({ data }: { data: TopCustomer[] }) {
@@ -12,7 +12,8 @@ export function TopCustomersTable({ data }: { data: TopCustomer[] }) {
               <th className="py-2 pr-3 font-normal">Rank</th>
               <th className="py-2 pr-3 font-normal">Name</th>
               <th className="py-2 pr-3 text-right font-normal">Total</th>
-              <th className="py-2 text-right font-normal">% of revenue</th>
+              <th className="py-2 pr-3 text-right font-normal">% of revenue</th>
+              <th className="py-2 text-right font-normal">Last purchase</th>
             </tr>
           </thead>
           <tbody>
@@ -21,8 +22,11 @@ export function TopCustomersTable({ data }: { data: TopCustomer[] }) {
                 <td className="py-2 pr-3 tabular-nums text-muted-foreground">{i + 1}</td>
                 <td className="py-2 pr-3 text-foreground">{row.name}</td>
                 <td className="py-2 pr-3 text-right tabular-nums text-foreground">{formatGBP(row.total)}</td>
-                <td className="py-2 text-right tabular-nums text-muted-foreground">
+                <td className="py-2 pr-3 text-right tabular-nums text-muted-foreground">
                   {row.percentOfTotal.toFixed(1)}%
+                </td>
+                <td className="py-2 text-right tabular-nums text-muted-foreground">
+                  {formatMonthLabel(row.lastPurchaseMonth)}
                 </td>
               </tr>
             ))}

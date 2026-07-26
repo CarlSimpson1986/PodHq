@@ -8,6 +8,7 @@ export interface AttendanceMember {
   userMemberId: string;
   name: string;
   attendance: number;
+  lastAttended: string | null;
 }
 
 export interface LtvCustomer {
@@ -17,6 +18,10 @@ export interface LtvCustomer {
   activeMonths: number;
   avgMonthlySpend: number;
   ltv: number;
+  /** Most recent report_month with any Revenue row — lets a reader spot a
+   *  high-LTV customer who's actually long gone (the formula has no
+   *  cancellation date to know that on its own). */
+  lastActiveMonth: string;
 }
 
 export interface LtvHistogramBucket {
@@ -48,15 +53,23 @@ export interface MemberInsightsSummary {
 async function fetchActiveAttendanceRows(
   gym: GymName | null,
   month: string
-): Promise<{ user_member_id: string; first_name: string; last_name: string; attendance: number }[]> {
+): Promise<
+  { user_member_id: string; first_name: string; last_name: string; attendance: number; last_attended: string | null }[]
+> {
   const admin = createAdminClient();
-  const rows: { user_member_id: string; first_name: string; last_name: string; attendance: number }[] = [];
+  const rows: {
+    user_member_id: string;
+    first_name: string;
+    last_name: string;
+    attendance: number;
+    last_attended: string | null;
+  }[] = [];
   let from = 0;
 
   for (;;) {
     const base = admin
       .from("attendance")
-      .select("user_member_id, first_name, last_name, attendance")
+      .select("user_member_id, first_name, last_name, attendance, last_attended")
       .eq("report_month", month)
       .gt("attendance", 0)
       .range(from, from + PAGE_SIZE - 1);
@@ -65,7 +78,13 @@ async function fetchActiveAttendanceRows(
     const { data, error } = await query;
     if (error) throw error;
 
-    const page = (data ?? []) as { user_member_id: string; first_name: string; last_name: string; attendance: number }[];
+    const page = (data ?? []) as {
+      user_member_id: string;
+      first_name: string;
+      last_name: string;
+      attendance: number;
+      last_attended: string | null;
+    }[];
     rows.push(...page);
 
     if (page.length < PAGE_SIZE) break;
@@ -165,17 +184,22 @@ async function fetchAllRevenueForLtv(
 function computeLtv(
   rows: { gym: GymName; sold_to: string; amount_inc_tax: number; report_month: string }[]
 ): LtvCustomer[] {
-  const perCustomer = new Map<string, { gym: GymName; name: string; totalSpend: number; months: Set<string> }>();
+  const perCustomer = new Map<
+    string,
+    { gym: GymName; name: string; totalSpend: number; months: Set<string>; lastActiveMonth: string }
+  >();
 
   for (const row of rows) {
     const key = `${row.gym}::${row.sold_to}`;
     let entry = perCustomer.get(key);
     if (!entry) {
-      entry = { gym: row.gym, name: row.sold_to, totalSpend: 0, months: new Set() };
+      entry = { gym: row.gym, name: row.sold_to, totalSpend: 0, months: new Set(), lastActiveMonth: row.report_month };
       perCustomer.set(key, entry);
     }
     entry.totalSpend += Number(row.amount_inc_tax);
     entry.months.add(row.report_month);
+    // report_month is "yyyy-MM" — lexicographic comparison is chronological.
+    if (row.report_month > entry.lastActiveMonth) entry.lastActiveMonth = row.report_month;
   }
 
   // Average lifespan computed per gym — gyms differ in retention, so a
@@ -203,6 +227,7 @@ function computeLtv(
       activeMonths,
       avgMonthlySpend,
       ltv: avgMonthlySpend * gymAvgLifespan,
+      lastActiveMonth: entry.lastActiveMonth,
     };
   });
 }
@@ -246,6 +271,7 @@ export async function getMemberInsightsSummary(gym: GymName | null, month: strin
     userMemberId: row.user_member_id,
     name: `${row.first_name} ${row.last_name}`.trim(),
     attendance: row.attendance,
+    lastAttended: row.last_attended,
   }));
 
   const atRiskMembers = named

@@ -189,23 +189,35 @@ export interface TopCustomer {
   name: string;
   total: number;
   percentOfTotal: number;
+  /** Most recent report_month with a purchase within the selected range — a
+   *  top-10 spot can come from one big early purchase with nothing since. */
+  lastPurchaseMonth: string;
 }
 
 async function getTopCustomers(gym: GymName | null, range: MonthRange, limit: number): Promise<TopCustomer[]> {
-  const rows = await fetchRevenueRowsForRange<{ sold_to: string; amount_inc_tax: number }>(
+  const rows = await fetchRevenueRowsForRange<{ sold_to: string; amount_inc_tax: number; report_month: string }>(
     gym,
     range,
-    "sold_to, amount_inc_tax"
+    "sold_to, amount_inc_tax, report_month"
   );
   const totals = new Map<string, number>();
+  const lastPurchaseMonth = new Map<string, string>();
   let grandTotal = 0;
   for (const row of rows) {
     const amount = Number(row.amount_inc_tax);
     totals.set(row.sold_to, (totals.get(row.sold_to) ?? 0) + amount);
     grandTotal += amount;
+    const prevLast = lastPurchaseMonth.get(row.sold_to);
+    // report_month is "yyyy-MM" — lexicographic comparison is chronological.
+    if (!prevLast || row.report_month > prevLast) lastPurchaseMonth.set(row.sold_to, row.report_month);
   }
   return [...totals.entries()]
-    .map(([name, total]) => ({ name, total, percentOfTotal: grandTotal > 0 ? (total / grandTotal) * 100 : 0 }))
+    .map(([name, total]) => ({
+      name,
+      total,
+      percentOfTotal: grandTotal > 0 ? (total / grandTotal) * 100 : 0,
+      lastPurchaseMonth: lastPurchaseMonth.get(name) ?? range.end,
+    }))
     .sort((a, b) => b.total - a.total)
     .slice(0, limit);
 }

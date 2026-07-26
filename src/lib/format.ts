@@ -20,6 +20,14 @@ export function formatPercent(value: number, digits = 1): string {
   return `${sign}${value.toFixed(digits)}%`;
 }
 
+export function formatDate(dateString: string): string {
+  return new Date(dateString).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
+}
+
 export function formatMonthLabel(month: string): string {
   const [year, mon] = month.split("-").map(Number);
   return new Date(Date.UTC(year, mon - 1, 1)).toLocaleDateString("en-GB", {
