@@ -68,7 +68,10 @@ export async function updateSession(request: NextRequest) {
   const mfaChallengePending = !!aal && aal.currentLevel !== aal.nextLevel;
 
   if (mfaChallengePending) {
-    if (pathname === "/login/mfa") return supabaseResponse;
+    // /api/auth/* routes (e.g. mfa/verify) validate the session themselves
+    // and must stay reachable while a challenge is outstanding — redirecting
+    // them here would break the very requests needed to clear the challenge.
+    if (pathname === "/login/mfa" || isPublic) return supabaseResponse;
     return NextResponse.redirect(new URL("/login/mfa", request.url));
   }
 
@@ -84,14 +87,25 @@ export async function updateSession(request: NextRequest) {
   if (role === "admin") {
     const { data: factors } = await supabase.auth.mfa.listFactors();
     if (!factors?.totp.length) {
-      if (pathname === "/login/mfa-setup") return supabaseResponse;
+      // Let a brand-new invited/recovering admin set a password first —
+      // they'll be bounced here again on their next navigation regardless.
+      // Also let /api/auth/* through: it's what set-password and
+      // mfa/enroll|verify run on, and redirecting those breaks the flow
+      // that's supposed to clear this very gate.
+      if (pathname === "/login/mfa-setup" || pathname === "/login/set-password" || isPublic) {
+        return supabaseResponse;
+      }
       return NextResponse.redirect(new URL("/login/mfa-setup", request.url));
     }
   }
 
   // Fully authenticated (and MFA-compliant) at this point — bounce away
-  // from the login flow.
-  if (pathname.startsWith("/login")) {
+  // from the login flow. set-password stays reachable even here: recovery
+  // for an account that already has MFA enrolled needs a completed AAL2
+  // challenge before Supabase will accept the new password, so by the time
+  // this gate is reached the user is "fully authenticated" but still needs
+  // this exact page to finish what the recovery link started.
+  if (pathname.startsWith("/login") && pathname !== "/login/set-password") {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState, type FormEvent } from "react";
+import { useSearchParams } from "next/navigation";
 import { AuthCard } from "@/components/auth/auth-card";
 
 const inputClass =
@@ -9,8 +9,30 @@ const inputClass =
 const buttonClass =
   "w-full rounded-md bg-accent px-3 py-2 text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent-hover disabled:opacity-50";
 
+// Only ever set by our own auth/callback redirect (recovery + already-enrolled
+// MFA needs the challenge cleared before Supabase will accept a password
+// change) — allowlisted rather than trusted verbatim from the query string.
+const ALLOWED_NEXT = new Set(["/login/set-password"]);
+
 export default function MfaChallengePage() {
-  const router = useRouter();
+  return (
+    <Suspense
+      fallback={
+        <AuthCard title="Enter your code" subtitle="Open your authenticator app and enter the 6-digit code.">
+          <p className="text-sm text-muted-foreground">One moment...</p>
+        </AuthCard>
+      }
+    >
+      <MfaChallengeInner />
+    </Suspense>
+  );
+}
+
+function MfaChallengeInner() {
+  const searchParams = useSearchParams();
+  const next = searchParams.get("next");
+  const redirectTo = next && ALLOWED_NEXT.has(next) ? next : "/dashboard";
+
   const [factorId, setFactorId] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -39,10 +61,13 @@ export default function MfaChallengePage() {
       });
       const body = await res.json();
       if (body.status === "ok") {
-        router.push("/dashboard");
-      } else {
-        setError(body.message ?? "Incorrect code. Try again.");
+        // Hard navigation: this session's cookie just changed AAL, and the
+        // App Router's client-side transition can silently fail to pick
+        // that up (soft nav hangs on this exact screen).
+        window.location.href = redirectTo;
+        return;
       }
+      setError(body.message ?? "Incorrect code. Try again.");
     } catch {
       setError("Something went wrong. Try again.");
     } finally {

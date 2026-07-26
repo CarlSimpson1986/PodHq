@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import { AuthCard } from "@/components/auth/auth-card";
 
 const inputClass =
@@ -10,7 +9,6 @@ const buttonClass =
   "w-full rounded-md bg-accent px-3 py-2 text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent-hover disabled:opacity-50";
 
 export default function MfaSetupPage() {
-  const router = useRouter();
   const enrolled = useRef(false);
   const [factorId, setFactorId] = useState<string | null>(null);
   const [qrCode, setQrCode] = useState<string | null>(null);
@@ -49,10 +47,13 @@ export default function MfaSetupPage() {
       });
       const body = await res.json();
       if (body.status === "ok") {
-        router.push("/dashboard");
-      } else {
-        setError(body.message ?? "Incorrect code. Try again.");
+        // Hard navigation: this account's session cookie just changed AAL,
+        // and the App Router's client-side transition can silently fail to
+        // pick that up (soft nav to /dashboard hangs on this exact screen).
+        window.location.href = "/dashboard";
+        return;
       }
+      setError(body.message ?? "Incorrect code. Try again.");
     } catch {
       setError("Something went wrong. Try again.");
     } finally {

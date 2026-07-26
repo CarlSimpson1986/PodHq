@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import { AuthCard } from "@/components/auth/auth-card";
 
 const inputClass =
@@ -10,7 +9,6 @@ const buttonClass =
   "w-full rounded-md bg-accent px-3 py-2 text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent-hover disabled:opacity-50";
 
 export default function SetPasswordPage() {
-  const router = useRouter();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -32,10 +30,14 @@ export default function SetPasswordPage() {
       });
       const body = await res.json();
       if (body.status === "ok") {
-        router.push("/dashboard");
-      } else {
-        setError(body.message ?? "Could not set password.");
+        // Hard navigation: for the recovery+already-enrolled-MFA path this
+        // session just cleared an AAL2 challenge, and soft nav has proven
+        // unreliable right after an auth-cookie change on this app (see
+        // the MFA pages) — so don't risk the same silent hang here.
+        window.location.href = "/dashboard";
+        return;
       }
+      setError(body.message ?? "Could not set password.");
     } catch {
       setError("Something went wrong. Try again.");
     } finally {
