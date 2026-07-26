@@ -1,9 +1,14 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { formatGBP, formatPercent, formatMonthLabel } from "@/lib/format";
+import { formatGBP, formatNumber, formatPercent, formatMonthLabel } from "@/lib/format";
 import { GYM_NAMES, type GymName } from "@/lib/data/types";
 import type { DateRangePreset, RevenueRangeSummary, MonthRange } from "@/lib/data/revenue";
+import { CategoryPieChart } from "./category-pie-chart";
+import { CategoryTrendChart } from "./category-trend-chart";
+import { TrendYoyChart } from "./trend-yoy-chart";
+import { TopProductsChart } from "./top-products-chart";
+import { TopCustomersTable } from "./top-customers-table";
 
 function formatRange(range: MonthRange): string {
   return range.start === range.end
@@ -38,7 +43,7 @@ export function RevenueSummaryView({ role, initialPreset, initialGym, initialSum
   const [preset, setPreset] = useState(initialPreset);
   const [year, setYear] = useState(currentYear);
   const [gym, setGym] = useState<GymName | null>(initialGym);
-  const [summary, setSummary] = useState(initialSummary);
+  const [summary, setSummary] = useState<RevenueRangeSummary | null>(initialSummary);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -53,11 +58,16 @@ export function RevenueSummaryView({ role, initialPreset, initialGym, initialSum
         const res = await fetch(`/api/revenue/summary?${params.toString()}`);
         const body = await res.json();
         if (body.status !== "ok") {
+          // Clear the old summary rather than leave it on screen — it's for
+          // a different filter selection now and showing it would be
+          // actively misleading, not just stale.
+          setSummary(null);
           setError(body.message ?? "Could not load revenue data.");
           return;
         }
         setSummary(body.summary);
       } catch {
+        setSummary(null);
         setError("Something went wrong. Try again.");
       }
     });
@@ -128,26 +138,64 @@ export function RevenueSummaryView({ role, initialPreset, initialGym, initialSum
       </div>
 
       {isPending && <p className="mt-3 text-sm text-muted-foreground">Loading…</p>}
-      {error && <p className="mt-3 text-sm text-danger">{error}</p>}
-
-      <section className="mt-4 rounded-[12px] border border-card-border bg-card p-5">
-        <p className="text-sm text-muted-foreground">
-          {summary.label} revenue <span className="text-muted-foreground/70">({formatRange(summary.range)})</span>
+      {error && (
+        <p className="mt-3 text-sm text-danger">
+          {error} {!isPending && "Pick a filter above to retry."}
         </p>
-        <p className="mt-2 text-3xl font-semibold text-foreground">{formatGBP(summary.total)}</p>
-        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
-          {summary.previousPeriod && summary.previousPeriod.percentChange !== null && (
-            <span className={summary.previousPeriod.percentChange >= 0 ? "text-success" : "text-danger"}>
-              {formatPercent(summary.previousPeriod.percentChange)} vs previous period
-            </span>
-          )}
-          {summary.sameRangeLastYear.percentChange !== null && (
-            <span className={summary.sameRangeLastYear.percentChange >= 0 ? "text-success" : "text-danger"}>
-              {formatPercent(summary.sameRangeLastYear.percentChange)} vs same period last year
-            </span>
-          )}
-        </div>
-      </section>
+      )}
+
+      {summary && (
+        <>
+          <section className="mt-4 rounded-[12px] border border-card-border bg-card p-5">
+            <p className="text-sm text-muted-foreground">
+              {summary.label} revenue{" "}
+              <span className="text-muted-foreground/70">({formatRange(summary.range)})</span>
+            </p>
+            <p className="mt-2 text-3xl font-semibold text-foreground">{formatGBP(summary.total)}</p>
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+              {summary.previousPeriod && summary.previousPeriod.percentChange !== null && (
+                <span className={summary.previousPeriod.percentChange >= 0 ? "text-success" : "text-danger"}>
+                  {formatPercent(summary.previousPeriod.percentChange)} vs previous period
+                </span>
+              )}
+              {summary.sameRangeLastYear.percentChange !== null && (
+                <span className={summary.sameRangeLastYear.percentChange >= 0 ? "text-success" : "text-danger"}>
+                  {formatPercent(summary.sameRangeLastYear.percentChange)} vs same period last year
+                </span>
+              )}
+            </div>
+          </section>
+
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="rounded-[12px] border border-card-border bg-card p-5">
+              <p className="text-sm text-muted-foreground">Transactions</p>
+              <p className="mt-2 text-2xl font-semibold text-foreground">{formatNumber(summary.transactionCount)}</p>
+            </div>
+            <div className="rounded-[12px] border border-card-border bg-card p-5">
+              <p className="text-sm text-muted-foreground">Average revenue per transaction</p>
+              <p className="mt-2 text-2xl font-semibold text-foreground">
+                {summary.averageRevenuePerTransaction !== null
+                  ? formatGBP(summary.averageRevenuePerTransaction)
+                  : "—"}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <CategoryPieChart data={summary.categoryBreakdown} />
+            <CategoryTrendChart data={summary.categoryTrend} />
+          </div>
+
+          <div className="mt-4">
+            <TrendYoyChart data={summary.trend} />
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <TopProductsChart data={summary.topProducts} />
+            <TopCustomersTable data={summary.topCustomers} />
+          </div>
+        </>
+      )}
     </div>
   );
 }

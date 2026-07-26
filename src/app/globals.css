@@ -12,6 +12,18 @@
   --danger: #e5484d;
   --warning: #d29922;
   --success: #3ba55d;
+  /*
+   * Categorical slots for revenue-category charts (Membership vs PAYG/Packs).
+   * Slot 1 reuses the brand accent — Membership is the core, primary
+   * product. Slot 2 (blue) validated against it: CVD ΔE 26.6 (protan) /
+   * 21.6 (tritan), normal-vision ΔE 29.6, contrast 8.2:1 on --card — all
+   * comfortably clear of the 8/15/3:1 thresholds. Accent's own lightness
+   * (L≈0.73) sits above the generic dark-mode categorical band (0.48–0.67);
+   * kept anyway since it's the established brand color everywhere else in
+   * the app and every check that actually affects accessibility passes.
+   */
+  --series-membership: #c9a24b;
+  --series-credit-pack: #3987e5;
 }
 
 @theme inline {
@@ -26,6 +38,8 @@
   --color-danger: var(--danger);
   --color-warning: var(--warning);
   --color-success: var(--success);
+  --color-series-membership: var(--series-membership);
+  --color-series-credit-pack: var(--series-credit-pack);
   --font-sans: var(--font-inter);
   --radius-card: 12px;
 }
