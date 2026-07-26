@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { formatGBP, formatNumber, formatMonthLabel } from "@/lib/format";
+import { formatGBP, formatNumber, formatMonthLabel, formatDate } from "@/lib/format";
 import { GYM_NAMES, type GymName } from "@/lib/data/types";
 import type { MemberInsightsSummary } from "@/lib/data/members";
 import { LtvHistogramChart } from "./ltv-histogram-chart";
@@ -159,13 +159,14 @@ export function MemberInsightsView({ role, initialMonth, initialGym, initialSumm
                   <thead>
                     <tr className="sticky top-0 border-b border-card-border bg-card text-left text-xs text-muted-foreground">
                       <th className="py-2 pr-3 font-normal">Name</th>
-                      <th className="py-2 text-right font-normal">Visits</th>
+                      <th className="py-2 pr-3 text-right font-normal">Visits</th>
+                      <th className="py-2 text-right font-normal">Last visited</th>
                     </tr>
                   </thead>
                   <tbody>
                     {summary.atRiskMembers.length === 0 && (
                       <tr>
-                        <td colSpan={2} className="py-3 text-center text-muted-foreground">
+                        <td colSpan={3} className="py-3 text-center text-muted-foreground">
                           No at-risk members this month
                         </td>
                       </tr>
@@ -174,11 +175,14 @@ export function MemberInsightsView({ role, initialMonth, initialGym, initialSumm
                       <tr key={m.userMemberId} className="border-b border-card-border last:border-0">
                         <td className="py-2 pr-3 text-foreground">{m.name}</td>
                         <td
-                          className={`py-2 text-right tabular-nums font-medium ${
+                          className={`py-2 pr-3 text-right tabular-nums font-medium ${
                             m.attendance === 1 ? "text-danger" : "text-warning"
                           }`}
                         >
                           {m.attendance}
+                        </td>
+                        <td className="py-2 text-right tabular-nums text-muted-foreground">
+                          {m.lastAttended ? formatDate(m.lastAttended) : "—"}
                         </td>
                       </tr>
                     ))}
