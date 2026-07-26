@@ -11,7 +11,7 @@ before moving to the next. Don't jump ahead to a later stage unprompted.
 2. **Auth** — login, session middleware, MFA, lockout. Done. Hardened 2026-07-26: fixed the proxy blocking `/api/auth/*` mid-MFA-setup, a `router.push` hang after MFA verify, and a recovery-flow gap where Supabase's AAL2 requirement had no path through it for accounts with MFA already enrolled.
 3. **Database helpers** — Supabase server-side client, typed queries against `Revenue`/`attendance`/`ad_spend`. Done, scoped to what Stage 4 needed rather than the full route surface up front: `src/lib/data/types.ts`, `src/lib/auth/gym-scope.ts`, `src/lib/data/dashboard.ts`.
 4. **Dashboard home page** (`/dashboard`, admin view first). Done. Server component, no separate API route (direct data-layer calls — deliberate, since this page has no filters to trigger client-side re-fetching). Admin: all-gyms stat cards, revenue-by-gym bar chart, >10%-down alerts, per-gym ARPM breakdown (paying customers from `Revenue.sold_to`, not attendance — see Data pipeline below), a data-completeness flag on the Active Members card when a gym has zero attendance rows for the period, and a 12-month all-gyms revenue trend. Owner: their one gym's stat cards + 12-month trend chart. Deliberately does *not* have date-range selection (QTD/Last Quarter/YTD/year picker) — that's Stage 5's job, since it needs real multi-month aggregation and comparison logic, not just a different `report_month` lookup.
-5. **Revenue analytics page** (`/revenue`) — **Pass 1 done 2026-07-26**: date-range presets (Last Month/QTD/Last Quarter/YTD/Full Year + year selector, replacing the plain "month picker" from the original spec — see Feature specs below), gym filter (admin only, owner locked to their own), total revenue with vs-previous-period and vs-same-period-last-year. Client-side filtering via `/api/revenue/summary` (first page-with-filters in the app — Stage 4 deliberately had none). Has `loading.tsx`/`error.tsx` and a visible loading indicator during filter changes. Title reflects the live gym selection (was a bug — the H1 was server-rendered from initial state only and went stale on filter change; moved into the client component). Verified live: QTD + Last Quarter sums exactly to YTD; a real owner test account confirmed the server ignores a manipulated `gym` query param and always returns their own gym's data regardless of what the client sends. **Pass 2 not started**: category pie (Memberships vs PAYG/Packs), category-split stacked area over time, monthly trend line w/ YoY overlay, top 10 products, top 10 customers.
+5. **Revenue analytics page** (`/revenue`) — **Pass 1 done 2026-07-26**: date-range presets (Last Month/QTD/Last Quarter/YTD/Full Year + year selector, replacing the plain "month picker" from the original spec — see Feature specs below), gym filter (admin only, owner locked to their own), total revenue with vs-previous-period and vs-same-period-last-year. Client-side filtering via `/api/revenue/summary` (first page-with-filters in the app — Stage 4 deliberately had none). Has `loading.tsx`/`error.tsx` and a visible loading indicator during filter changes. Title reflects the live gym selection (was a bug — the H1 was server-rendered from initial state only and went stale on filter change; moved into the client component). Verified live: QTD + Last Quarter sums exactly to YTD; a real owner test account confirmed the server ignores a manipulated `gym` query param and always returns their own gym's data regardless of what the client sends. **Pass 2 done 2026-07-26**: category pie (Memberships vs PAYG/Packs, donut with legend), category-split stacked area (last 12 months), monthly trend line with YoY overlay (this-year in accent, last-year de-emphasized/dashed — same convention as a stat-tile trend sparkline), top 10 products bar chart, top 10 customers table (rank/name/total/% of revenue), transaction count, average revenue/transaction. First multi-category chart in the app — validated a new 2-slot palette (`--series-membership` reuses the brand accent, `--series-credit-pack` is a new blue) against PodHQ's dark card surface: CVD ΔE 26.6/21.6, normal-vision ΔE 29.6, contrast 8.2:1, all comfortably clear; the one soft fail (accent's lightness sits above the generic categorical band) is a documented, deliberate exception for brand consistency — see the comment in `globals.css`. Verified live: category breakdown sums exactly to total revenue, top-10 customer percentages are sane, all figures match Stage 4's dashboard exactly for the same month.
 6. **Member insights page** (`/members`) — not started. Includes LTV calculations.
 7. **Outgoings / P&L** — not started, scoped 2026-07-26 (not in the original brief — came from the user's business partner). See Feature specs below.
 8. **Marketing / ads upload page** (`/marketing`) — not started. CSV parsing (Meta Ads export + GymFlow leads export).
@@ -70,6 +70,27 @@ came already populated from GymFlow. Everything else was created in
 8. Milton Keynes
 9. Oxford East
 
+## Auth pattern in server-side code
+
+**Never query `users_gyms` (or any table) via the session-scoped client
+relying on RLS as the actual authorization check — use the service-role
+client after verifying the session separately.** RLS on `users_gyms` is
+documented defense-in-depth (see the migration file), not the primary
+authorization path; every data-layer query already followed this except
+`getGymScope`, which used the session client and depended on RLS's
+`user_id = auth.uid()` policy passing. Found 2026-07-26: a real admin
+account intermittently got "No gym or role is assigned to this account" —
+not an error, `auth.uid()` was transiently failing to resolve (a
+token-refresh timing gap), which RLS turns into a silent empty result,
+indistinguishable from "this account genuinely has no gym" unless you
+already suspect it. Fixed by having `getGymScope` take just `userId` (already
+verified by the caller via `supabase.auth.getUser()`) and query via
+`createAdminClient()` instead — no RLS dependency, no timing gap possible.
+If a future data-layer function is tempted to take a session-scoped
+`SupabaseClient` and query through it, don't — verify the session once
+(`getUser()`), then query via the admin client, matching every other
+function in `src/lib/data/`.
+
 ## Data pipeline
 
 **Supabase/PostgREST caps a single request at 1000 rows and truncates
@@ -126,15 +147,16 @@ working around the current CSV's limitations if PDK is coming.
 
 ## Feature specs (Stages 5-9)
 
-**Revenue analytics (`/revenue`)** — filters: gym (admin only), date-range
-presets (Last Month/QTD/Last Quarter/YTD/Full Year + year selector — done,
-Pass 1), vs-previous-period and vs-same-period-last-year (done). Still to
-build (Pass 2) — KPIs: category pie (Memberships vs PAYG/Packs),
-category-split stacked area over time, monthly
-trend line w/ YoY overlay, MoM growth %, avg revenue/transaction, top 10
-products bar chart, top 10 customers table (rank, name, total, % of gym
-revenue). Once this page exists, make the dashboard's revenue-by-gym bar
-chart bars link through to it, filtered to that gym.
+**Revenue analytics (`/revenue`) — done in full 2026-07-26.** Filters: gym
+(admin only), date-range presets (Last Month/QTD/Last Quarter/YTD/Full Year
++ year selector). KPIs: total revenue with vs-previous-period and
+vs-same-period-last-year, transaction count, average revenue/transaction,
+category pie (Memberships vs PAYG/Packs), category-split stacked area over
+time, monthly trend line w/ YoY overlay, top 10 products bar chart, top 10
+customers table (rank, name, total, % of revenue). Still to do: make the
+dashboard's revenue-by-gym bar chart bars link through to this page,
+filtered to that gym (deferred — no urgency now that both pages exist
+independently).
 
 **Member insights (`/members`)** — filters: gym, month. KPIs: active members
 (`attendance`>0), at-risk table (1-3 visits, colour-coded: 1=red, 2-3=amber),

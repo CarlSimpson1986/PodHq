@@ -2,6 +2,7 @@ import { createSessionClient } from "@/lib/supabase/server";
 import { getGymScope } from "@/lib/auth/gym-scope";
 import { getRevenueSummaryForRange } from "@/lib/data/revenue";
 import { RevenueSummaryView } from "@/components/revenue/revenue-summary-view";
+import { AppShell } from "@/components/layout/app-shell";
 
 export default async function RevenuePage() {
   const supabase = await createSessionClient();
@@ -17,7 +18,7 @@ export default async function RevenuePage() {
     );
   }
 
-  const scope = await getGymScope(supabase, user.id);
+  const scope = await getGymScope(user.id);
   if (!scope) {
     return (
       <main className="flex min-h-screen items-center justify-center px-4 text-center">
@@ -32,11 +33,10 @@ export default async function RevenuePage() {
   const summary = await getRevenueSummaryForRange(gym, "last_month");
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8">
-      <p className="text-sm font-semibold tracking-wide text-accent">PodHQ</p>
-      <div className="mt-1">
+    <AppShell>
+      <div className="mx-auto max-w-6xl px-4 py-8">
         <RevenueSummaryView role={scope.role} initialPreset="last_month" initialGym={gym} initialSummary={summary} />
       </div>
-    </main>
+    </AppShell>
   );
 }
