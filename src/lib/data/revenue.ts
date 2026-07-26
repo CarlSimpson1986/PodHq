@@ -1,7 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { GymName } from "./types";
-import { getDefaultReportMonth, shiftMonth } from "./dashboard";
+import { getDefaultReportMonth, getRevenueTrend, shiftMonth } from "./dashboard";
 
 export type DateRangePreset = "last_month" | "qtd" | "last_quarter" | "ytd" | "full_year";
 
@@ -17,6 +17,14 @@ export interface RevenueRangeSummary {
   previousPeriod: { range: MonthRange; total: number; percentChange: number | null } | null;
   /** Always populated, unlike previousPeriod — "same range, 12 months back" is meaningful for every preset. */
   sameRangeLastYear: { range: MonthRange; total: number; percentChange: number | null };
+  categoryBreakdown: CategoryBreakdown;
+  categoryTrend: ({ month: string } & CategoryBreakdown)[];
+  transactionCount: number;
+  averageRevenuePerTransaction: number | null;
+  topProducts: TopProduct[];
+  topCustomers: TopCustomer[];
+  /** Fixed 12 months ending at the last completed month — independent of the selected preset/range. */
+  trend: TrendPoint[];
 }
 
 function quarterStartMonth(month: string): string {
@@ -74,15 +82,20 @@ function percentChange(current: number, previous: number): number | null {
 // through results rather than assume one request returns everything.
 const PAGE_SIZE = 1000;
 
-async function sumRevenueForRange(gym: GymName | null, range: MonthRange): Promise<number> {
+/** Paginated raw-row fetch against Revenue for a month range — the shared primitive every aggregate below builds on. */
+async function fetchRevenueRowsForRange<T>(
+  gym: GymName | null,
+  range: MonthRange,
+  columns: string
+): Promise<T[]> {
   const admin = createAdminClient();
-  let total = 0;
+  const rows: T[] = [];
   let from = 0;
 
   for (;;) {
     const base = admin
       .from("Revenue")
-      .select("amount_inc_tax")
+      .select(columns)
       .gte("report_month", range.start)
       .lte("report_month", range.end)
       .range(from, from + PAGE_SIZE - 1);
@@ -91,14 +104,125 @@ async function sumRevenueForRange(gym: GymName | null, range: MonthRange): Promi
     const { data, error } = await query;
     if (error) throw error;
 
-    const rows = (data ?? []) as { amount_inc_tax: number }[];
-    total += rows.reduce((sum, row) => sum + Number(row.amount_inc_tax), 0);
+    const page = (data ?? []) as T[];
+    rows.push(...page);
 
-    if (rows.length < PAGE_SIZE) break;
+    if (page.length < PAGE_SIZE) break;
     from += PAGE_SIZE;
   }
 
-  return total;
+  return rows;
+}
+
+async function sumRevenueForRange(gym: GymName | null, range: MonthRange): Promise<number> {
+  const rows = await fetchRevenueRowsForRange<{ amount_inc_tax: number }>(gym, range, "amount_inc_tax");
+  return rows.reduce((sum, row) => sum + Number(row.amount_inc_tax), 0);
+}
+
+async function countTransactionsForRange(gym: GymName | null, range: MonthRange): Promise<number> {
+  const admin = createAdminClient();
+  const base = admin
+    .from("Revenue")
+    .select("*", { count: "exact", head: true })
+    .gte("report_month", range.start)
+    .lte("report_month", range.end);
+  const query = gym ? base.eq("gym", gym) : base;
+
+  const { count, error } = await query;
+  if (error) throw error;
+  return count ?? 0;
+}
+
+export interface CategoryBreakdown {
+  membership: number;
+  creditPack: number;
+}
+
+async function getCategoryBreakdown(gym: GymName | null, range: MonthRange): Promise<CategoryBreakdown> {
+  const rows = await fetchRevenueRowsForRange<{ category: "MEMBERSHIP" | "CREDIT_PACK"; amount_inc_tax: number }>(
+    gym,
+    range,
+    "category, amount_inc_tax"
+  );
+  let membership = 0;
+  let creditPack = 0;
+  for (const row of rows) {
+    if (row.category === "MEMBERSHIP") membership += Number(row.amount_inc_tax);
+    else creditPack += Number(row.amount_inc_tax);
+  }
+  return { membership, creditPack };
+}
+
+/** Last `months` category splits ending at `endingMonth`, oldest first — for the category-over-time stacked area. */
+async function getCategoryTrend(
+  gym: GymName | null,
+  months: number,
+  endingMonth: string
+): Promise<({ month: string } & CategoryBreakdown)[]> {
+  const monthList = Array.from({ length: months }, (_, i) => shiftMonth(endingMonth, -(months - 1 - i)));
+  const breakdowns = await Promise.all(monthList.map((month) => getCategoryBreakdown(gym, { start: month, end: month })));
+  return monthList.map((month, i) => ({ month, ...breakdowns[i] }));
+}
+
+export interface TopProduct {
+  item: string;
+  total: number;
+}
+
+async function getTopProducts(gym: GymName | null, range: MonthRange, limit: number): Promise<TopProduct[]> {
+  const rows = await fetchRevenueRowsForRange<{ item: string; amount_inc_tax: number }>(
+    gym,
+    range,
+    "item, amount_inc_tax"
+  );
+  const totals = new Map<string, number>();
+  for (const row of rows) {
+    totals.set(row.item, (totals.get(row.item) ?? 0) + Number(row.amount_inc_tax));
+  }
+  return [...totals.entries()]
+    .map(([item, total]) => ({ item, total }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, limit);
+}
+
+export interface TopCustomer {
+  name: string;
+  total: number;
+  percentOfTotal: number;
+}
+
+async function getTopCustomers(gym: GymName | null, range: MonthRange, limit: number): Promise<TopCustomer[]> {
+  const rows = await fetchRevenueRowsForRange<{ sold_to: string; amount_inc_tax: number }>(
+    gym,
+    range,
+    "sold_to, amount_inc_tax"
+  );
+  const totals = new Map<string, number>();
+  let grandTotal = 0;
+  for (const row of rows) {
+    const amount = Number(row.amount_inc_tax);
+    totals.set(row.sold_to, (totals.get(row.sold_to) ?? 0) + amount);
+    grandTotal += amount;
+  }
+  return [...totals.entries()]
+    .map(([name, total]) => ({ name, total, percentOfTotal: grandTotal > 0 ? (total / grandTotal) * 100 : 0 }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, limit);
+}
+
+export interface TrendPoint {
+  month: string;
+  current: number;
+  priorYear: number;
+}
+
+/** Fixed 12-month trend ending at the last completed month, with a same-months-prior-year overlay — independent of the date-range preset. */
+async function getRevenueTrendWithYoy(gym: GymName | null, months: number, endingMonth: string): Promise<TrendPoint[]> {
+  const [current, priorYear] = await Promise.all([
+    getRevenueTrend(gym, months, endingMonth),
+    getRevenueTrend(gym, months, shiftMonth(endingMonth, -12)),
+  ]);
+  return current.map((row, i) => ({ month: row.month, current: row.total, priorYear: priorYear[i].total }));
 }
 
 /**
@@ -127,11 +251,31 @@ export async function getRevenueSummaryForRange(
       ? { start: shiftMonth(range.start, -monthCount(range)), end: shiftMonth(range.end, -monthCount(range)) }
       : null;
 
-  const [total, sameLastYearTotal, previousPeriodTotal] = await Promise.all([
-    sumRevenueForRange(gym, range),
+  const refMonth = getDefaultReportMonth();
+
+  // categoryBreakdown covers the same range as `total`, so total is derived
+  // from it rather than fetched a second time.
+  const [
+    categoryBreakdown,
+    sameLastYearTotal,
+    previousPeriodTotal,
+    categoryTrend,
+    topProducts,
+    topCustomers,
+    trend,
+    transactionCount,
+  ] = await Promise.all([
+    getCategoryBreakdown(gym, range),
     sumRevenueForRange(gym, sameRangeLastYear),
     previousPeriod ? sumRevenueForRange(gym, previousPeriod) : Promise.resolve(null),
+    getCategoryTrend(gym, 12, refMonth),
+    getTopProducts(gym, range, 10),
+    getTopCustomers(gym, range, 10),
+    getRevenueTrendWithYoy(gym, 12, refMonth),
+    countTransactionsForRange(gym, range),
   ]);
+
+  const total = categoryBreakdown.membership + categoryBreakdown.creditPack;
 
   return {
     range,
@@ -146,5 +290,12 @@ export async function getRevenueSummaryForRange(
       total: sameLastYearTotal,
       percentChange: percentChange(total, sameLastYearTotal),
     },
+    categoryBreakdown,
+    categoryTrend,
+    transactionCount,
+    averageRevenuePerTransaction: transactionCount > 0 ? total / transactionCount : null,
+    topProducts,
+    topCustomers,
+    trend,
   };
 }
