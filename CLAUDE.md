@@ -1,4 +1,5 @@
 @AGENTS.md
+@ROADMAP.md
 
 # PodHQ — Project Rules
 
