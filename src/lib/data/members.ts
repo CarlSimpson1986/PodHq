@@ -1,6 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { GYM_NAMES, type GymName } from "./types";
+import { getDefaultReportMonth, shiftMonth } from "./dashboard";
 
 const PAGE_SIZE = 1000;
 
@@ -282,8 +283,23 @@ export async function getMemberInsightsSummary(gym: GymName | null, month: strin
 
   const ltvCustomers = computeLtv(revenueRows);
   const ltvValues = ltvCustomers.map((c) => c.ltv);
+  // averageLtv/affordableCac deliberately use every customer who's ever
+  // paid, churned or not — a churned customer's full observed lifespan is
+  // real data that's part of what makes "average lifespan" meaningful; only
+  // the *displayed* Top 20 list below excludes them, since that list's job
+  // is "who to focus on now," not a historical record.
   const averageLtv = ltvValues.length > 0 ? ltvValues.reduce((sum, v) => sum + v, 0) / ltvValues.length : null;
-  const topCustomers = [...ltvCustomers].sort((a, b) => b.ltv - a.ltv).slice(0, 20);
+
+  // Anchored to the latest completed month regardless of the page's month
+  // filter — same "not scoped to the month filter" rule as the rest of the
+  // LTV section. A 3-month rolling window: generous enough that a PAYG
+  // customer between pack purchases doesn't wrongly drop off, but still
+  // excludes someone who's been gone 6+ months.
+  const recentCutoff = shiftMonth(getDefaultReportMonth(), -2);
+  const topCustomers = ltvCustomers
+    .filter((c) => c.lastActiveMonth >= recentCutoff)
+    .sort((a, b) => b.ltv - a.ltv)
+    .slice(0, 20);
 
   return {
     month,
