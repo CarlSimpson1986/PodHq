@@ -82,21 +82,23 @@ export async function updateSession(request: NextRequest) {
     .limit(1);
   const role = gymRows?.[0]?.role;
 
-  // Admin MFA is mandatory: Supabase's own AAL check can't know that, since
-  // it only requires aal2 once a factor exists. Enforce it ourselves.
-  if (role === "admin") {
-    const { data: factors } = await supabase.auth.mfa.listFactors();
-    if (!factors?.totp.length) {
-      // Let a brand-new invited/recovering admin set a password first —
-      // they'll be bounced here again on their next navigation regardless.
-      // Also let /api/auth/* through: it's what set-password and
-      // mfa/enroll|verify run on, and redirecting those breaks the flow
-      // that's supposed to clear this very gate.
-      if (pathname === "/login/mfa-setup" || pathname === "/login/set-password" || isPublic) {
-        return supabaseResponse;
-      }
-      return NextResponse.redirect(new URL("/login/mfa-setup", request.url));
+  // MFA is mandatory for every role, not just admin — found 2026-07-27 when
+  // a freshly created owner test account reached the dashboard with no MFA
+  // prompt at all. This used to be gated behind `role === "admin"`; Supabase's
+  // own AAL check can't catch a no-factors-enrolled account on its own
+  // (nextLevel only exceeds currentLevel once a factor exists), so without an
+  // unconditional check here, every non-admin role skipped MFA setup entirely.
+  const { data: factors } = await supabase.auth.mfa.listFactors();
+  if (!factors?.totp.length) {
+    // Let a brand-new invited/recovering account set a password first —
+    // they'll be bounced here again on their next navigation regardless.
+    // Also let /api/auth/* through: it's what set-password and
+    // mfa/enroll|verify run on, and redirecting those breaks the flow
+    // that's supposed to clear this very gate.
+    if (pathname === "/login/mfa-setup" || pathname === "/login/set-password" || isPublic) {
+      return supabaseResponse;
     }
+    return NextResponse.redirect(new URL("/login/mfa-setup", request.url));
   }
 
   // Fully authenticated (and MFA-compliant) at this point — bounce away
