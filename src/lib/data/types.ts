@@ -12,6 +12,20 @@ export const GYM_NAMES = [
 
 export type GymName = (typeof GYM_NAMES)[number];
 
+export const OUTGOING_CATEGORIES = [
+  "Rent/Lease",
+  "Staff Wages",
+  "Utilities",
+  "Insurance",
+  "Equipment (purchase/maintenance)",
+  "Software/Subscriptions",
+  "Cleaning",
+  "Card/Merchant Processing Fees",
+  "Other",
+] as const;
+
+export type OutgoingCategory = (typeof OUTGOING_CATEGORIES)[number];
+
 export interface RevenueRow {
   id: number;
   gym: string;
