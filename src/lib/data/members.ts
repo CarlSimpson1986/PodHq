@@ -263,6 +263,34 @@ function buildLtvHistogram(ltvValues: number[], bucketCount = 8): LtvHistogramBu
   return buckets;
 }
 
+export interface MemberHighlights {
+  activeCount: number;
+  atRiskCount: number;
+  hasAttendanceData: boolean;
+}
+
+/**
+ * A cheap subset of getMemberInsightsSummary for a single gym — just the
+ * attendance-derived counts, deliberately skipping the all-time revenue
+ * fetch the LTV section needs. Built for the dashboard's per-gym
+ * highlight, which just needs "how many, how many at risk," not the full
+ * Member Insights page.
+ */
+export async function getMemberHighlights(gym: GymName, month: string): Promise<MemberHighlights> {
+  const [attendanceRows, completeness] = await Promise.all([
+    fetchActiveAttendanceRows(gym, month),
+    getAttendanceCompleteness(gym, month),
+  ]);
+
+  const atRiskCount = attendanceRows.filter((row) => row.attendance >= 1 && row.attendance <= 3).length;
+
+  return {
+    activeCount: attendanceRows.length,
+    atRiskCount,
+    hasAttendanceData: !completeness.noAttendanceDataForGym,
+  };
+}
+
 /**
  * `gym` must already be security-resolved by the caller: an owner's own
  * gym always, an admin's explicit selection or null for "all gyms" — see

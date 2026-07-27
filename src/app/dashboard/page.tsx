@@ -1,8 +1,12 @@
 import { createSessionClient } from "@/lib/supabase/server";
 import { getGymScope } from "@/lib/auth/gym-scope";
 import { getDashboardSummary, getRevenueTrend, getDefaultReportMonth, shiftMonth } from "@/lib/data/dashboard";
+import { getMemberHighlights } from "@/lib/data/members";
+import { getPnlSummary, getOutgoingsHistory } from "@/lib/data/outgoings";
+import { OUTGOING_CATEGORIES } from "@/lib/data/types";
 import { formatGBP, formatNumber, formatPercent, formatMonthLabel } from "@/lib/format";
 import { StatCard } from "@/components/dashboard/stat-card";
+import { NeedsAttention } from "@/components/dashboard/needs-attention";
 import { RevenueByGymChart } from "@/components/dashboard/revenue-by-gym-chart";
 import { RevenueTrendChart } from "@/components/dashboard/revenue-trend-chart";
 import { GymDownAlerts } from "@/components/dashboard/gym-down-alerts";
@@ -36,16 +40,70 @@ export default async function DashboardPage() {
 
   const month = getDefaultReportMonth();
   const summary = await getDashboardSummary(scope, month);
-  const trend = await getRevenueTrend(scope.role === "owner" ? scope.gym : null, 12, month);
 
+  if (scope.role === "owner") {
+    const [memberHighlights, pnl, outgoingsHistory] = await Promise.all([
+      getMemberHighlights(scope.gym, month),
+      getPnlSummary(scope, null, month),
+      getOutgoingsHistory(scope.gym),
+    ]);
+
+    const enteredCategories = new Set(outgoingsHistory.map((row) => row.category));
+    const missingOutgoingsCategories = OUTGOING_CATEGORIES.filter((c) => !enteredCategories.has(c));
+    const net = pnl.single?.net ?? null;
+
+    return (
+      <AppShell>
+        <div className="mx-auto max-w-6xl px-4 py-8">
+          <h1 className="text-xl font-semibold text-foreground">{scope.gym}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{formatMonthLabel(month)}</p>
+
+          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <StatCard
+              label="Revenue"
+              value={formatGBP(summary.currentMonthRevenue)}
+              delta={
+                summary.monthOverMonthPercent !== null
+                  ? { percent: summary.monthOverMonthPercent, comparisonLabel: formatMonthLabel(shiftMonth(month, -1)) }
+                  : null
+              }
+            />
+            <StatCard
+              label="Active members"
+              value={formatNumber(memberHighlights.activeCount)}
+              note={
+                !memberHighlights.hasAttendanceData
+                  ? "No attendance data this month"
+                  : memberHighlights.atRiskCount > 0
+                    ? `${memberHighlights.atRiskCount} at risk`
+                    : undefined
+              }
+            />
+            <StatCard
+              label="Net P&L this month"
+              value={net !== null ? formatGBP(net) : "—"}
+              tone={net !== null ? (net >= 0 ? "success" : "danger") : undefined}
+            />
+          </div>
+
+          <div className="mt-4">
+            <NeedsAttention
+              missingOutgoingsCategories={missingOutgoingsCategories}
+              hasAttendanceData={memberHighlights.hasAttendanceData}
+            />
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
+
+  const trend = await getRevenueTrend(null, 12, month);
   const previousMonth = formatMonthLabel(shiftMonth(month, -1));
 
   return (
     <AppShell>
       <div className="mx-auto max-w-6xl px-4 py-8">
-        <h1 className="text-xl font-semibold text-foreground">
-          {scope.role === "admin" ? "All gyms" : scope.gym}
-        </h1>
+        <h1 className="text-xl font-semibold text-foreground">All gyms</h1>
         <p className="mt-1 text-sm text-muted-foreground">{formatMonthLabel(month)}</p>
 
         <section className="mt-6 rounded-[12px] border border-card-border bg-card p-5">
@@ -67,7 +125,7 @@ export default async function DashboardPage() {
           </div>
         </section>
 
-        <div className={`mt-4 grid grid-cols-1 gap-4 ${scope.role === "owner" ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <StatCard label="Transactions" value={formatNumber(summary.transactionCount)} />
           <StatCard
             label="Active members"
@@ -78,31 +136,21 @@ export default async function DashboardPage() {
                 : undefined
             }
           />
-          {scope.role === "owner" && (
-            <StatCard
-              label="Average revenue per member"
-              value={
-                summary.averageRevenuePerMember !== null
-                  ? formatGBP(summary.averageRevenuePerMember)
-                  : "—"
-              }
-            />
-          )}
         </div>
 
-        {scope.role === "admin" && summary.gymsDownAlert && summary.gymsDownAlert.length > 0 && (
+        {summary.gymsDownAlert && summary.gymsDownAlert.length > 0 && (
           <div className="mt-4">
             <GymDownAlerts alerts={summary.gymsDownAlert} />
           </div>
         )}
 
-        {scope.role === "admin" && summary.revenueByGym && (
+        {summary.revenueByGym && (
           <div className="mt-4">
             <RevenueByGymChart data={summary.revenueByGym} />
           </div>
         )}
 
-        {scope.role === "admin" && summary.arpmByGym && (
+        {summary.arpmByGym && (
           <div className="mt-4">
             <ArpmByGym data={summary.arpmByGym} />
           </div>
