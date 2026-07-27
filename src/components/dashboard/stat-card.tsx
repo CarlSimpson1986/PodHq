@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { formatPercent } from "@/lib/format";
 
 interface StatCardProps {
@@ -9,9 +10,11 @@ interface StatCardProps {
   note?: string;
   /** Colors the value itself instead of a delta — e.g. Net P&L, which has no "prior period" to compare against but still reads as good/bad by sign. */
   tone?: "success" | "danger";
+  /** Makes the whole card a link through to that area's full page. */
+  href?: string;
 }
 
-export function StatCard({ label, value, delta, note, tone }: StatCardProps) {
+export function StatCard({ label, value, delta, note, tone, href }: StatCardProps) {
   const deltaColor = !delta
     ? ""
     : (delta.percent >= 0) === (delta.upIsGood ?? true)
@@ -20,8 +23,8 @@ export function StatCard({ label, value, delta, note, tone }: StatCardProps) {
 
   const valueColor = tone === "success" ? "text-success" : tone === "danger" ? "text-danger" : "text-foreground";
 
-  return (
-    <div className="rounded-[12px] border border-card-border bg-card p-5">
+  const content = (
+    <>
       <p className="text-sm text-muted-foreground">{label}</p>
       <p className={`mt-2 text-2xl font-semibold ${valueColor}`}>{value}</p>
       {delta && (
@@ -30,6 +33,20 @@ export function StatCard({ label, value, delta, note, tone }: StatCardProps) {
         </p>
       )}
       {note && <p className="mt-1 text-xs text-warning">{note}</p>}
-    </div>
+    </>
   );
+
+  const className = `rounded-[12px] border border-card-border bg-card p-5${
+    href ? " transition-colors hover:border-accent" : ""
+  }`;
+
+  if (href) {
+    return (
+      <Link href={href} className={`block ${className}`}>
+        {content}
+      </Link>
+    );
+  }
+
+  return <div className={className}>{content}</div>;
 }

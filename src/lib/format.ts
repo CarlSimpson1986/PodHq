@@ -28,6 +28,15 @@ export function formatDate(dateString: string): string {
   });
 }
 
+/** "3 months ago" style label for an at-risk member's staleness — always in
+ *  months since the minimum at-risk threshold is 90 days, so a day-level
+ *  label would be spurious precision. */
+export function formatDaysAgo(days: number): string {
+  const months = Math.round(days / 30);
+  if (months <= 1) return "about a month ago";
+  return `${months} months ago`;
+}
+
 export function customerProfileHref(gym: string, name: string): string {
   return `/members/customer/${encodeURIComponent(gym)}/${encodeURIComponent(name)}`;
 }

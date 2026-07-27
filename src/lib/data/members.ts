@@ -13,6 +13,14 @@ export interface AttendanceMember {
   lastAttended: string | null;
 }
 
+export interface AtRiskMember {
+  userMemberId: string;
+  name: string;
+  gym: GymName;
+  lastAttended: string;
+  daysSinceLastVisit: number;
+}
+
 export interface LtvCustomer {
   name: string;
   gym: GymName;
@@ -36,8 +44,12 @@ export interface MemberInsightsSummary {
   month: string;
   activeMemberCount: number;
   avgAttendancePerActiveMember: number | null;
-  /** 1-3 visits, sorted worst-first (1 before 3). */
-  atRiskMembers: AttendanceMember[];
+  /** Hasn't visited in 90+ days but has visited within the last 12 months —
+   *  a recency signal, not a low-visit-count-this-month signal (see
+   *  getAtRiskMembers). Sorted most-recoverable-first: freshest lapse to
+   *  longest-gone, since a member who went quiet 91 days ago is a much
+   *  better use of a retention call than one gone 10 months. */
+  atRiskMembers: AtRiskMember[];
   topAttenders: AttendanceMember[];
   /** Admin viewing all gyms only — which of the 9 gyms have zero attendance rows this month. */
   gymsWithNoAttendanceData: GymName[] | null;
@@ -263,31 +275,125 @@ function buildLtvHistogram(ltvValues: number[], bucketCount = 8): LtvHistogramBu
   return buckets;
 }
 
+const AT_RISK_LOOKBACK_MONTHS = 12;
+const AT_RISK_THRESHOLD_DAYS = 90;
+
+/**
+ * "At risk" = visited this gym at some point in the last 12 months, but not
+ * within the last ~90 days — a recency signal, not a low-visit-count-this-
+ * month signal. A member with 1 visit this month who joined two weeks ago
+ * isn't at risk; someone who used to come regularly and has gone quiet for
+ * 3+ months is (found 2026-07-27: the original "1-3 visits this month"
+ * definition would have flagged the former and missed the latter entirely).
+ *
+ * attendance rows only exist for months a member actually visited — there
+ * are no zero-visit rows — so finding "gone quiet" requires scanning
+ * several months of history per gym, not just the current one; a single
+ * month's query genuinely cannot see someone who visited zero times in it.
+ *
+ * Sorted most-recoverable-first (freshest lapse to longest-gone): someone
+ * who went quiet 91 days ago is a far better retention call to make today
+ * than someone gone 10 months, who's very likely already found another gym.
+ */
+export async function getAtRiskMembers(gym: GymName | null, month: string): Promise<AtRiskMember[]> {
+  const admin = createAdminClient();
+  const earliestMonth = shiftMonth(month, -(AT_RISK_LOOKBACK_MONTHS - 1));
+
+  const rows: {
+    gym: GymName;
+    user_member_id: string;
+    first_name: string;
+    last_name: string;
+    last_attended: string | null;
+  }[] = [];
+  let from = 0;
+  for (;;) {
+    const base = admin
+      .from("attendance")
+      .select("gym, user_member_id, first_name, last_name, last_attended")
+      .gte("report_month", earliestMonth)
+      .lte("report_month", month)
+      .range(from, from + PAGE_SIZE - 1);
+    const query = gym ? base.eq("gym", gym) : base;
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    const page = (data ?? []) as typeof rows;
+    rows.push(...page);
+
+    if (page.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+
+  const latestVisitByMember = new Map<string, { gym: GymName; name: string; lastAttended: string }>();
+  for (const row of rows) {
+    if (!row.last_attended) continue;
+    const key = `${row.gym}::${row.user_member_id}`;
+    const existing = latestVisitByMember.get(key);
+    if (!existing || row.last_attended > existing.lastAttended) {
+      latestVisitByMember.set(key, {
+        gym: row.gym,
+        name: `${row.first_name} ${row.last_name}`.trim(),
+        lastAttended: row.last_attended,
+      });
+    }
+  }
+
+  // Reference point is the report month's last day, not literal "today" —
+  // same convention as the rest of this app, given the pipeline always
+  // lags a month behind.
+  const [refYear, refMon] = month.split("-").map(Number);
+  const referenceMs = Date.UTC(refYear, refMon, 0); // day 0 of next month = last day of this one
+  const dayMs = 24 * 60 * 60 * 1000;
+
+  const atRisk: AtRiskMember[] = [];
+  for (const [key, entry] of latestVisitByMember) {
+    const daysSinceLastVisit = Math.floor((referenceMs - new Date(entry.lastAttended).getTime()) / dayMs);
+    if (daysSinceLastVisit >= AT_RISK_THRESHOLD_DAYS) {
+      atRisk.push({
+        userMemberId: key.slice(key.indexOf("::") + 2),
+        name: entry.name,
+        gym: entry.gym,
+        lastAttended: entry.lastAttended,
+        daysSinceLastVisit,
+      });
+    }
+  }
+
+  return atRisk.sort((a, b) => a.daysSinceLastVisit - b.daysSinceLastVisit);
+}
+
 export interface MemberHighlights {
   activeCount: number;
   atRiskCount: number;
   hasAttendanceData: boolean;
+  /** Most recoverable first, capped short — this is a dashboard glance,
+   *  not the full at-risk table. */
+  topAtRisk: AtRiskMember[];
 }
 
+const DASHBOARD_TOP_AT_RISK_LIMIT = 5;
+
 /**
- * A cheap subset of getMemberInsightsSummary for a single gym — just the
- * attendance-derived counts, deliberately skipping the all-time revenue
- * fetch the LTV section needs. Built for the dashboard's per-gym
- * highlight, which just needs "how many, how many at risk," not the full
- * Member Insights page.
+ * A cheap subset of getMemberInsightsSummary for a single gym — active
+ * count from the current month only, deliberately skipping the all-time
+ * revenue fetch the LTV section needs. Built for the dashboard's per-gym
+ * highlight, which needs "how many active, how many going quiet, who's
+ * most worth calling," not the full Member Insights page.
  */
 export async function getMemberHighlights(gym: GymName, month: string): Promise<MemberHighlights> {
-  const [attendanceRows, completeness] = await Promise.all([
+  const [attendanceRows, completeness, atRisk] = await Promise.all([
     fetchActiveAttendanceRows(gym, month),
     getAttendanceCompleteness(gym, month),
+    getAtRiskMembers(gym, month),
   ]);
-
-  const atRiskCount = attendanceRows.filter((row) => row.attendance >= 1 && row.attendance <= 3).length;
 
   return {
     activeCount: attendanceRows.length,
-    atRiskCount,
+    atRiskCount: atRisk.length,
     hasAttendanceData: !completeness.noAttendanceDataForGym,
+    topAtRisk: atRisk.slice(0, DASHBOARD_TOP_AT_RISK_LIMIT),
   };
 }
 
@@ -297,10 +403,11 @@ export async function getMemberHighlights(gym: GymName, month: string): Promise<
  * /api/members/summary.
  */
 export async function getMemberInsightsSummary(gym: GymName | null, month: string): Promise<MemberInsightsSummary> {
-  const [attendanceRows, completeness, revenueRows] = await Promise.all([
+  const [attendanceRows, completeness, revenueRows, atRiskMembers] = await Promise.all([
     fetchActiveAttendanceRows(gym, month),
     getAttendanceCompleteness(gym, month),
     fetchAllRevenueForLtv(gym),
+    getAtRiskMembers(gym, month),
   ]);
 
   const activeMemberCount = attendanceRows.length;
@@ -313,10 +420,6 @@ export async function getMemberInsightsSummary(gym: GymName | null, month: strin
     attendance: row.attendance,
     lastAttended: row.last_attended,
   }));
-
-  const atRiskMembers = named
-    .filter((row) => row.attendance >= 1 && row.attendance <= 3)
-    .sort((a, b) => a.attendance - b.attendance);
 
   const topAttenders = [...named].sort((a, b) => b.attendance - a.attendance).slice(0, 10);
 

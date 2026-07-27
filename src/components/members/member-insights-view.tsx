@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { formatGBP, formatNumber, formatMonthLabel, formatDate, customerProfileHref } from "@/lib/format";
+import { formatGBP, formatNumber, formatMonthLabel, formatDate, formatDaysAgo, customerProfileHref } from "@/lib/format";
 import { GYM_NAMES, type GymName } from "@/lib/data/types";
 import type { MemberInsightsSummary } from "@/lib/data/members";
 import { LtvHistogramChart } from "./ltv-histogram-chart";
@@ -148,8 +148,12 @@ export function MemberInsightsView({ role, initialMonth, initialGym, initialSumm
           <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
             <div className="rounded-[12px] border border-card-border bg-card p-5">
               <p className="text-sm font-semibold text-foreground">
-                At-risk members (1–3 visits){" "}
+                At-risk members — gone quiet 3+ months{" "}
                 <span className="font-normal text-muted-foreground">({summary.atRiskMembers.length})</span>
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Sorted most-recoverable first — a member who lapsed 3 months ago is a far better retention call than
+                one gone a year.
               </p>
               {/* Fixed height + scroll: this list can run into the hundreds
                   across all gyms, and left unbounded it stretches the whole
@@ -160,15 +164,15 @@ export function MemberInsightsView({ role, initialMonth, initialGym, initialSumm
                   <thead>
                     <tr className="sticky top-0 border-b border-card-border bg-card text-left text-xs text-muted-foreground">
                       <th className="py-2 pr-3 font-normal">Name</th>
-                      <th className="py-2 pr-3 text-right font-normal">Visits</th>
-                      <th className="py-2 text-right font-normal">Last visited</th>
+                      <th className="py-2 pr-3 text-right font-normal">Last visited</th>
+                      <th className="py-2 text-right font-normal">Gone</th>
                     </tr>
                   </thead>
                   <tbody>
                     {summary.atRiskMembers.length === 0 && (
                       <tr>
                         <td colSpan={3} className="py-3 text-center text-muted-foreground">
-                          No at-risk members this month
+                          No at-risk members
                         </td>
                       </tr>
                     )}
@@ -179,15 +183,15 @@ export function MemberInsightsView({ role, initialMonth, initialGym, initialSumm
                             {m.name}
                           </Link>
                         </td>
+                        <td className="py-2 pr-3 text-right tabular-nums text-muted-foreground">
+                          {formatDate(m.lastAttended)}
+                        </td>
                         <td
-                          className={`py-2 pr-3 text-right tabular-nums font-medium ${
-                            m.attendance === 1 ? "text-danger" : "text-warning"
+                          className={`py-2 text-right tabular-nums font-medium ${
+                            m.daysSinceLastVisit >= 180 ? "text-danger" : "text-warning"
                           }`}
                         >
-                          {m.attendance}
-                        </td>
-                        <td className="py-2 text-right tabular-nums text-muted-foreground">
-                          {m.lastAttended ? formatDate(m.lastAttended) : "—"}
+                          {formatDaysAgo(m.daysSinceLastVisit)}
                         </td>
                       </tr>
                     ))}
