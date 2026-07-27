@@ -40,6 +40,16 @@ const NAV_ITEMS = [
       </svg>
     ),
   },
+  {
+    href: "/outgoings",
+    label: "Outgoings",
+    icon: (
+      <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.5}>
+        <circle cx="10" cy="10" r="7" />
+        <path d="M10 6v8M7.5 8.2c0-1.2 1.1-2.2 2.5-2.2s2.5.8 2.5 1.9-1 1.6-2.5 1.9c-1.5.3-2.5.9-2.5 2s1.1 1.9 2.5 1.9 2.5-.8 2.5-1.9" strokeLinecap="round" />
+      </svg>
+    ),
+  },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {

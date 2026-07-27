@@ -19,7 +19,13 @@ before moving to the next. Don't jump ahead to a later stage unprompted.
    **Top 20 LTV list filtered to recently-active customers (added 2026-07-26, same-day follow-up):** the "Last active" column above surfaces staleness but doesn't fix the actual problem — a list meant to answer "who should I focus on right now" still had long-gone customers cluttering it. Resolved by distinguishing the list's *display* from the underlying *calculation*: the Top 20 table now only shows customers active within a rolling 3-month window (deliberately generous — a PAYG/credit-pack customer can go 6-8 weeks between pack purchases without having churned, unlike a monthly membership customer who'd show a new Revenue row every month if still subscribed), anchored to the last completed month regardless of the page's month filter (same as the rest of the LTV section). Average LTV, affordable CAC, and the cohort average-lifespan multiplier all deliberately keep using *every* customer who's ever paid, churned or not — a churned customer's full observed lifespan is real data that's part of what makes "average lifespan" meaningful, so only the displayed list changes, not the maths behind it. Verified live: Func Fitness and Tracy Lamond dropped out of the Top 20 entirely (replaced by genuinely recent customers), while Average LTV (£57.13) and Affordable CAC (£19.04) stayed exactly unchanged — confirming the filter only touches the list, not the aggregate calculation.
 
    **LTV methodology (decided 2026-07-26, before building):** LTV = a customer's own avg monthly spend × their *gym's* average customer lifespan (in active months), not the customer's own lifespan — using an individual's own lifespan makes the multiplication collapse straight back to their raw total spend, which would make "affordable CAC = LTV÷3" meaningless. "Active months" = distinct `report_month`s with any Revenue row, not the calendar span (a customer who paid Jan/Feb/Mar/May/Jun has 5 active months, not 6). Because there are no cancellation/join dates (out of scope until PDK), average lifespan is really "average active-months observed so far," which understates a still-active customer's true lifespan — the whole figure is a **conservative floor, never an overstatement**, and that's an intentional, documented tradeoff, not a gap to fix by e.g. guessing at churn. Verified live: the per-gym LTV/avg-monthly-spend ratio is stable across every customer within the same gym (e.g. every Basingstoke customer's LTV was exactly 2.605× their avg monthly spend), confirming the per-gym multiplier is applied consistently.
-7. **Outgoings / P&L** — not started, scoped 2026-07-26 (not in the original brief — came from the user's business partner). See Feature specs below.
+7. **Outgoings / P&L** (`/outgoings`) — done 2026-07-27 (scoped 2026-07-26, not in the original brief — came from the user's business partner). See Feature specs below for the full spec; built as designed, with two changes made live during the build:
+
+   **`category` not DB-constrained (found while applying the migration, 2026-07-27):** the original plan put a `check (category in (...))` constraint on `gym_outgoings.category`. Applying it broke PostgREST for this table in a very specific, reproducible way — `HEAD` requests succeeded but every row-returning query failed with `PGRST205` ("could not find the table in the schema cache"), for every query shape tried, immediately and consistently, not intermittently. Read at the time as Supabase infrastructure flakiness (multiple backend pods out of sync) and chased for over an hour — project restart, manual `NOTIFY pgrst, 'reload schema'`, the lot — before the real cause surfaced: the SQL Editor's paste path was silently converting straight quotes to typographic "smart" quotes, corrupting both the check constraint's string literal and, separately, the quoted multi-word policy names, in a way that left Postgres reading an unterminated token until end-of-input. The infra-flakiness diagnosis was a plausible-sounding wrong turn, not the real fix. Fixed by dropping the DB-level enum entirely — `category` is validated by `z.enum(OUTGOING_CATEGORIES)` in `src/lib/validation/outgoings.ts` before every insert, which was always the real guard; the DB constraint was redundant defense-in-depth, not load-bearing — and by switching policy names to plain unquoted identifiers, which have no quote characters left for anything to mangle. Same lesson as the Stage 2 auth-debugging history above: don't accept an environmental/infrastructure explanation for a deterministic, 100%-reproducible failure without checking the actual query/DDL first.
+
+   **Delete added (2026-07-27, same-day follow-up):** the original design was append-only — "changing" a value meant inserting a new row with a later `effective_from`, matching every other table in this app. First live use (the user testing their own account) immediately surfaced the gap: no way to remove an outright data-entry mistake, only to correct it going forward while the wrong row stayed in history forever. Added `deleteOutgoing` + `DELETE /api/outgoings/[id]`, gym-locked the same way insert already was (owner: own gym only; admin: fallback access to whichever gym is selected), plus a matching RLS delete policy (`supabase/migrations/0003_gym_outgoings_delete.sql`). Verified live: an entry entered from the real admin account, then deleted via the actual route (not a direct DB write) — gym's outgoings total and the consolidated total both dropped by exactly the deleted amount.
+
+   Verified live throughout: revenue side of the P&L matched the Revenue page's monthly total exactly (£23,806.69, all gyms, Jun 2026); per-gym P&L rows summed exactly to the consolidated row; carry-forward logic confirmed by entering Rent/Lease at two different rates with different effective months and stepping the page back before/after the change date — each month correctly showed whichever rate was in effect at that point, not just the latest.
 8. **Marketing / ads upload page** (`/marketing`) — not started. CSV parsing (Meta Ads export + GymFlow leads export).
 9. **Admin panel** (`/admin`, admin only) — not started. User management, system status.
 10. **Owner role restrictions** — RLS policies already exist (`supabase/migrations/0001_core_schema.sql`) as defense-in-depth; this stage is the application-level filtering in each page/route.
@@ -170,15 +176,21 @@ top attenders, avg attendance/active member. LTV section: LTV per `sold_to`
 (total spend, avg monthly spend × avg lifespan months), LTV distribution
 histogram, top 20 LTV customers/gym, "affordable CAC" = LTV ÷ 3.
 
-**Outgoings / P&L (Stage 7)** — a new `gym_outgoings` table (app-managed, not
-GymFlow-sourced), owner-submitted per gym, admin can view all + has fallback
-edit access (same oversight pattern as everything else — entry is owner-only,
-visibility isn't). Suggested shape: `gym`, `category`, `amount_gbp`,
-`effective_from` (month), `created_by`, `created_at` — a category's value
-carries forward automatically to later months until the owner changes it, so
-nobody re-enters unchanged figures like rent every month; look up "most
-recent row at or before the target month" per category rather than requiring
-a row for every period.
+**Outgoings / P&L (Stage 7) — done in full 2026-07-27.** `gym_outgoings`
+table (app-managed, not GymFlow-sourced), owner-submitted per gym, admin can
+view all + has fallback edit access to any gym they select (same oversight
+pattern as everything else — entry is owner-only, visibility isn't). Shape:
+`gym`, `category` (validated at the app layer, not a DB constraint — see the
+build note above), `amount_gbp`, `effective_from` (month), `created_by`,
+`created_at` — a category's value carries forward automatically to later
+months until changed, so nobody re-enters unchanged figures like rent every
+month; looks up "most recent row at or before the target month" per
+category rather than requiring a row for every period. Delete also
+supported (added same-day, see build note above), gym-locked the same way
+insert is. `/outgoings` shows KPI tiles (Revenue, Outgoings, Ad spend, Net
+P&L), a per-category breakdown + entry form + history for whichever single
+gym is in view, and — admin, "All gyms" only — a per-gym P&L table plus a
+consolidated total row.
 
 Fixed category list (owner picks from this, no free text, so figures stay
 comparable across gyms — validated against real gym expense-structure data:

@@ -79,7 +79,7 @@ function percentChange(current: number, previous: number): number | null {
 // than assuming one request returns everything.
 const PAGE_SIZE = 1000;
 
-async function sumRevenue(gym: GymName | null, month: string): Promise<number> {
+export async function sumRevenue(gym: GymName | null, month: string): Promise<number> {
   const admin = createAdminClient();
   let total = 0;
   let from = 0;
@@ -132,7 +132,7 @@ async function countActiveMembers(gym: GymName | null, month: string): Promise<n
   return count ?? 0;
 }
 
-async function getRevenueByGym(month: string): Promise<GymRevenue[]> {
+export async function getRevenueByGym(month: string): Promise<GymRevenue[]> {
   const admin = createAdminClient();
   const totals = new Map<GymName, number>(GYM_NAMES.map((gym) => [gym, 0]));
   let from = 0;
