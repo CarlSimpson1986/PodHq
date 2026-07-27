@@ -28,6 +28,10 @@ export function formatDate(dateString: string): string {
   });
 }
 
+export function customerProfileHref(gym: string, name: string): string {
+  return `/members/customer/${encodeURIComponent(gym)}/${encodeURIComponent(name)}`;
+}
+
 export function formatMonthLabel(month: string): string {
   const [year, mon] = month.split("-").map(Number);
   return new Date(Date.UTC(year, mon - 1, 1)).toLocaleDateString("en-GB", {

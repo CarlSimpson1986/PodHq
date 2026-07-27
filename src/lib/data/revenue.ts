@@ -187,6 +187,7 @@ async function getTopProducts(gym: GymName | null, range: MonthRange, limit: num
 
 export interface TopCustomer {
   name: string;
+  gym: GymName;
   total: number;
   percentOfTotal: number;
   /** Most recent report_month with a purchase within the selected range — a
@@ -195,28 +196,37 @@ export interface TopCustomer {
 }
 
 async function getTopCustomers(gym: GymName | null, range: MonthRange, limit: number): Promise<TopCustomer[]> {
-  const rows = await fetchRevenueRowsForRange<{ sold_to: string; amount_inc_tax: number; report_month: string }>(
-    gym,
-    range,
-    "sold_to, amount_inc_tax, report_month"
-  );
-  const totals = new Map<string, number>();
+  const rows = await fetchRevenueRowsForRange<{
+    gym: GymName;
+    sold_to: string;
+    amount_inc_tax: number;
+    report_month: string;
+  }>(gym, range, "gym, sold_to, amount_inc_tax, report_month");
+  // Keyed by gym::sold_to (matching the LTV convention in lib/data/members.ts),
+  // not sold_to alone — two different customers can share a name across
+  // different gyms, and in the admin "All gyms" view that would otherwise
+  // wrongly merge them into one row.
+  const totals = new Map<string, { gym: GymName; name: string; total: number }>();
   const lastPurchaseMonth = new Map<string, string>();
   let grandTotal = 0;
   for (const row of rows) {
+    const key = `${row.gym}::${row.sold_to}`;
     const amount = Number(row.amount_inc_tax);
-    totals.set(row.sold_to, (totals.get(row.sold_to) ?? 0) + amount);
+    const entry = totals.get(key) ?? { gym: row.gym, name: row.sold_to, total: 0 };
+    entry.total += amount;
+    totals.set(key, entry);
     grandTotal += amount;
-    const prevLast = lastPurchaseMonth.get(row.sold_to);
+    const prevLast = lastPurchaseMonth.get(key);
     // report_month is "yyyy-MM" — lexicographic comparison is chronological.
-    if (!prevLast || row.report_month > prevLast) lastPurchaseMonth.set(row.sold_to, row.report_month);
+    if (!prevLast || row.report_month > prevLast) lastPurchaseMonth.set(key, row.report_month);
   }
   return [...totals.entries()]
-    .map(([name, total]) => ({
+    .map(([key, { gym, name, total }]) => ({
       name,
+      gym,
       total,
       percentOfTotal: grandTotal > 0 ? (total / grandTotal) * 100 : 0,
-      lastPurchaseMonth: lastPurchaseMonth.get(name) ?? range.end,
+      lastPurchaseMonth: lastPurchaseMonth.get(key) ?? range.end,
     }))
     .sort((a, b) => b.total - a.total)
     .slice(0, limit);
