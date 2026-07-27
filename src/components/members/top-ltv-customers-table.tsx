@@ -1,4 +1,5 @@
-import { formatGBP, formatMonthLabel } from "@/lib/format";
+import Link from "next/link";
+import { formatGBP, formatMonthLabel, customerProfileHref } from "@/lib/format";
 import type { LtvCustomer } from "@/lib/data/members";
 
 export function TopLtvCustomersTable({ data, showGym }: { data: LtvCustomer[]; showGym: boolean }) {
@@ -36,7 +37,11 @@ export function TopLtvCustomersTable({ data, showGym }: { data: LtvCustomer[]; s
             {data.map((row, i) => (
               <tr key={`${row.gym}-${row.name}`} className="border-b border-card-border last:border-0">
                 <td className="py-2 pr-3 tabular-nums text-muted-foreground">{i + 1}</td>
-                <td className="py-2 pr-3 text-foreground">{row.name}</td>
+                <td className="py-2 pr-3">
+                  <Link href={customerProfileHref(row.gym, row.name)} className="text-accent hover:underline">
+                    {row.name}
+                  </Link>
+                </td>
                 {showGym && <td className="py-2 pr-3 text-muted-foreground">{row.gym}</td>}
                 <td className="py-2 pr-3 text-right tabular-nums text-foreground">{formatGBP(row.avgMonthlySpend)}</td>
                 <td className="py-2 pr-3 text-right tabular-nums text-muted-foreground">{row.activeMonths}</td>

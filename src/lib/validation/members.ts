@@ -10,3 +10,9 @@ export const memberInsightsQuerySchema = z
     gym: z.enum(GYM_NAMES).optional(),
   })
   .strict();
+
+export const customerDirectoryQuerySchema = z
+  .object({
+    gym: z.enum(GYM_NAMES).optional(),
+  })
+  .strict();

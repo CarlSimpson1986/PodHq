@@ -8,6 +8,7 @@ const PAGE_SIZE = 1000;
 export interface AttendanceMember {
   userMemberId: string;
   name: string;
+  gym: GymName;
   attendance: number;
   lastAttended: string | null;
 }
@@ -55,10 +56,18 @@ async function fetchActiveAttendanceRows(
   gym: GymName | null,
   month: string
 ): Promise<
-  { user_member_id: string; first_name: string; last_name: string; attendance: number; last_attended: string | null }[]
+  {
+    gym: GymName;
+    user_member_id: string;
+    first_name: string;
+    last_name: string;
+    attendance: number;
+    last_attended: string | null;
+  }[]
 > {
   const admin = createAdminClient();
   const rows: {
+    gym: GymName;
     user_member_id: string;
     first_name: string;
     last_name: string;
@@ -70,7 +79,7 @@ async function fetchActiveAttendanceRows(
   for (;;) {
     const base = admin
       .from("attendance")
-      .select("user_member_id, first_name, last_name, attendance, last_attended")
+      .select("gym, user_member_id, first_name, last_name, attendance, last_attended")
       .eq("report_month", month)
       .gt("attendance", 0)
       .range(from, from + PAGE_SIZE - 1);
@@ -80,6 +89,7 @@ async function fetchActiveAttendanceRows(
     if (error) throw error;
 
     const page = (data ?? []) as {
+      gym: GymName;
       user_member_id: string;
       first_name: string;
       last_name: string;
@@ -140,7 +150,7 @@ async function getAttendanceCompleteness(
  * pagination approach as every other aggregate in this app (no caching
  * layer yet); will keep growing as history accumulates.
  */
-async function fetchAllRevenueForLtv(
+export async function fetchAllRevenueForLtv(
   gym: GymName | null
 ): Promise<{ gym: GymName; sold_to: string; amount_inc_tax: number; report_month: string }[]> {
   const admin = createAdminClient();
@@ -182,7 +192,7 @@ async function fetchAllRevenueForLtv(
  * so far — this systematically understates both average lifespan and LTV,
  * a conservative floor, never an overstatement.
  */
-function computeLtv(
+export function computeLtv(
   rows: { gym: GymName; sold_to: string; amount_inc_tax: number; report_month: string }[]
 ): LtvCustomer[] {
   const perCustomer = new Map<
@@ -271,6 +281,7 @@ export async function getMemberInsightsSummary(gym: GymName | null, month: strin
   const named: AttendanceMember[] = attendanceRows.map((row) => ({
     userMemberId: row.user_member_id,
     name: `${row.first_name} ${row.last_name}`.trim(),
+    gym: row.gym,
     attendance: row.attendance,
     lastAttended: row.last_attended,
   }));
@@ -316,5 +327,160 @@ export async function getMemberInsightsSummary(gym: GymName | null, month: strin
       affordableCac: averageLtv !== null ? averageLtv / 3 : null,
       customerCount: ltvCustomers.length,
     },
+  };
+}
+
+/**
+ * Full customer list for the directory/lookup page — same fetch + compute
+ * as the LTV section above, just not sliced to the Top 20. Not a new query
+ * pattern or extra cost: it's the identical all-gym-scoped fetch the
+ * Members page already performs on every load.
+ */
+export async function getCustomerDirectory(gym: GymName | null): Promise<LtvCustomer[]> {
+  const revenueRows = await fetchAllRevenueForLtv(gym);
+  // Most recently active first — lets a reader spot who's actually current
+  // at a glance rather than paging past long-churned customers alphabetically.
+  // lastActiveMonth is "yyyy-MM", so lexicographic comparison is chronological.
+  return computeLtv(revenueRows).sort((a, b) => b.lastActiveMonth.localeCompare(a.lastActiveMonth));
+}
+
+export interface CustomerProfile {
+  name: string;
+  gym: GymName;
+  totalSpend: number;
+  activeMonths: number;
+  avgMonthlySpend: number;
+  ltv: number;
+  lastActiveMonth: string;
+  transactions: {
+    date: string;
+    item: string;
+    category: "MEMBERSHIP" | "CREDIT_PACK";
+    quantitySold: number;
+    amountIncTax: number;
+  }[];
+  /** null = no matching attendance rows found for this name (Hackney/Crewe
+   *  gap, or a name-format mismatch) — surfaced as-is, never guessed at. */
+  attendance: { reportMonth: string; attendance: number; lastAttended: string | null }[] | null;
+}
+
+async function fetchCustomerTransactions(
+  gym: GymName,
+  name: string
+): Promise<{ date: string; item: string; category: "MEMBERSHIP" | "CREDIT_PACK"; quantitySold: number; amountIncTax: number }[]> {
+  const admin = createAdminClient();
+  const rows: {
+    date: string;
+    item: string;
+    category: "MEMBERSHIP" | "CREDIT_PACK";
+    quantitySold: number;
+    amountIncTax: number;
+  }[] = [];
+  let from = 0;
+
+  for (;;) {
+    const { data, error } = await admin
+      .from("Revenue")
+      .select("date, item, category, quantity_sold, amount_inc_tax")
+      .eq("gym", gym)
+      .eq("sold_to", name)
+      .order("date", { ascending: false })
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+
+    const page = (data ?? []) as {
+      date: string;
+      item: string;
+      category: "MEMBERSHIP" | "CREDIT_PACK";
+      quantity_sold: number;
+      amount_inc_tax: number;
+    }[];
+    rows.push(
+      ...page.map((r) => ({
+        date: r.date,
+        item: r.item,
+        category: r.category,
+        quantitySold: r.quantity_sold,
+        amountIncTax: Number(r.amount_inc_tax),
+      }))
+    );
+
+    if (page.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+
+  return rows;
+}
+
+/**
+ * Best-effort inverse of the `${first_name} ${last_name}`.trim()` convention
+ * used to build a display name elsewhere in this file — splits on the first
+ * space so multi-part surnames ("Mary Jane Smith") still round-trip, since
+ * `last_name` is whatever GymFlow stored as-is.
+ */
+function splitName(name: string): { firstName: string; lastName: string } {
+  const spaceIndex = name.indexOf(" ");
+  if (spaceIndex === -1) return { firstName: name, lastName: "" };
+  return { firstName: name.slice(0, spaceIndex), lastName: name.slice(spaceIndex + 1) };
+}
+
+async function fetchCustomerAttendance(
+  gym: GymName,
+  name: string
+): Promise<{ reportMonth: string; attendance: number; lastAttended: string | null }[] | null> {
+  const { firstName, lastName } = splitName(name);
+  const admin = createAdminClient();
+  const rows: { reportMonth: string; attendance: number; lastAttended: string | null }[] = [];
+  let from = 0;
+
+  for (;;) {
+    const { data, error } = await admin
+      .from("attendance")
+      .select("report_month, attendance, last_attended")
+      .eq("gym", gym)
+      .eq("first_name", firstName)
+      .eq("last_name", lastName)
+      .order("report_month", { ascending: false })
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+
+    const page = (data ?? []) as { report_month: string; attendance: number; last_attended: string | null }[];
+    rows.push(...page.map((r) => ({ reportMonth: r.report_month, attendance: r.attendance, lastAttended: r.last_attended })));
+
+    if (page.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+
+  return rows.length > 0 ? rows : null;
+}
+
+/**
+ * Single-customer profile: the LTV figure comes from a single-gym LTV
+ * computation (same cost as loading the Members page for that gym, since
+ * the multiplier depends on the gym's average customer lifespan) so it
+ * always matches what's shown elsewhere; the transaction and attendance
+ * history are separate small, targeted queries scoped to just this person,
+ * not a gym-wide scan.
+ */
+export async function getCustomerProfile(gym: GymName, name: string): Promise<CustomerProfile | null> {
+  const [revenueRows, transactions, attendance] = await Promise.all([
+    fetchAllRevenueForLtv(gym),
+    fetchCustomerTransactions(gym, name),
+    fetchCustomerAttendance(gym, name),
+  ]);
+
+  const ltvEntry = computeLtv(revenueRows).find((c) => c.name === name);
+  if (!ltvEntry) return null;
+
+  return {
+    name: ltvEntry.name,
+    gym: ltvEntry.gym,
+    totalSpend: ltvEntry.totalSpend,
+    activeMonths: ltvEntry.activeMonths,
+    avgMonthlySpend: ltvEntry.avgMonthlySpend,
+    ltv: ltvEntry.ltv,
+    lastActiveMonth: ltvEntry.lastActiveMonth,
+    transactions,
+    attendance,
   };
 }

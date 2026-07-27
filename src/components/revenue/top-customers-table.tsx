@@ -1,4 +1,5 @@
-import { formatGBP, formatMonthLabel } from "@/lib/format";
+import Link from "next/link";
+import { formatGBP, formatMonthLabel, customerProfileHref } from "@/lib/format";
 import type { TopCustomer } from "@/lib/data/revenue";
 
 export function TopCustomersTable({ data }: { data: TopCustomer[] }) {
@@ -18,9 +19,13 @@ export function TopCustomersTable({ data }: { data: TopCustomer[] }) {
           </thead>
           <tbody>
             {data.map((row, i) => (
-              <tr key={row.name} className="border-b border-card-border last:border-0">
+              <tr key={`${row.gym}-${row.name}`} className="border-b border-card-border last:border-0">
                 <td className="py-2 pr-3 tabular-nums text-muted-foreground">{i + 1}</td>
-                <td className="py-2 pr-3 text-foreground">{row.name}</td>
+                <td className="py-2 pr-3">
+                  <Link href={customerProfileHref(row.gym, row.name)} className="text-accent hover:underline">
+                    {row.name}
+                  </Link>
+                </td>
                 <td className="py-2 pr-3 text-right tabular-nums text-foreground">{formatGBP(row.total)}</td>
                 <td className="py-2 pr-3 text-right tabular-nums text-muted-foreground">
                   {row.percentOfTotal.toFixed(1)}%

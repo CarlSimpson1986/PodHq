@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
-import { formatGBP, formatNumber, formatMonthLabel, formatDate } from "@/lib/format";
+import { formatGBP, formatNumber, formatMonthLabel, formatDate, customerProfileHref } from "@/lib/format";
 import { GYM_NAMES, type GymName } from "@/lib/data/types";
 import type { MemberInsightsSummary } from "@/lib/data/members";
 import { LtvHistogramChart } from "./ltv-histogram-chart";
@@ -173,7 +174,11 @@ export function MemberInsightsView({ role, initialMonth, initialGym, initialSumm
                     )}
                     {summary.atRiskMembers.map((m) => (
                       <tr key={m.userMemberId} className="border-b border-card-border last:border-0">
-                        <td className="py-2 pr-3 text-foreground">{m.name}</td>
+                        <td className="py-2 pr-3">
+                          <Link href={customerProfileHref(m.gym, m.name)} className="text-accent hover:underline">
+                            {m.name}
+                          </Link>
+                        </td>
                         <td
                           className={`py-2 pr-3 text-right tabular-nums font-medium ${
                             m.attendance === 1 ? "text-danger" : "text-warning"
@@ -213,7 +218,11 @@ export function MemberInsightsView({ role, initialMonth, initialGym, initialSumm
                     {summary.topAttenders.map((m, i) => (
                       <tr key={m.userMemberId} className="border-b border-card-border last:border-0">
                         <td className="py-2 pr-3 tabular-nums text-muted-foreground">{i + 1}</td>
-                        <td className="py-2 pr-3 text-foreground">{m.name}</td>
+                        <td className="py-2 pr-3">
+                          <Link href={customerProfileHref(m.gym, m.name)} className="text-accent hover:underline">
+                            {m.name}
+                          </Link>
+                        </td>
                         <td className="py-2 text-right tabular-nums text-foreground">{m.attendance}</td>
                       </tr>
                     ))}
@@ -224,7 +233,12 @@ export function MemberInsightsView({ role, initialMonth, initialGym, initialSumm
           </div>
 
           <section className="mt-8">
-            <h2 className="text-lg font-semibold text-foreground">Lifetime value</h2>
+            <div className="flex items-baseline justify-between gap-4">
+              <h2 className="text-lg font-semibold text-foreground">Lifetime value</h2>
+              <Link href="/members/directory" className="text-sm text-accent hover:underline">
+                Browse full customer directory →
+              </Link>
+            </div>
             <p className="mt-1 text-xs text-muted-foreground">
               Predictive estimate (avg monthly spend × average customer lifespan per gym) — a conservative floor,
               since cancellation dates for still-active members aren&apos;t available yet. Uses full purchase
