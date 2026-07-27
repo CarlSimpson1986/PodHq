@@ -7,6 +7,7 @@ import { OUTGOING_CATEGORIES } from "@/lib/data/types";
 import { formatGBP, formatNumber, formatPercent, formatMonthLabel } from "@/lib/format";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { NeedsAttention } from "@/components/dashboard/needs-attention";
+import { AtRiskPreview } from "@/components/dashboard/at-risk-preview";
 import { RevenueByGymChart } from "@/components/dashboard/revenue-by-gym-chart";
 import { RevenueTrendChart } from "@/components/dashboard/revenue-trend-chart";
 import { GymDownAlerts } from "@/components/dashboard/gym-down-alerts";
@@ -67,23 +68,24 @@ export default async function DashboardPage() {
                   ? { percent: summary.monthOverMonthPercent, comparisonLabel: formatMonthLabel(shiftMonth(month, -1)) }
                   : null
               }
+              href="/revenue"
             />
             <StatCard
               label="Active members"
               value={formatNumber(memberHighlights.activeCount)}
-              note={
-                !memberHighlights.hasAttendanceData
-                  ? "No attendance data this month"
-                  : memberHighlights.atRiskCount > 0
-                    ? `${memberHighlights.atRiskCount} at risk`
-                    : undefined
-              }
+              note={!memberHighlights.hasAttendanceData ? "No attendance data this month" : undefined}
+              href="/members"
             />
             <StatCard
               label="Net P&L this month"
               value={net !== null ? formatGBP(net) : "—"}
               tone={net !== null ? (net >= 0 ? "success" : "danger") : undefined}
+              href="/outgoings"
             />
+          </div>
+
+          <div className="mt-4">
+            <AtRiskPreview members={memberHighlights.topAtRisk} totalAtRisk={memberHighlights.atRiskCount} />
           </div>
 
           <div className="mt-4">
