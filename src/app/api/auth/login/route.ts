@@ -49,6 +49,6 @@ export async function POST(request: NextRequest) {
 
   await logAuthEvent({ email, userId: data.user.id, eventType: "login_success", ipAddress: ip });
 
-  const nextStep = await resolveNextAuthStep(supabase, data.user.id);
+  const nextStep = await resolveNextAuthStep(supabase);
   return NextResponse.json({ status: nextStep });
 }

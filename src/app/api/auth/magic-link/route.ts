@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createSessionClient } from "@/lib/supabase/server";
 import { magicLinkSchema } from "@/lib/validation/auth";
 import { logAuthEvent } from "@/lib/audit";
+import { checkMagicLinkRateLimit } from "@/lib/auth/lockout";
 import { getRequestIp } from "@/lib/request-ip";
 
 // Always the same response, whether or not the email matches an account —
@@ -23,6 +24,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: "error", message: "Enter a valid email address." }, { status: 400 });
   }
   const { email } = parsed.data;
+
+  const rateLimit = await checkMagicLinkRateLimit(email, ip);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { status: "error", message: "Too many requests. Try again in a few minutes." },
+      { status: 429 }
+    );
+  }
 
   const supabase = await createSessionClient();
   const origin = request.nextUrl.origin;

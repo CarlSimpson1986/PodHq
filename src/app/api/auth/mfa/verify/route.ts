@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createSessionClient } from "@/lib/supabase/server";
 import { mfaVerifySchema } from "@/lib/validation/auth";
 import { logAuthEvent } from "@/lib/audit";
+import { checkMfaLockout } from "@/lib/auth/lockout";
 import { getRequestIp } from "@/lib/request-ip";
 
 export async function POST(request: NextRequest) {
@@ -27,6 +28,27 @@ export async function POST(request: NextRequest) {
   }
   const { factorId, code } = parsed.data;
   const ip = getRequestIp(request);
+
+  const lockout = await checkMfaLockout(user.id);
+  if (lockout.locked) {
+    if (lockout.reason === "account_locked") {
+      await logAuthEvent({
+        email: user.email,
+        userId: user.id,
+        eventType: "account_locked",
+        ipAddress: ip,
+        detail: "mfa",
+      });
+      return NextResponse.json(
+        { status: "error", message: "Too many incorrect codes. Contact your admin to reset MFA." },
+        { status: 423 }
+      );
+    }
+    return NextResponse.json(
+      { status: "error", message: "Too many attempts. Try again in a few minutes." },
+      { status: 429 }
+    );
+  }
 
   const { data: factorsData } = await supabase.auth.mfa.listFactors();
   const isFirstTimeEnrolment = (factorsData?.all ?? []).find((f) => f.id === factorId)?.status === "unverified";
