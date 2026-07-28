@@ -26,7 +26,13 @@ before moving to the next. Don't jump ahead to a later stage unprompted.
    **Delete added (2026-07-27, same-day follow-up):** the original design was append-only — "changing" a value meant inserting a new row with a later `effective_from`, matching every other table in this app. First live use (the user testing their own account) immediately surfaced the gap: no way to remove an outright data-entry mistake, only to correct it going forward while the wrong row stayed in history forever. Added `deleteOutgoing` + `DELETE /api/outgoings/[id]`, gym-locked the same way insert already was (owner: own gym only; admin: fallback access to whichever gym is selected), plus a matching RLS delete policy (`supabase/migrations/0003_gym_outgoings_delete.sql`). Verified live: an entry entered from the real admin account, then deleted via the actual route (not a direct DB write) — gym's outgoings total and the consolidated total both dropped by exactly the deleted amount.
 
    Verified live throughout: revenue side of the P&L matched the Revenue page's monthly total exactly (£23,806.69, all gyms, Jun 2026); per-gym P&L rows summed exactly to the consolidated row; carry-forward logic confirmed by entering Rent/Lease at two different rates with different effective months and stepping the page back before/after the change date — each month correctly showed whichever rate was in effect at that point, not just the latest.
-8. **Marketing / ads upload page** (`/marketing`) — not started. CSV parsing (Meta Ads export + GymFlow leads export).
+8. **Marketing / ads upload page** (`/marketing`) — done 2026-07-28. CSV parsing (Meta Ads weekly "Ad sets" export + GymFlow leads export) into `ad_spend`, upsert-on-reupload, weekly spend/CPC/CPL charts, LTV-vs-CAC card reusing Member Insights' LTV calculation, week-by-week table. Built across an earlier session (scaffold — parse logic, data layer, API routes, components) and finished/verified in this one.
+
+   **Found and fixed: `0004_ad_spend_upsert.sql` had never been applied to the live DB.** `upsertAdSpend()` upserts on `(gym, week_starting)`, but without the matching unique index Postgres has no conflict target — every save would have failed with "no unique or exclusion constraint matching the ON CONFLICT specification". Caught by probing the live DB directly (an upsert attempt errored) before any live UI testing even started, not by reading the code. Fixed by running the migration's `create unique index` statement via the SQL Editor; re-verified afterward that two upserts on the same key correctly leave one row with the second write's values (overwrite, not duplicate).
+
+   Verified live as **admin**: `/marketing` correctly shows the "All gyms" summary with no upload form until a specific gym is selected (no single gym to attribute an upload to otherwise); selecting Milton Keynes surfaces the form and switches the LTV figure to that gym's own average. Uploaded a real two-file test (Meta CSV with a mixed ISO/short date, GymFlow leads CSV with DD/MM/YYYY+time) through the actual UI — parse preview correctly normalized both to Monday-starting weeks and merged them (6 Jul: £150.25/42 clicks/2 leads, 13 Jul: £175.50/55 clicks/1 lead); confirm-and-save round-tripped through the real API, and every derived figure checked out by hand (CPC, CPL, totals, ROI multiple). Test rows deleted afterward.
+
+   Verified live as **owner** (Milton Keynes test account): no gym selector shown, page auto-locked to Milton Keynes. Tampering test — same pattern as Stage 5's revenue-summary check — sent both `/api/marketing/summary?gym=Aylesbury Berryfields` and a POST to `/api/marketing/upload` with `gym: "Aylesbury Berryfields"` in the body from the owner's authenticated session: the GET ignored the query param and returned Milton Keynes data (`role: "owner"` in the response), and the POST's spoofed `gym` field was silently overridden — the row landed in the DB tagged `gym: "Milton Keynes"`, `uploaded_by` the owner's own user ID, not Aylesbury Berryfields. Confirmed directly against the table, not just the 200 response. Test row deleted afterward.
 9. **Admin panel** (`/admin`, admin only) — not started. User management, system status.
 10. **Owner role restrictions** — RLS policies already exist (`supabase/migrations/0001_core_schema.sql`) as defense-in-depth; this stage is the application-level filtering in each page/route.
 11. **PWA finalisation** — manifest, icons, install prompt.
@@ -150,6 +156,50 @@ user is asking their team. Not fixable by changing queries — an upstream
 pipeline question. The dashboard surfaces which gyms are missing attendance
 data for the period rather than silently producing a misleadingly low
 aggregate.
+
+**Resolved 2026-07-28:** user re-ran the GymFlow/UiPath automation for
+Aylesbury Berryfields and it backfilled cleanly — Jan–May 2026 now show
+244/185/207/171/232 rows respectively, in line with the surrounding months
+(Dec 2025: 192, Jun 2026: 203). Checked for duplicates from the re-run
+(matching on date + item + `sold_to` + amount across all 1,039 Jan–May rows,
+since `Revenue` has no unique constraint to prevent double-insertion on a
+rerun) — zero repeats found. No further action needed; kept the note below
+for the record since it documents both the gap and how it was ruled out as
+app-caused.
+
+**Known gap (resolved, see above): Aylesbury Berryfields was missing
+`Revenue` entirely for Jan–May 2026** (confirmed 2026-07-28 by querying row
+counts per
+`report_month`) — zero rows for all five months, despite continuous monthly
+data from 2023-02 through 2025-12 and data resuming normally in 2026-06
+(203 rows, in line with prior months). Every other established gym has
+`Revenue` rows throughout Jan–May 2026, including Hackney and Crewe, so this
+isn't the same issue as the attendance gap above — it's isolated to one
+gym, one metric, one contiguous window, with real data both before and
+after. (Fairford Leys having no data before 2026-06 is unrelated and
+expected — it's a newly onboarded gym, not a gap.) Cause unknown — an
+upstream GymFlow/UiPath pipeline question, not fixable by changing queries.
+Any revenue total, trend chart, or YoY comparison covering Jan–May 2026 will
+understate Aylesbury Berryfields until this is backfilled or the cause is
+found; no query-layer workaround (e.g. estimating/interpolating the gap) has
+been applied — the pages surface whatever's actually in the table.
+
+**Ruled out as app-caused (verified 2026-07-28):** user suspected a recent
+code change deleted the rows. Checked directly against the DB rather than
+just re-reading the code (per the auth-debugging lesson above — don't
+accept "it should be fine" without live verification): `pg_policy` on
+`"Revenue"` shows exactly one policy, `select own gyms` (`polcmd = 'r'`,
+SELECT-only) — no write/update/delete policy has ever existed on this
+table, in any migration. A full-repo check (all 4 migration files, every
+API route, every `src/lib/data/*.ts` reference to `Revenue`) found zero
+INSERT/UPDATE/DELETE/TRUNCATE statements against it anywhere — it's
+read-only from the app's side, consistent with it being GymFlow/UiPath-
+populated and never manually written to (see Data pipeline intro above).
+An `ilike '%aylesbury%'` sweep across Jan–May 2026 (to rule out the rows
+being hidden under a whitespace/case-variant gym string rather than truly
+absent) also returned zero rows. Conclusion: the data was never ingested
+for this window — no app code path could have deleted it, since none ever
+had write access.
 
 **Future system change:** moving from Kisi to **PDK (ProdataKey)** for door
 access, which will give proper day-to-day check-in/check-out timeseries

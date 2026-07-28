@@ -50,6 +50,16 @@ const NAV_ITEMS = [
       </svg>
     ),
   },
+  {
+    href: "/marketing",
+    label: "Marketing",
+    icon: (
+      <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.5}>
+        <path d="M3 9v2a1 1 0 0 0 1 1h2l4 3V5L6 8H4a1 1 0 0 0-1 1Z" strokeLinejoin="round" />
+        <path d="M13 7.5a3 3 0 0 1 0 5M15.5 5.5a6 6 0 0 1 0 9" strokeLinecap="round" />
+      </svg>
+    ),
+  },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {

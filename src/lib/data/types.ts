@@ -50,3 +50,14 @@ export interface AttendanceRow {
   report_month: string;
   created_at: string;
 }
+
+export interface AdSpendRow {
+  id: number;
+  gym: string;
+  week_starting: string;
+  spend_gbp: number;
+  clicks: number;
+  leads: number;
+  uploaded_by: string | null;
+  created_at: string;
+}
