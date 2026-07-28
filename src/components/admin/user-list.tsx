@@ -1,0 +1,94 @@
+"use client";
+
+import { useState } from "react";
+import { formatDate } from "@/lib/format";
+import type { AdminUserRow } from "@/lib/data/admin";
+
+const secondaryButtonClass =
+  "rounded-md border border-card-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-background disabled:opacity-50";
+
+export function UserList({
+  users,
+  currentUserId,
+  onChanged,
+}: {
+  users: AdminUserRow[];
+  currentUserId: string;
+  onChanged: () => void;
+}) {
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function toggleBanned(userId: string, banned: boolean) {
+    setError(null);
+    setBusyId(userId);
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ banned }),
+      });
+      const body = await res.json();
+      if (body.status !== "ok") {
+        setError(body.message ?? "Could not update this account.");
+        return;
+      }
+      onChanged();
+    } catch {
+      setError("Something went wrong. Try again.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <div className="rounded-[12px] border border-card-border bg-card p-5">
+      <p className="text-sm font-semibold text-foreground">Users ({users.length})</p>
+      {error && <p className="mt-2 text-sm text-danger">{error}</p>}
+
+      <div className="mt-4 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-card-border text-left text-xs text-muted-foreground">
+              <th className="py-2 pr-3 font-normal">Email</th>
+              <th className="py-2 pr-3 font-normal">Role</th>
+              <th className="py-2 pr-3 font-normal">Gym</th>
+              <th className="py-2 pr-3 font-normal">Status</th>
+              <th className="py-2 pr-3 font-normal">Created</th>
+              <th className="py-2 font-normal" />
+            </tr>
+          </thead>
+          <tbody>
+            {users.map((u) => (
+              <tr key={u.userId} className="border-b border-card-border last:border-0">
+                <td className="py-2 pr-3 text-foreground">{u.email}</td>
+                <td className="py-2 pr-3 capitalize text-muted-foreground">{u.role}</td>
+                <td className="py-2 pr-3 text-muted-foreground">{u.gym ?? "All gyms"}</td>
+                <td className="py-2 pr-3">
+                  <span className={u.banned ? "text-danger" : "text-muted-foreground"}>
+                    {u.banned ? "Deactivated" : "Active"}
+                  </span>
+                </td>
+                <td className="py-2 pr-3 text-muted-foreground">{formatDate(u.createdAt)}</td>
+                <td className="py-2 text-right">
+                  {u.userId === currentUserId ? (
+                    <span className="text-xs text-muted-foreground">You</span>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={busyId === u.userId}
+                      onClick={() => toggleBanned(u.userId, !u.banned)}
+                      className={secondaryButtonClass}
+                    >
+                      {busyId === u.userId ? "..." : u.banned ? "Reactivate" : "Deactivate"}
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}

@@ -60,6 +60,16 @@ const NAV_ITEMS = [
       </svg>
     ),
   },
+  {
+    href: "/admin",
+    label: "Admin",
+    icon: (
+      <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.5}>
+        <path d="M10 2.5 4 5v4.5c0 4 2.6 6.6 6 8 3.4-1.4 6-4 6-8V5l-6-2.5Z" strokeLinejoin="round" />
+        <path d="M7.5 10 9 11.5 12.5 8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
