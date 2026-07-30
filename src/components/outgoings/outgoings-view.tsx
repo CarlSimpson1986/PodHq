@@ -2,11 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { formatMonthLabel } from "@/lib/format";
-import { GYM_NAMES, type GymName } from "@/lib/data/types";
+import type { GymName } from "@/lib/data/types";
 import type { PnlSummary, OutgoingEntry } from "@/lib/data/outgoings";
 import { PnlSummary as PnlSummaryTiles } from "./pnl-summary";
 import { PnlByGymTable } from "./pnl-by-gym-table";
 import { OutgoingsBreakdownTable } from "./outgoings-breakdown-table";
+import { GymSelect } from "@/components/ui/gym-select";
 
 // Duplicated rather than imported from lib/data/dashboard — that module is
 // "server-only" and this is a client component.
@@ -106,19 +107,7 @@ export function OutgoingsView({ role, initialMonth, initialGym, initialSummary, 
         </button>
 
         {role === "admin" && (
-          <select
-            value={gym ?? ""}
-            disabled={isPending}
-            onChange={(e) => handleGymChange(e.target.value ? (e.target.value as GymName) : null)}
-            className="ml-auto rounded-md border border-card-border bg-card px-2 py-1.5 text-sm text-foreground"
-          >
-            <option value="">All gyms</option>
-            {GYM_NAMES.map((g) => (
-              <option key={g} value={g}>
-                {g}
-              </option>
-            ))}
-          </select>
+          <GymSelect value={gym} onChange={handleGymChange} disabled={isPending} className="ml-auto" />
         )}
       </div>
 

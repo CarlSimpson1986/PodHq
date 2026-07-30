@@ -6,7 +6,7 @@ export function TopLtvCustomersTable({ data, showGym }: { data: LtvCustomer[]; s
   const columnCount = showGym ? 7 : 6;
 
   return (
-    <div className="rounded-[12px] border border-card-border bg-card p-5">
+    <div className="card-glass p-5">
       <p className="text-sm font-semibold text-foreground">Top 20 LTV customers</p>
       <p className="mt-1 text-xs text-muted-foreground">
         Only customers with a purchase in the last 3 months are shown — someone who&apos;s since left won&apos;t

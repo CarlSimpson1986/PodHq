@@ -15,7 +15,7 @@ export function CategoryPieChart({ data }: { data: CategoryBreakdown }) {
   const total = data.membership + data.creditPack;
 
   return (
-    <div className="rounded-[12px] border border-card-border bg-card p-5">
+    <div className="card-glass p-5">
       <p className="text-sm font-semibold text-foreground">Revenue by category</p>
       <div className="mt-4 h-64 w-full">
         <ResponsiveContainer>

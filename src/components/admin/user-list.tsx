@@ -42,7 +42,7 @@ export function UserList({
   }
 
   return (
-    <div className="rounded-[12px] border border-card-border bg-card p-5">
+    <div className="card-glass p-5">
       <p className="text-sm font-semibold text-foreground">Users ({users.length})</p>
       {error && <p className="mt-2 text-sm text-danger">{error}</p>}
 

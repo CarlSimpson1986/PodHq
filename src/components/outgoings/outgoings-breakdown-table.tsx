@@ -83,7 +83,7 @@ export function OutgoingsBreakdownTable({
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <div className="rounded-[12px] border border-card-border bg-card p-5">
+      <div className="card-glass p-5">
         <p className="text-sm font-semibold text-foreground">Current outgoings — {gym}</p>
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-sm">
@@ -150,7 +150,7 @@ export function OutgoingsBreakdownTable({
         )}
       </div>
 
-      <div className="rounded-[12px] border border-card-border bg-card p-5">
+      <div className="card-glass p-5">
         <p className="text-sm font-semibold text-foreground">Add / update an entry</p>
         <p className="mt-1 text-xs text-muted-foreground">
           Entering a new amount for a category takes effect from the month you choose onward — it doesn&apos;t

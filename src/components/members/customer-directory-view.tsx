@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { formatGBP, formatMonthLabel, customerProfileHref } from "@/lib/format";
-import { GYM_NAMES, type GymName } from "@/lib/data/types";
+import type { GymName } from "@/lib/data/types";
 import type { LtvCustomer } from "@/lib/data/members";
+import { GymSelect } from "@/components/ui/gym-select";
 
 interface CustomerDirectoryViewProps {
   role: "admin" | "owner";
@@ -69,19 +70,7 @@ export function CustomerDirectoryView({ role, initialGym, initialCustomers }: Cu
         />
 
         {role === "admin" && (
-          <select
-            value={gym ?? ""}
-            disabled={isPending}
-            onChange={(e) => handleGymChange(e.target.value ? (e.target.value as GymName) : null)}
-            className="ml-auto rounded-md border border-card-border bg-card px-2 py-1.5 text-sm text-foreground"
-          >
-            <option value="">All gyms</option>
-            {GYM_NAMES.map((g) => (
-              <option key={g} value={g}>
-                {g}
-              </option>
-            ))}
-          </select>
+          <GymSelect value={gym} onChange={handleGymChange} disabled={isPending} className="ml-auto" />
         )}
       </div>
 
@@ -92,7 +81,7 @@ export function CustomerDirectoryView({ role, initialGym, initialCustomers }: Cu
         </p>
       )}
 
-      <div className="mt-4 rounded-[12px] border border-card-border bg-card p-5">
+      <div className="mt-4 card-glass p-5">
         <p className="text-sm font-semibold text-foreground">
           Customers <span className="font-normal text-muted-foreground">({filtered.length})</span>
         </p>

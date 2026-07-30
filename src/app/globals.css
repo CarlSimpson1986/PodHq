@@ -1,11 +1,11 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0a0a0b;
+  --background: #000000;
   --foreground: #ffffff;
   --muted-foreground: #9a9ba3;
-  --card: #1a1d27;
-  --card-border: #2a2d3a;
+  --card: #000000;
+  --card-border: rgba(255, 255, 255, 0.09);
   --accent: #c9a24b;
   --accent-hover: #dcb868;
   --accent-foreground: #0a0a0b;
@@ -41,17 +41,65 @@
   --color-series-membership: var(--series-membership);
   --color-series-credit-pack: var(--series-credit-pack);
   --font-sans: var(--font-inter);
-  --radius-card: 12px;
+  --radius-card: 16px;
 }
 
 /* PodHQ is dark-only by design — no light theme, no prefers-color-scheme override */
 
+:root {
+  /* Tells the browser to render native form controls (select dropdowns,
+     scrollbars, date pickers) with its dark UA theme instead of the OS
+     light default — otherwise an open <select> popup ignores our CSS
+     entirely and renders as a plain white system dropdown. */
+  color-scheme: dark;
+  accent-color: var(--accent);
+}
+
 body {
-  background: var(--background);
+  background:
+    radial-gradient(1100px 550px at 8% -12%, rgba(201, 162, 75, 0.09), transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, rgba(57, 135, 229, 0.07), transparent 55%),
+    var(--background);
+  background-attachment: fixed;
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
 
 .tabular-nums {
   font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Shared glass panel: a translucent, blurred surface with a soft gradient
+ * hairline border, replacing the old flat bg-card/border-card-border combo
+ * that was copy-pasted across ~60 call sites. One definition here, swapped
+ * in everywhere via the `card-glass` class.
+ */
+.card-glass {
+  position: relative;
+  border-radius: var(--radius-card);
+  background: var(--card);
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.06) inset,
+    0 24px 48px -28px rgba(0, 0, 0, 0.8);
+}
+
+.card-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.22),
+    rgba(255, 255, 255, 0.02) 45%,
+    rgba(201, 162, 75, 0.16) 100%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
 }

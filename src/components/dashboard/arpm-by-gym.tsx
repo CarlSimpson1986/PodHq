@@ -3,7 +3,7 @@ import type { GymArpm } from "@/lib/data/dashboard";
 
 export function ArpmByGym({ data }: { data: GymArpm[] }) {
   return (
-    <div className="rounded-[12px] border border-card-border bg-card p-5">
+    <div className="card-glass p-5">
       <p className="text-sm font-semibold text-foreground">Revenue per member by gym</p>
       <p className="mt-1 text-xs text-muted-foreground">
         Gyms price differently, so this is more actionable than a single blended average.

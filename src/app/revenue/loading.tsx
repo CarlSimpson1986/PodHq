@@ -9,7 +9,7 @@ export default function RevenueLoading() {
         <div className="h-8 w-24 animate-pulse rounded-md bg-card" />
         <div className="h-8 w-24 animate-pulse rounded-md bg-card" />
       </div>
-      <div className="mt-4 h-28 animate-pulse rounded-[12px] border border-card-border bg-card" />
+      <div className="mt-4 h-28 animate-pulse card-glass" />
     </main>
   );
 }

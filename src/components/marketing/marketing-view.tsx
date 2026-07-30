@@ -2,13 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { formatGBP } from "@/lib/format";
-import { GYM_NAMES, type GymName } from "@/lib/data/types";
+import type { GymName } from "@/lib/data/types";
 import type { MarketingSummary } from "@/lib/data/marketing";
 import { WeeklySpendChart } from "./weekly-spend-chart";
 import { WeeklyRateChart } from "./weekly-rate-chart";
 import { LtvVsCacCard } from "./ltv-vs-cac-card";
 import { WeeklyTable } from "./weekly-table";
 import { AdSpendUploadForm } from "./ad-spend-upload-form";
+import { GymSelect } from "@/components/ui/gym-select";
 
 interface MarketingViewProps {
   role: "admin" | "owner";
@@ -58,19 +59,7 @@ export function MarketingView({ role, initialGym, initialSummary }: MarketingVie
 
       {role === "admin" && (
         <div className="mt-6 flex flex-wrap items-center gap-2">
-          <select
-            value={gym ?? ""}
-            disabled={isPending}
-            onChange={(e) => handleGymChange(e.target.value ? (e.target.value as GymName) : null)}
-            className="rounded-md border border-card-border bg-card px-2 py-1.5 text-sm text-foreground"
-          >
-            <option value="">All gyms</option>
-            {GYM_NAMES.map((g) => (
-              <option key={g} value={g}>
-                {g}
-              </option>
-            ))}
-          </select>
+          <GymSelect value={gym} onChange={handleGymChange} disabled={isPending} />
         </div>
       )}
 
@@ -83,19 +72,19 @@ export function MarketingView({ role, initialGym, initialSummary }: MarketingVie
 
       <div className="mt-4 space-y-4">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <div className="rounded-[12px] border border-card-border bg-card p-5">
+          <div className="card-glass p-5">
             <p className="text-sm text-muted-foreground">Total spend</p>
             <p className="mt-2 text-xl font-semibold text-foreground">{formatGBP(summary.totals.spendGbp)}</p>
           </div>
-          <div className="rounded-[12px] border border-card-border bg-card p-5">
+          <div className="card-glass p-5">
             <p className="text-sm text-muted-foreground">Total clicks</p>
             <p className="mt-2 text-xl font-semibold text-foreground">{summary.totals.clicks}</p>
           </div>
-          <div className="rounded-[12px] border border-card-border bg-card p-5">
+          <div className="card-glass p-5">
             <p className="text-sm text-muted-foreground">Total leads</p>
             <p className="mt-2 text-xl font-semibold text-foreground">{summary.totals.leads}</p>
           </div>
-          <div className="rounded-[12px] border border-card-border bg-card p-5">
+          <div className="card-glass p-5">
             <p className="text-sm text-muted-foreground">Avg. CPL</p>
             <p className="mt-2 text-xl font-semibold text-foreground">
               {summary.totals.cpl !== null ? formatGBP(summary.totals.cpl) : "—"}

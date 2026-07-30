@@ -108,7 +108,7 @@ export default async function DashboardPage() {
         <h1 className="text-xl font-semibold text-foreground">All gyms</h1>
         <p className="mt-1 text-sm text-muted-foreground">{formatMonthLabel(month)}</p>
 
-        <section className="mt-6 rounded-[12px] border border-card-border bg-card p-5">
+        <section className="mt-6 card-glass p-5">
           <p className="text-sm text-muted-foreground">Total revenue</p>
           <p className="mt-2 text-3xl font-semibold text-foreground">
             {formatGBP(summary.currentMonthRevenue)}

@@ -4,7 +4,7 @@ import type { TopCustomer } from "@/lib/data/revenue";
 
 export function TopCustomersTable({ data }: { data: TopCustomer[] }) {
   return (
-    <div className="rounded-[12px] border border-card-border bg-card p-5">
+    <div className="card-glass p-5">
       <p className="text-sm font-semibold text-foreground">Top 10 customers</p>
       <div className="mt-4 overflow-x-auto">
         <table className="w-full text-sm">

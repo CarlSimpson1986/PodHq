@@ -42,7 +42,7 @@ export function CreateOwnerForm({ onCreated }: { onCreated: () => void }) {
   }
 
   return (
-    <div className="rounded-[12px] border border-card-border bg-card p-5">
+    <div className="card-glass p-5">
       <p className="text-sm font-semibold text-foreground">Add a new franchisee owner</p>
       <p className="mt-1 text-xs text-muted-foreground">
         Sends an email invite to set their own password. They&apos;ll only have access to the gym selected below.

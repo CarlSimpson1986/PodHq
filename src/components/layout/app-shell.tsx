@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { SignOutButton } from "@/components/auth/sign-out-button";
+import { Logo } from "@/components/layout/logo";
 
 const NAV_ITEMS = [
   {
@@ -80,7 +81,10 @@ export function AppShell({ children, role }: { children: ReactNode; role?: "admi
     <div className="min-h-screen md:flex">
       {/* Desktop sidebar */}
       <aside className="sticky top-0 hidden h-screen w-56 shrink-0 flex-col border-r border-card-border bg-card md:flex">
-        <p className="px-5 py-6 text-sm font-semibold tracking-wide text-accent">PodHQ</p>
+        <div className="flex items-center gap-2 px-5 py-6">
+          <Logo />
+          <span className="text-xs font-medium tracking-wide text-muted-foreground">PodHQ</span>
+        </div>
         <nav className="flex flex-1 flex-col gap-1 px-3">
           {navItems.map((item) => {
             const active = pathname?.startsWith(item.href);
@@ -88,10 +92,10 @@ export function AppShell({ children, role }: { children: ReactNode; role?: "admi
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${
                   active
-                    ? "bg-accent text-accent-foreground"
-                    : "text-muted-foreground hover:bg-background hover:text-foreground"
+                    ? "bg-gradient-to-r from-accent to-accent-hover text-accent-foreground shadow-[0_0_24px_-6px_var(--accent)]"
+                    : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
                 }`}
               >
                 {item.icon}
@@ -107,7 +111,10 @@ export function AppShell({ children, role }: { children: ReactNode; role?: "admi
 
       {/* Mobile top bar (wordmark + sign out — nav itself is the bottom bar) */}
       <div className="flex items-center justify-between border-b border-card-border bg-card px-4 py-3 md:hidden">
-        <p className="text-sm font-semibold tracking-wide text-accent">PodHQ</p>
+        <div className="flex items-center gap-2">
+          <Logo />
+          <span className="text-xs font-medium tracking-wide text-muted-foreground">PodHQ</span>
+        </div>
         <SignOutButton />
       </div>
 
@@ -121,7 +128,7 @@ export function AppShell({ children, role }: { children: ReactNode; role?: "admi
             <Link
               key={item.href}
               href={item.href}
-              className={`flex flex-1 flex-col items-center gap-1 py-2.5 text-xs font-medium ${
+              className={`flex flex-1 flex-col items-center gap-1 py-2.5 text-xs font-medium transition-colors ${
                 active ? "text-accent" : "text-muted-foreground"
               }`}
             >

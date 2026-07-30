@@ -33,23 +33,23 @@ export function CustomerProfileView({ gym, name, profile }: CustomerProfileViewP
       {profile && (
         <>
           <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
-            <div className="rounded-[12px] border border-card-border bg-card p-5">
+            <div className="card-glass p-5">
               <p className="text-sm text-muted-foreground">Total spend</p>
               <p className="mt-2 text-xl font-semibold text-foreground">{formatGBP(profile.totalSpend)}</p>
             </div>
-            <div className="rounded-[12px] border border-card-border bg-card p-5">
+            <div className="card-glass p-5">
               <p className="text-sm text-muted-foreground">Avg / month</p>
               <p className="mt-2 text-xl font-semibold text-foreground">{formatGBP(profile.avgMonthlySpend)}</p>
             </div>
-            <div className="rounded-[12px] border border-card-border bg-card p-5">
+            <div className="card-glass p-5">
               <p className="text-sm text-muted-foreground">Active months</p>
               <p className="mt-2 text-xl font-semibold text-foreground">{formatNumber(profile.activeMonths)}</p>
             </div>
-            <div className="rounded-[12px] border border-card-border bg-card p-5">
+            <div className="card-glass p-5">
               <p className="text-sm text-muted-foreground">LTV</p>
               <p className="mt-2 text-xl font-semibold text-foreground">{formatGBP(profile.ltv)}</p>
             </div>
-            <div className="rounded-[12px] border border-card-border bg-card p-5">
+            <div className="card-glass p-5">
               <p className="text-sm text-muted-foreground">Last active</p>
               <p className="mt-2 text-xl font-semibold text-foreground">{formatMonthLabel(profile.lastActiveMonth)}</p>
             </div>
@@ -57,7 +57,7 @@ export function CustomerProfileView({ gym, name, profile }: CustomerProfileViewP
 
           <section className="mt-8">
             <h2 className="text-lg font-semibold text-foreground">Transactions</h2>
-            <div className="mt-4 max-h-96 overflow-y-auto overflow-x-auto rounded-[12px] border border-card-border bg-card p-5">
+            <div className="mt-4 max-h-96 overflow-y-auto overflow-x-auto card-glass p-5">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="sticky top-0 border-b border-card-border bg-card text-left text-xs text-muted-foreground">
@@ -99,7 +99,7 @@ export function CustomerProfileView({ gym, name, profile }: CustomerProfileViewP
               </p>
             )}
             {profile.attendance && (
-              <div className="mt-4 max-h-96 overflow-y-auto overflow-x-auto rounded-[12px] border border-card-border bg-card p-5">
+              <div className="mt-4 max-h-96 overflow-y-auto overflow-x-auto card-glass p-5">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="sticky top-0 border-b border-card-border bg-card text-left text-xs text-muted-foreground">

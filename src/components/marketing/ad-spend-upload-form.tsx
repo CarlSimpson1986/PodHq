@@ -119,7 +119,7 @@ export function AdSpendUploadForm({ gym, isAdmin, onSaved }: AdSpendUploadFormPr
   }
 
   return (
-    <div className="rounded-[12px] border border-card-border bg-card p-5">
+    <div className="card-glass p-5">
       <p className="text-sm font-semibold text-foreground">Upload ad spend &amp; leads — {gym}</p>
       <p className="mt-1 text-xs text-muted-foreground">
         Meta Ads weekly &ldquo;Ad sets&rdquo; export and/or the GymFlow leads export. Either file can be uploaded on
