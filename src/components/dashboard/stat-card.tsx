@@ -36,7 +36,7 @@ export function StatCard({ label, value, delta, note, tone, href }: StatCardProp
     </>
   );
 
-  const className = `rounded-[12px] border border-card-border bg-card p-5${
+  const className = `card-glass p-5${
     href ? " transition-colors hover:border-accent" : ""
   }`;
 

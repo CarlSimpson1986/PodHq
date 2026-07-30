@@ -15,7 +15,7 @@ export function LtvHistogramChart({ data }: { data: LtvHistogramBucket[] }) {
   }));
 
   return (
-    <div className="rounded-[12px] border border-card-border bg-card p-5">
+    <div className="card-glass p-5">
       <p className="text-sm font-semibold text-foreground">LTV distribution</p>
       {chartData.length === 0 ? (
         <p className="mt-4 text-sm text-muted-foreground">Not enough customer history yet.</p>

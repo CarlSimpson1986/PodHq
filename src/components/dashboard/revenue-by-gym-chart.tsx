@@ -10,7 +10,7 @@ const MUTED = "#9a9ba3";
 
 export function RevenueByGymChart({ data }: { data: GymRevenue[] }) {
   return (
-    <div className="rounded-[12px] border border-card-border bg-card p-5">
+    <div className="card-glass p-5">
       <p className="text-sm font-semibold text-foreground">Revenue by gym</p>
       <div className="mt-4 h-80 w-full">
         <ResponsiveContainer>

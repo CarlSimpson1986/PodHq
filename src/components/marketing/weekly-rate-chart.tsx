@@ -20,7 +20,7 @@ interface WeeklyRateChartProps {
  *  single-series color, differing only in which derived rate they plot. */
 export function WeeklyRateChart({ title, data, dataKey, seriesName, formatValue }: WeeklyRateChartProps) {
   return (
-    <div className="rounded-[12px] border border-card-border bg-card p-5">
+    <div className="card-glass p-5">
       <p className="text-sm font-semibold text-foreground">{title}</p>
       <div className="mt-4 h-56 w-full">
         <ResponsiveContainer>

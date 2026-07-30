@@ -9,7 +9,7 @@ const MUTED = "#9a9ba3";
 
 export function RevenueTrendChart({ data }: { data: { month: string; total: number }[] }) {
   return (
-    <div className="rounded-[12px] border border-card-border bg-card p-5">
+    <div className="card-glass p-5">
       <p className="text-sm font-semibold text-foreground">Revenue trend (last 12 months)</p>
       <div className="mt-4 h-64 w-full">
         <ResponsiveContainer>

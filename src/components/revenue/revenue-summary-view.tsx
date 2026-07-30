@@ -2,13 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { formatGBP, formatNumber, formatPercent, formatMonthLabel } from "@/lib/format";
-import { GYM_NAMES, type GymName } from "@/lib/data/types";
+import type { GymName } from "@/lib/data/types";
 import type { DateRangePreset, RevenueRangeSummary, MonthRange } from "@/lib/data/revenue";
 import { CategoryPieChart } from "./category-pie-chart";
 import { CategoryTrendChart } from "./category-trend-chart";
 import { TrendYoyChart } from "./trend-yoy-chart";
 import { TopProductsChart } from "./top-products-chart";
 import { TopCustomersTable } from "./top-customers-table";
+import { GymSelect } from "@/components/ui/gym-select";
 
 function formatRange(range: MonthRange): string {
   return range.start === range.end
@@ -121,19 +122,7 @@ export function RevenueSummaryView({ role, initialPreset, initialGym, initialSum
         )}
 
         {role === "admin" && (
-          <select
-            value={gym ?? ""}
-            disabled={isPending}
-            onChange={(e) => handleGymChange(e.target.value ? (e.target.value as GymName) : null)}
-            className="ml-auto rounded-md border border-card-border bg-card px-2 py-1.5 text-sm text-foreground"
-          >
-            <option value="">All gyms</option>
-            {GYM_NAMES.map((g) => (
-              <option key={g} value={g}>
-                {g}
-              </option>
-            ))}
-          </select>
+          <GymSelect value={gym} onChange={handleGymChange} disabled={isPending} className="ml-auto" />
         )}
       </div>
 
@@ -146,7 +135,7 @@ export function RevenueSummaryView({ role, initialPreset, initialGym, initialSum
 
       {summary && (
         <>
-          <section className="mt-4 rounded-[12px] border border-card-border bg-card p-5">
+          <section className="mt-4 card-glass p-5">
             <p className="text-sm text-muted-foreground">
               {summary.label} revenue{" "}
               <span className="text-muted-foreground/70">({formatRange(summary.range)})</span>
@@ -167,11 +156,11 @@ export function RevenueSummaryView({ role, initialPreset, initialGym, initialSum
           </section>
 
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="rounded-[12px] border border-card-border bg-card p-5">
+            <div className="card-glass p-5">
               <p className="text-sm text-muted-foreground">Transactions</p>
               <p className="mt-2 text-2xl font-semibold text-foreground">{formatNumber(summary.transactionCount)}</p>
             </div>
-            <div className="rounded-[12px] border border-card-border bg-card p-5">
+            <div className="card-glass p-5">
               <p className="text-sm text-muted-foreground">Average revenue per transaction</p>
               <p className="mt-2 text-2xl font-semibold text-foreground">
                 {summary.averageRevenuePerTransaction !== null

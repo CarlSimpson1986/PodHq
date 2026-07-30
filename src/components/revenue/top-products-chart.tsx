@@ -12,7 +12,7 @@ export function TopProductsChart({ data }: { data: TopProduct[] }) {
   const sorted = [...data].sort((a, b) => b.total - a.total);
 
   return (
-    <div className="rounded-[12px] border border-card-border bg-card p-5">
+    <div className="card-glass p-5">
       <p className="text-sm font-semibold text-foreground">Top 10 products</p>
       <div className="mt-4 h-80 w-full">
         <ResponsiveContainer>

@@ -23,7 +23,7 @@ const TABLE_LABELS: Record<keyof SystemStatus["rowCounts"], string> = {
 
 export function SystemStatusCard({ status }: { status: SystemStatus }) {
   return (
-    <div className="rounded-[12px] border border-card-border bg-card p-5">
+    <div className="card-glass p-5">
       <p className="text-sm font-semibold text-foreground">System status</p>
       <p className="mt-1 text-xs text-muted-foreground">
         &ldquo;Last sync&rdquo; is the most recent row inserted into Revenue or attendance — a proxy for when

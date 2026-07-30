@@ -3,7 +3,7 @@ import type { WeeklyAdSpend } from "@/lib/data/marketing";
 
 export function WeeklyTable({ weeks }: { weeks: WeeklyAdSpend[] }) {
   return (
-    <div className="rounded-[12px] border border-card-border bg-card p-5">
+    <div className="card-glass p-5">
       <p className="text-sm font-semibold text-foreground">Week by week ({weeks.length})</p>
       {weeks.length === 0 ? (
         <p className="mt-3 text-sm text-muted-foreground">No ad spend uploaded yet.</p>

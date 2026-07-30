@@ -3,7 +3,7 @@ import type { PnlFigures, PnlTotals } from "@/lib/data/outgoings";
 
 export function PnlByGymTable({ perGym, consolidated }: { perGym: PnlFigures[]; consolidated: PnlTotals }) {
   return (
-    <div className="rounded-[12px] border border-card-border bg-card p-5">
+    <div className="card-glass p-5">
       <p className="text-sm font-semibold text-foreground">P&amp;L by gym</p>
       <div className="mt-4 overflow-x-auto">
         <table className="w-full text-sm">

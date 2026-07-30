@@ -6,7 +6,7 @@ export function LtvVsCacCard({ ltvVsCac }: { ltvVsCac: MarketingSummary["ltvVsCa
   const hasData = averageLtv !== null && costPerLead !== null && roiMultiple !== null;
 
   return (
-    <div className="rounded-[12px] border border-card-border bg-card p-5">
+    <div className="card-glass p-5">
       <p className="text-sm font-semibold text-foreground">LTV vs. cost per lead</p>
 
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">

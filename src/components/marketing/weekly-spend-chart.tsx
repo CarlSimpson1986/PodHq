@@ -10,7 +10,7 @@ const MUTED = "#9a9ba3";
 
 export function WeeklySpendChart({ data }: { data: WeeklyAdSpend[] }) {
   return (
-    <div className="rounded-[12px] border border-card-border bg-card p-5">
+    <div className="card-glass p-5">
       <p className="text-sm font-semibold text-foreground">Weekly ad spend (last 12 weeks)</p>
       <div className="mt-4 h-56 w-full">
         <ResponsiveContainer>

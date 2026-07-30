@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { formatGBP, formatNumber, formatMonthLabel, formatDate, formatDaysAgo, customerProfileHref } from "@/lib/format";
-import { GYM_NAMES, type GymName } from "@/lib/data/types";
+import type { GymName } from "@/lib/data/types";
 import type { MemberInsightsSummary } from "@/lib/data/members";
 import { LtvHistogramChart } from "./ltv-histogram-chart";
 import { TopLtvCustomersTable } from "./top-ltv-customers-table";
+import { GymSelect } from "@/components/ui/gym-select";
 
 // Duplicated rather than imported from lib/data/dashboard — that module is
 // "server-only" and this is a client component.
@@ -99,19 +100,7 @@ export function MemberInsightsView({ role, initialMonth, initialGym, initialSumm
         </button>
 
         {role === "admin" && (
-          <select
-            value={gym ?? ""}
-            disabled={isPending}
-            onChange={(e) => handleGymChange(e.target.value ? (e.target.value as GymName) : null)}
-            className="ml-auto rounded-md border border-card-border bg-card px-2 py-1.5 text-sm text-foreground"
-          >
-            <option value="">All gyms</option>
-            {GYM_NAMES.map((g) => (
-              <option key={g} value={g}>
-                {g}
-              </option>
-            ))}
-          </select>
+          <GymSelect value={gym} onChange={handleGymChange} disabled={isPending} className="ml-auto" />
         )}
       </div>
 
@@ -125,7 +114,7 @@ export function MemberInsightsView({ role, initialMonth, initialGym, initialSumm
       {summary && (
         <>
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="rounded-[12px] border border-card-border bg-card p-5">
+            <div className="card-glass p-5">
               <p className="text-sm text-muted-foreground">Active members</p>
               <p className="mt-2 text-2xl font-semibold text-foreground">{formatNumber(summary.activeMemberCount)}</p>
               {summary.noAttendanceDataForGym && (
@@ -137,7 +126,7 @@ export function MemberInsightsView({ role, initialMonth, initialGym, initialSumm
                 </p>
               )}
             </div>
-            <div className="rounded-[12px] border border-card-border bg-card p-5">
+            <div className="card-glass p-5">
               <p className="text-sm text-muted-foreground">Avg attendance / active member</p>
               <p className="mt-2 text-2xl font-semibold text-foreground">
                 {summary.avgAttendancePerActiveMember !== null ? summary.avgAttendancePerActiveMember.toFixed(1) : "—"}
@@ -146,7 +135,7 @@ export function MemberInsightsView({ role, initialMonth, initialGym, initialSumm
           </div>
 
           <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <div className="rounded-[12px] border border-card-border bg-card p-5">
+            <div className="card-glass p-5">
               <p className="text-sm font-semibold text-foreground">
                 At-risk members — gone quiet 3+ months{" "}
                 <span className="font-normal text-muted-foreground">({summary.atRiskMembers.length})</span>
@@ -200,7 +189,7 @@ export function MemberInsightsView({ role, initialMonth, initialGym, initialSumm
               </div>
             </div>
 
-            <div className="rounded-[12px] border border-card-border bg-card p-5">
+            <div className="card-glass p-5">
               <p className="text-sm font-semibold text-foreground">Top attenders</p>
               <div className="mt-4 overflow-x-auto">
                 <table className="w-full text-sm">
@@ -250,13 +239,13 @@ export function MemberInsightsView({ role, initialMonth, initialGym, initialSumm
             </p>
 
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="rounded-[12px] border border-card-border bg-card p-5">
+              <div className="card-glass p-5">
                 <p className="text-sm text-muted-foreground">Average LTV</p>
                 <p className="mt-2 text-2xl font-semibold text-foreground">
                   {summary.ltv.averageLtv !== null ? formatGBP(summary.ltv.averageLtv) : "—"}
                 </p>
               </div>
-              <div className="rounded-[12px] border border-card-border bg-card p-5">
+              <div className="card-glass p-5">
                 <p className="text-sm text-muted-foreground">Affordable CAC (LTV ÷ 3)</p>
                 <p className="mt-2 text-2xl font-semibold text-foreground">
                   {summary.ltv.affordableCac !== null ? formatGBP(summary.ltv.affordableCac) : "—"}
