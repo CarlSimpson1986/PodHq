@@ -37,7 +37,7 @@ export default async function OutgoingsPage() {
   const history = historyGym ? await getOutgoingsHistory(historyGym) : null;
 
   return (
-    <AppShell>
+    <AppShell role={scope.role}>
       <div className="mx-auto max-w-6xl px-4 py-8">
         <OutgoingsView
           role={scope.role}

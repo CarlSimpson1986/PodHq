@@ -34,7 +34,7 @@ export default async function MarketingPage() {
   const summary = await getMarketingSummary(gym);
 
   return (
-    <AppShell>
+    <AppShell role={scope.role}>
       <div className="mx-auto max-w-6xl px-4 py-8">
         <MarketingView role={scope.role} initialGym={gym} initialSummary={summary} />
       </div>

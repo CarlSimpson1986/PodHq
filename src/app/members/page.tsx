@@ -35,7 +35,7 @@ export default async function MembersPage() {
   const summary = await getMemberInsightsSummary(gym, month);
 
   return (
-    <AppShell>
+    <AppShell role={scope.role}>
       <div className="mx-auto max-w-6xl px-4 py-8">
         <MemberInsightsView role={scope.role} initialMonth={month} initialGym={gym} initialSummary={summary} />
       </div>

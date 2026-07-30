@@ -72,8 +72,9 @@ const NAV_ITEMS = [
   },
 ];
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({ children, role }: { children: ReactNode; role?: "admin" | "owner" }) {
   const pathname = usePathname();
+  const navItems = role === "admin" ? NAV_ITEMS : NAV_ITEMS.filter((item) => item.href !== "/admin");
 
   return (
     <div className="min-h-screen md:flex">
@@ -81,7 +82,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <aside className="sticky top-0 hidden h-screen w-56 shrink-0 flex-col border-r border-card-border bg-card md:flex">
         <p className="px-5 py-6 text-sm font-semibold tracking-wide text-accent">PodHQ</p>
         <nav className="flex flex-1 flex-col gap-1 px-3">
-          {NAV_ITEMS.map((item) => {
+          {navItems.map((item) => {
             const active = pathname?.startsWith(item.href);
             return (
               <Link
@@ -114,7 +115,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* Mobile bottom nav */}
       <nav className="fixed inset-x-0 bottom-0 flex border-t border-card-border bg-card md:hidden">
-        {NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const active = pathname?.startsWith(item.href);
           return (
             <Link

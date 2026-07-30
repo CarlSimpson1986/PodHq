@@ -33,7 +33,7 @@ export default async function CustomerDirectoryPage() {
   const customers = await getCustomerDirectory(gym);
 
   return (
-    <AppShell>
+    <AppShell role={scope.role}>
       <div className="mx-auto max-w-6xl px-4 py-8">
         <CustomerDirectoryView role={scope.role} initialGym={gym} initialCustomers={customers} />
       </div>
