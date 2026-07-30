@@ -67,7 +67,7 @@ export default async function CustomerProfilePage({
   const profile = await getCustomerProfile(gymParam, nameParam);
 
   return (
-    <AppShell>
+    <AppShell role={scope.role}>
       <div className="mx-auto max-w-4xl px-4 py-8">
         <CustomerProfileView gym={gymParam} name={nameParam} profile={profile} />
       </div>

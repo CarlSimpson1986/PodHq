@@ -33,7 +33,7 @@ export default async function RevenuePage() {
   const summary = await getRevenueSummaryForRange(gym, "last_month");
 
   return (
-    <AppShell>
+    <AppShell role={scope.role}>
       <div className="mx-auto max-w-6xl px-4 py-8">
         <RevenueSummaryView role={scope.role} initialPreset="last_month" initialGym={gym} initialSummary={summary} />
       </div>

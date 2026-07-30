@@ -30,7 +30,7 @@ export default async function AdminPage() {
   const [users, systemStatus] = await Promise.all([getAllUsers(), getSystemStatus()]);
 
   return (
-    <AppShell>
+    <AppShell role={scope.role}>
       <div className="mx-auto max-w-6xl px-4 py-8">
         <AdminView currentUserId={user.id} initialUsers={users} initialStatus={systemStatus} />
       </div>

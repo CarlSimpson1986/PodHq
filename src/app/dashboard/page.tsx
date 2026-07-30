@@ -54,7 +54,7 @@ export default async function DashboardPage() {
     const net = pnl.single?.net ?? null;
 
     return (
-      <AppShell>
+      <AppShell role={scope.role}>
         <div className="mx-auto max-w-6xl px-4 py-8">
           <h1 className="text-xl font-semibold text-foreground">{scope.gym}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{formatMonthLabel(month)}</p>
@@ -103,7 +103,7 @@ export default async function DashboardPage() {
   const previousMonth = formatMonthLabel(shiftMonth(month, -1));
 
   return (
-    <AppShell>
+    <AppShell role={scope.role}>
       <div className="mx-auto max-w-6xl px-4 py-8">
         <h1 className="text-xl font-semibold text-foreground">All gyms</h1>
         <p className="mt-1 text-sm text-muted-foreground">{formatMonthLabel(month)}</p>
