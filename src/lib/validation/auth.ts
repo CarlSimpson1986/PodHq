@@ -12,10 +12,12 @@ export const passwordSchema = z
 export const loginSchema = z.object({
   email: emailSchema,
   password: z.string().min(1, "Password is required"),
+  captchaToken: z.string().min(1, "Captcha verification is required"),
 }).strict();
 
 export const magicLinkSchema = z.object({
   email: emailSchema,
+  captchaToken: z.string().min(1, "Captcha verification is required"),
 }).strict();
 
 export const setPasswordSchema = z.object({
