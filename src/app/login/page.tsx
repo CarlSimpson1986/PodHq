@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, useCallback, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { AuthCard } from "@/components/auth/auth-card";
+import { TurnstileWidget } from "@/components/auth/turnstile-widget";
 
 const inputClass =
   "w-full rounded-md border border-card-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-accent focus:outline-none";
@@ -18,6 +19,17 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaKey, setCaptchaKey] = useState(0);
+
+  const handleCaptchaToken = useCallback((token: string) => setCaptchaToken(token), []);
+
+  // Turnstile tokens are single-use — remount the widget after every attempt
+  // (success or failure) so the next submit has a fresh one.
+  function resetCaptcha() {
+    setCaptchaToken("");
+    setCaptchaKey((k) => k + 1);
+  }
 
   async function handlePasswordSubmit(e: FormEvent) {
     e.preventDefault();
@@ -27,7 +39,7 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, captchaToken }),
       });
       const body = await res.json();
       if (body.status === "ok") {
@@ -43,6 +55,7 @@ export default function LoginPage() {
       setError("Something went wrong. Try again.");
     } finally {
       setLoading(false);
+      resetCaptcha();
     }
   }
 
@@ -55,7 +68,7 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/magic-link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, captchaToken }),
       });
       const body = await res.json();
       setInfo(body.message ?? "If an account exists for that email, a login link has been sent.");
@@ -63,6 +76,7 @@ export default function LoginPage() {
       setError("Something went wrong. Try again.");
     } finally {
       setLoading(false);
+      resetCaptcha();
     }
   }
 
@@ -101,8 +115,9 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
+          <TurnstileWidget key={captchaKey} onToken={handleCaptchaToken} />
           {error && <p className="text-sm text-danger">{error}</p>}
-          <button type="submit" disabled={loading} className={buttonClass}>
+          <button type="submit" disabled={loading || !captchaToken} className={buttonClass}>
             {loading ? "Signing in..." : "Sign in"}
           </button>
           <button type="button" className={linkButtonClass} onClick={() => { setMode("magic-link"); setError(null); }}>
@@ -125,9 +140,10 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
+          <TurnstileWidget key={captchaKey} onToken={handleCaptchaToken} />
           {error && <p className="text-sm text-danger">{error}</p>}
           {info && <p className="text-sm text-success">{info}</p>}
-          <button type="submit" disabled={loading} className={buttonClass}>
+          <button type="submit" disabled={loading || !captchaToken} className={buttonClass}>
             {loading ? "Sending..." : "Send login link"}
           </button>
           <button type="button" className={linkButtonClass} onClick={() => { setMode("password"); setError(null); setInfo(null); }}>
