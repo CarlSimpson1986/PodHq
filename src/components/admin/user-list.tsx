@@ -41,6 +41,24 @@ export function UserList({
     }
   }
 
+  async function clearLockout(userId: string) {
+    setError(null);
+    setBusyId(userId);
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/unlock`, { method: "POST" });
+      const body = await res.json();
+      if (body.status !== "ok") {
+        setError(body.message ?? "Could not clear lockout.");
+        return;
+      }
+      onChanged();
+    } catch {
+      setError("Something went wrong. Try again.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   return (
     <div className="card-glass p-5">
       <p className="text-sm font-semibold text-foreground">Users ({users.length})</p>
@@ -74,14 +92,25 @@ export function UserList({
                   {u.userId === currentUserId ? (
                     <span className="text-xs text-muted-foreground">You</span>
                   ) : (
-                    <button
-                      type="button"
-                      disabled={busyId === u.userId}
-                      onClick={() => toggleBanned(u.userId, !u.banned)}
-                      className={secondaryButtonClass}
-                    >
-                      {busyId === u.userId ? "..." : u.banned ? "Reactivate" : "Deactivate"}
-                    </button>
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        disabled={busyId === u.userId}
+                        onClick={() => clearLockout(u.userId)}
+                        className={secondaryButtonClass}
+                        title="Clear a login lockout so the account can sign in with its password again"
+                      >
+                        {busyId === u.userId ? "..." : "Clear lockout"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busyId === u.userId}
+                        onClick={() => toggleBanned(u.userId, !u.banned)}
+                        className={secondaryButtonClass}
+                      >
+                        {busyId === u.userId ? "..." : u.banned ? "Reactivate" : "Deactivate"}
+                      </button>
+                    </div>
                   )}
                 </td>
               </tr>

@@ -5,6 +5,9 @@ const SOFT_LOCK_WINDOW_MINUTES = 15;
 const SOFT_LOCK_THRESHOLD = 5;
 const HARD_LOCK_THRESHOLD = 10;
 
+const LOGIN_IP_WINDOW_MINUTES = 15;
+const LOGIN_IP_LIMIT = 20;
+
 const MAGIC_LINK_WINDOW_MINUTES = 15;
 const MAGIC_LINK_PER_EMAIL_LIMIT = 3;
 const MAGIC_LINK_PER_IP_LIMIT = 10;
@@ -20,7 +23,7 @@ export type LockoutState =
  * only clears once an admin resets it (i.e. a fresh login_success or a
  * future admin-reset event appears in the log).
  */
-export async function checkLoginLockout(email: string): Promise<LockoutState> {
+export async function checkLoginLockout(email: string, ip?: string | null): Promise<LockoutState> {
   const admin = createAdminClient();
 
   const since = new Date(Date.now() - SOFT_LOCK_WINDOW_MINUTES * 60_000).toISOString();
@@ -35,11 +38,30 @@ export async function checkLoginLockout(email: string): Promise<LockoutState> {
     return { locked: true, reason: "too_many_recent_attempts" };
   }
 
+  // Per-account thresholds alone can't stop one source spraying many
+  // different accounts a few guesses each — same rationale as the
+  // magic-link per-IP cap below.
+  if (ip) {
+    const { count: ipFailures } = await admin
+      .from("auth_events")
+      .select("*", { count: "exact", head: true })
+      .eq("ip_address", ip)
+      .eq("event_type", "login_failure")
+      .gte("created_at", new Date(Date.now() - LOGIN_IP_WINDOW_MINUTES * 60_000).toISOString());
+
+    if ((ipFailures ?? 0) >= LOGIN_IP_LIMIT) {
+      return { locked: true, reason: "too_many_recent_attempts" };
+    }
+  }
+
+  // admin_lockout_reset lets an admin clear a hard lock even though the
+  // locked-out account can no longer produce a login_success itself — see
+  // the /api/admin/users/[id]/unlock route.
   const { data: lastSuccessRows } = await admin
     .from("auth_events")
     .select("created_at")
     .eq("user_email", email)
-    .eq("event_type", "login_success")
+    .in("event_type", ["login_success", "admin_lockout_reset"])
     .order("created_at", { ascending: false })
     .limit(1);
 
