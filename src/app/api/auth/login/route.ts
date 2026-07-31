@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
   }
   const { email, password } = parsed.data;
 
-  const lockout = await checkLoginLockout(email);
+  const lockout = await checkLoginLockout(email, ip);
   if (lockout.locked) {
     if (lockout.reason === "account_locked") {
       await logAuthEvent({ email, eventType: "account_locked", ipAddress: ip });

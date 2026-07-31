@@ -9,8 +9,8 @@ export const parseAdSpendSchema = z
     // At least one of the two must be present — a franchisee may paste one
     // export before the other, and a week appearing in only one file still
     // has a real number worth previewing (see refine below).
-    metaCsv: z.string().optional(),
-    leadsCsv: z.string().optional(),
+    metaCsv: z.string().max(5_000_000, "CSV is too large.").optional(),
+    leadsCsv: z.string().max(5_000_000, "CSV is too large.").optional(),
   })
   .strict()
   .refine((data) => Boolean(data.metaCsv) || Boolean(data.leadsCsv), {

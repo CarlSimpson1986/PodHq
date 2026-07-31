@@ -1,5 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logAuthEvent } from "@/lib/audit";
 import type { GymName } from "./types";
 
 export interface AdminUserRow {
@@ -114,6 +115,25 @@ export async function setUserBanned(userId: string, banned: boolean): Promise<vo
     ban_duration: banned ? INDEFINITE_BAN : "none",
   });
   if (error) throw error;
+}
+
+/**
+ * A hard login lockout only ever clears on a fresh login_success — which a
+ * locked-out account can no longer produce itself. This writes the one
+ * other event type checkLoginLockout treats as a reset marker, so an admin
+ * has an actual way to clear it (there wasn't one before this).
+ */
+export async function resetUserLockout(userId: string): Promise<void> {
+  const admin = createAdminClient();
+  const { data, error } = await admin.auth.admin.getUserById(userId);
+  if (error) throw error;
+  if (!data.user?.email) throw new Error("User has no email on record.");
+
+  await logAuthEvent({
+    email: data.user.email,
+    userId,
+    eventType: "admin_lockout_reset",
+  });
 }
 
 async function mostRecentCreatedAt(table: "Revenue" | "attendance"): Promise<string | null> {
