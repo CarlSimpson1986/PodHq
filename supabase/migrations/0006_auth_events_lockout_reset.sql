@@ -1,0 +1,11 @@
+-- admin_lockout_reset lets an admin clear a hard login lockout — the
+-- lockout previously only cleared on a fresh login_success, which a
+-- locked-out account can never produce itself. See src/lib/auth/lockout.ts.
+--
+-- Dropped rather than widened: the same quoted-string-literal paste
+-- corruption documented in the Stage 7 gym_outgoings.category history hit
+-- this constraint too. event_type is already validated at the app layer —
+-- every write goes through logAuthEvent's typed AuthEventType parameter —
+-- so this constraint was redundant defense-in-depth, not load-bearing,
+-- same conclusion as that earlier fix.
+alter table public.auth_events drop constraint auth_events_event_type_check;
