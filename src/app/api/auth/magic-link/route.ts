@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ status: "error", message: "Enter a valid email address." }, { status: 400 });
   }
-  const { email } = parsed.data;
+  const { email, captchaToken } = parsed.data;
 
   const rateLimit = await checkMagicLinkRateLimit(email, ip);
   if (!rateLimit.allowed) {
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
   const origin = request.nextUrl.origin;
   const { error } = await supabase.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: `${origin}/auth/callback` },
+    options: { emailRedirectTo: `${origin}/auth/callback`, captchaToken },
   });
 
   await logAuthEvent({

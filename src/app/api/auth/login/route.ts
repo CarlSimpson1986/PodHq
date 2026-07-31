@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ status: "error", message: GENERIC_ERROR }, { status: 400 });
   }
-  const { email, password } = parsed.data;
+  const { email, password, captchaToken } = parsed.data;
 
   const lockout = await checkLoginLockout(email, ip);
   if (lockout.locked) {
@@ -40,7 +40,11 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = await createSessionClient();
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+    options: { captchaToken },
+  });
 
   if (error || !data.user) {
     await logAuthEvent({ email, eventType: "login_failure", ipAddress: ip, detail: error?.message });
