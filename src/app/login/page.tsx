@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useCallback, type FormEvent } from "react";
+import { useState, useCallback, useEffect, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { AuthCard } from "@/components/auth/auth-card";
 import { TurnstileWidget } from "@/components/auth/turnstile-widget";
+
+const CAPTCHA_TIMEOUT_MS = 8000;
 
 const inputClass =
   "w-full rounded-md border border-card-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-accent focus:outline-none";
@@ -21,8 +23,22 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaKey, setCaptchaKey] = useState(0);
+  const [captchaStuck, setCaptchaStuck] = useState(false);
 
   const handleCaptchaToken = useCallback((token: string) => setCaptchaToken(token), []);
+
+  // The widget failing to load is otherwise silent — the submit button just
+  // stays disabled forever with no explanation, which is exactly what made
+  // a real production incident look like "the button doesn't work" with no
+  // clue why. If no token has arrived within a few seconds, say so and
+  // suggest the one workaround that's actually been confirmed to help
+  // (browser extensions interfering with the widget's own script load).
+  useEffect(() => {
+    setCaptchaStuck(false);
+    if (captchaToken) return;
+    const timer = setTimeout(() => setCaptchaStuck(true), CAPTCHA_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [captchaKey, captchaToken]);
 
   // Turnstile tokens are single-use — remount the widget after every attempt
   // (success or failure) so the next submit has a fresh one.
@@ -126,6 +142,13 @@ export default function LoginPage() {
             />
           </div>
           <TurnstileWidget key={captchaKey} onToken={handleCaptchaToken} />
+          {captchaStuck && !error && (
+            <p className="rounded-md border border-warning/40 bg-warning/10 p-3 text-xs text-warning">
+              Verification is taking longer than expected. This is sometimes caused by a browser extension
+              (particularly password managers or ad blockers) — try disabling extensions for this site, or open
+              this page in a private/incognito window.
+            </p>
+          )}
           {error && <p className="text-sm text-danger">{error}</p>}
           <button type="submit" disabled={loading || !captchaToken} className={buttonClass}>
             {loading ? "Signing in..." : "Sign in"}
@@ -151,6 +174,13 @@ export default function LoginPage() {
             />
           </div>
           <TurnstileWidget key={captchaKey} onToken={handleCaptchaToken} />
+          {captchaStuck && !error && (
+            <p className="rounded-md border border-warning/40 bg-warning/10 p-3 text-xs text-warning">
+              Verification is taking longer than expected. This is sometimes caused by a browser extension
+              (particularly password managers or ad blockers) — try disabling extensions for this site, or open
+              this page in a private/incognito window.
+            </p>
+          )}
           {error && <p className="text-sm text-danger">{error}</p>}
           {info && <p className="text-sm text-success">{info}</p>}
           <button type="submit" disabled={loading || !captchaToken} className={buttonClass}>
