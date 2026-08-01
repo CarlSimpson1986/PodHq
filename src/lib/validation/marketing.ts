@@ -26,14 +26,31 @@ export const adSpendWeekSchema = z
   })
   .strict();
 
+export const leadDraftSchema = z
+  .object({
+    leadSourceId: z.string().min(1),
+    firstName: z.string(),
+    lastName: z.string(),
+    email: z.string().email(),
+    createdDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  })
+  .strict();
+
 export const confirmAdSpendSchema = z
   .object({
     gym: z.enum(GYM_NAMES).optional(),
     weeks: z.array(adSpendWeekSchema).min(1),
+    leads: z.array(leadDraftSchema).max(5000).optional(),
   })
   .strict();
 
 export const marketingSummaryQuerySchema = z
+  .object({
+    gym: z.enum(GYM_NAMES).optional(),
+  })
+  .strict();
+
+export const clearMarketingDataSchema = z
   .object({
     gym: z.enum(GYM_NAMES).optional(),
   })

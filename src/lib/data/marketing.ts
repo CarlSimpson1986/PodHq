@@ -2,7 +2,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { GymName } from "./types";
 import { fetchAllRevenueForLtv, computeLtv } from "./members";
-import type { WeeklyAdSpendDraft } from "@/lib/marketing/parse";
+import type { WeeklyAdSpendDraft, LeadDraft } from "@/lib/marketing/parse";
 
 export interface WeeklyAdSpend {
   weekStarting: string;
@@ -15,6 +15,14 @@ export interface WeeklyAdSpend {
   cpl: number | null;
 }
 
+export interface RecentLead {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  createdDate: string;
+}
+
 export interface MarketingSummary {
   gym: GymName | null;
   totals: { spendGbp: number; clicks: number; leads: number; cpc: number | null; cpl: number | null };
@@ -22,6 +30,9 @@ export interface MarketingSummary {
   weeklyTrend: WeeklyAdSpend[];
   /** All weeks, most recent first — for the week-by-week table. */
   weeklyTable: WeeklyAdSpend[];
+  /** Most recent leads, most recent first — null when no single gym is in
+   *  view (admin "All gyms"), same convention as Outgoings' history/gym. */
+  recentLeads: RecentLead[] | null;
   ltvVsCac: {
     averageLtv: number | null;
     /** All-time total spend ÷ total leads — the closest available proxy for
@@ -81,7 +92,11 @@ const TREND_WEEKS = 12;
  * consolidated P&L row.
  */
 export async function getMarketingSummary(gym: GymName | null): Promise<MarketingSummary> {
-  const [rows, revenueRows] = await Promise.all([fetchAdSpendRows(gym), fetchAllRevenueForLtv(gym)]);
+  const [rows, revenueRows, recentLeads] = await Promise.all([
+    fetchAdSpendRows(gym),
+    fetchAllRevenueForLtv(gym),
+    gym ? getRecentLeads(gym) : Promise.resolve(null),
+  ]);
 
   const byWeek = new Map<string, { spendGbp: number; clicks: number; leads: number }>();
   for (const row of rows) {
@@ -123,8 +138,53 @@ export async function getMarketingSummary(gym: GymName | null): Promise<Marketin
     totals,
     weeklyTrend: allWeeks.slice(-TREND_WEEKS),
     weeklyTable: [...allWeeks].reverse(),
+    recentLeads,
     ltvVsCac: { averageLtv, costPerLead, roiMultiple },
   };
+}
+
+const RECENT_LEADS_LIMIT = 100;
+
+export async function getRecentLeads(gym: GymName): Promise<RecentLead[]> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("leads")
+    .select("id, first_name, last_name, email, created_date")
+    .eq("gym", gym)
+    .order("created_date", { ascending: false })
+    .limit(RECENT_LEADS_LIMIT);
+  if (error) throw error;
+
+  return (data ?? []).map((row) => ({
+    id: row.id as number,
+    firstName: row.first_name as string,
+    lastName: row.last_name as string,
+    email: row.email as string,
+    createdDate: row.created_date as string,
+  }));
+}
+
+/**
+ * Upsert on (gym, lead_source_id) — GymFlow's own Lead ID — same
+ * re-upload-overwrites-cleanly convention as upsertAdSpend. Requires the
+ * unique index from supabase/migrations/0008_leads.sql.
+ */
+export async function upsertLeads(gym: GymName, leads: LeadDraft[], uploadedBy: string): Promise<void> {
+  if (leads.length === 0) return;
+  const admin = createAdminClient();
+  const { error } = await admin.from("leads").upsert(
+    leads.map((l) => ({
+      gym,
+      lead_source_id: l.leadSourceId,
+      first_name: l.firstName,
+      last_name: l.lastName,
+      email: l.email,
+      created_date: l.createdDate,
+      uploaded_by: uploadedBy,
+    })),
+    { onConflict: "gym,lead_source_id" }
+  );
+  if (error) throw error;
 }
 
 /**
@@ -149,4 +209,32 @@ export async function upsertAdSpend(gym: GymName, weeks: WeeklyAdSpendDraft[], u
     { onConflict: "gym,week_starting" }
   );
   if (error) throw error;
+}
+
+export interface ClearMarketingDataResult {
+  adSpendDeleted: number;
+  leadsDeleted: number;
+}
+
+/**
+ * Permanently wipes every ad_spend row and every lead for one gym — the
+ * whole point is a clean reset, so this is a hard delete, not a soft one.
+ * Scoped to a single gym like every other write/delete in this app; never
+ * a cross-gym action. Returns counts so the caller can show what actually
+ * happened, not just "done".
+ */
+export async function clearMarketingData(gym: GymName): Promise<ClearMarketingDataResult> {
+  const admin = createAdminClient();
+
+  const { data: adSpendRows, error: adSpendError } = await admin
+    .from("ad_spend")
+    .delete()
+    .eq("gym", gym)
+    .select("id");
+  if (adSpendError) throw adSpendError;
+
+  const { data: leadRows, error: leadsError } = await admin.from("leads").delete().eq("gym", gym).select("id");
+  if (leadsError) throw leadsError;
+
+  return { adSpendDeleted: (adSpendRows ?? []).length, leadsDeleted: (leadRows ?? []).length };
 }

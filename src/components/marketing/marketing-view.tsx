@@ -9,6 +9,8 @@ import { WeeklyRateChart } from "./weekly-rate-chart";
 import { LtvVsCacCard } from "./ltv-vs-cac-card";
 import { WeeklyTable } from "./weekly-table";
 import { AdSpendUploadForm } from "./ad-spend-upload-form";
+import { RecentLeadsTable } from "./recent-leads-table";
+import { ClearMarketingDataButton } from "./clear-marketing-data-button";
 import { GymSelect } from "@/components/ui/gym-select";
 
 interface MarketingViewProps {
@@ -116,7 +118,17 @@ export function MarketingView({ role, initialGym, initialSummary }: MarketingVie
           <AdSpendUploadForm gym={uploadTargetGym} isAdmin={role === "admin"} onSaved={() => refetch(gym)} />
         )}
 
+        {summary.recentLeads && <RecentLeadsTable leads={summary.recentLeads} />}
+
         <WeeklyTable weeks={summary.weeklyTable} />
+
+        {uploadTargetGym && (
+          <ClearMarketingDataButton
+            gym={uploadTargetGym}
+            isAdmin={role === "admin"}
+            onCleared={() => refetch(gym)}
+          />
+        )}
       </div>
     </div>
   );
