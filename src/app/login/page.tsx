@@ -34,6 +34,10 @@ export default function LoginPage() {
   async function handlePasswordSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!captchaToken) {
+      setError("Verification is still loading. Wait a moment and try again.");
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/auth/login", {
@@ -44,6 +48,8 @@ export default function LoginPage() {
       const body = await res.json();
       if (body.status === "ok") {
         router.push("/dashboard");
+      } else if (body.status === "password_change_required") {
+        router.push("/login/set-password");
       } else if (body.status === "mfa_required") {
         router.push("/login/mfa");
       } else if (body.status === "mfa_setup_required") {
@@ -63,6 +69,10 @@ export default function LoginPage() {
     e.preventDefault();
     setError(null);
     setInfo(null);
+    if (!captchaToken) {
+      setError("Verification is still loading. Wait a moment and try again.");
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/auth/magic-link", {

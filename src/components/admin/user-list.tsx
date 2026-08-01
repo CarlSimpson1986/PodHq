@@ -18,6 +18,10 @@ export function UserList({
 }) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showDeactivated, setShowDeactivated] = useState(false);
+
+  const deactivatedCount = users.filter((u) => u.banned).length;
+  const visibleUsers = showDeactivated ? users : users.filter((u) => !u.banned);
 
   async function toggleBanned(userId: string, banned: boolean) {
     setError(null);
@@ -61,7 +65,18 @@ export function UserList({
 
   return (
     <div className="card-glass p-5">
-      <p className="text-sm font-semibold text-foreground">Users ({users.length})</p>
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold text-foreground">Users ({visibleUsers.length})</p>
+        {deactivatedCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowDeactivated((v) => !v)}
+            className="text-xs text-muted-foreground underline hover:text-foreground"
+          >
+            {showDeactivated ? "Hide deactivated" : `Show deactivated (${deactivatedCount})`}
+          </button>
+        )}
+      </div>
       {error && <p className="mt-2 text-sm text-danger">{error}</p>}
 
       <div className="mt-4 overflow-x-auto">
@@ -77,7 +92,7 @@ export function UserList({
             </tr>
           </thead>
           <tbody>
-            {users.map((u) => (
+            {visibleUsers.map((u) => (
               <tr key={u.userId} className="border-b border-card-border last:border-0">
                 <td className="py-2 pr-3 text-foreground">{u.email}</td>
                 <td className="py-2 pr-3 capitalize text-muted-foreground">{u.role}</td>
