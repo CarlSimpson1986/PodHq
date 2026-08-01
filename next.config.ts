@@ -3,6 +3,9 @@ import withPWAInit from "@ducanh2912/next-pwa";
 
 const isProd = process.env.NODE_ENV === "production";
 
+// Content-Security-Policy is set per-request in src/proxy.ts instead of
+// here — it needs a fresh nonce on every request (see proxy.ts for why),
+// which a static config value can't provide.
 const securityHeaders = [
   {
     key: "Strict-Transport-Security",
@@ -17,28 +20,6 @@ const securityHeaders = [
     value: "camera=(), microphone=(), geolocation=()",
   },
 ];
-
-// CSP is production-only: Next.js's dev-mode client (hot-reload eval(),
-// the debug-channel inline bootstrap script) needs allowances that would
-// defeat the point of a strict policy, and dev never runs anywhere but
-// localhost. Production gets the real, strict policy.
-if (isProd) {
-  securityHeaders.push({
-    key: "Content-Security-Policy",
-    value: [
-      "default-src 'self'",
-      "script-src 'self' https://challenges.cloudflare.com",
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data:",
-      "font-src 'self' data:",
-      "connect-src 'self' https://challenges.cloudflare.com",
-      "frame-src https://challenges.cloudflare.com",
-      "frame-ancestors 'none'",
-      "base-uri 'self'",
-      "form-action 'self'",
-    ].join("; "),
-  });
-}
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
