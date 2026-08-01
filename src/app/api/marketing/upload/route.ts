@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createSessionClient } from "@/lib/supabase/server";
 import { getGymScope } from "@/lib/auth/gym-scope";
-import { upsertAdSpend } from "@/lib/data/marketing";
+import { upsertAdSpend, upsertLeads } from "@/lib/data/marketing";
 import { confirmAdSpendSchema } from "@/lib/validation/marketing";
 import { checkRateLimit } from "@/lib/rate-limit";
 
@@ -46,6 +46,9 @@ export async function POST(request: NextRequest) {
     }
 
     await upsertAdSpend(gym, parsed.data.weeks, user.id);
+    if (parsed.data.leads) {
+      await upsertLeads(gym, parsed.data.leads, user.id);
+    }
 
     return NextResponse.json({ status: "ok" });
   } catch (err) {

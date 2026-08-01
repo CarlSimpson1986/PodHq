@@ -16,6 +16,14 @@ interface PreviewWeek {
   leads: number;
 }
 
+interface PreviewLead {
+  leadSourceId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  createdDate: string;
+}
+
 interface AdSpendUploadFormProps {
   gym: GymName;
   isAdmin: boolean;
@@ -37,6 +45,7 @@ export function AdSpendUploadForm({ gym, isAdmin, onSaved }: AdSpendUploadFormPr
   const [metaFileName, setMetaFileName] = useState<string | null>(null);
   const [leadsFileName, setLeadsFileName] = useState<string | null>(null);
   const [preview, setPreview] = useState<PreviewWeek[] | null>(null);
+  const [previewLeads, setPreviewLeads] = useState<PreviewLead[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [parsing, setParsing] = useState(false);
@@ -78,6 +87,7 @@ export function AdSpendUploadForm({ gym, isAdmin, onSaved }: AdSpendUploadFormPr
         return;
       }
       setPreview(body.weeks);
+      setPreviewLeads(body.leads ?? []);
       setWarnings(body.warnings ?? []);
     } catch {
       setError("Something went wrong reading these files. Try again.");
@@ -95,7 +105,7 @@ export function AdSpendUploadForm({ gym, isAdmin, onSaved }: AdSpendUploadFormPr
       const res = await fetch("/api/marketing/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ weeks: preview, ...(isAdmin ? { gym } : {}) }),
+        body: JSON.stringify({ weeks: preview, leads: previewLeads, ...(isAdmin ? { gym } : {}) }),
       });
       const body = await res.json();
       if (body.status !== "ok") {
@@ -103,6 +113,7 @@ export function AdSpendUploadForm({ gym, isAdmin, onSaved }: AdSpendUploadFormPr
         return;
       }
       setPreview(null);
+      setPreviewLeads([]);
       setWarnings([]);
       resetFiles();
       onSaved();
@@ -115,6 +126,7 @@ export function AdSpendUploadForm({ gym, isAdmin, onSaved }: AdSpendUploadFormPr
 
   function handleCancelPreview() {
     setPreview(null);
+    setPreviewLeads([]);
     setWarnings([]);
   }
 

@@ -15,6 +15,20 @@ interface ParseResult {
   warnings: string[];
 }
 
+export interface LeadDraft {
+  leadSourceId: string; // GymFlow's own "Lead ID" — the upsert key, see 0008_leads.sql
+  firstName: string;
+  lastName: string;
+  email: string;
+  createdDate: string; // yyyy-MM-dd
+}
+
+interface LeadsParseResult {
+  weeks: WeeklyAdSpendDraft[];
+  leads: LeadDraft[];
+  warnings: string[];
+}
+
 /**
  * Real Meta Ads exports have been seen using both `2026-07-17` (ISO) and
  * `17/07/2026` (DD/MM/YYYY) for the same "Reporting starts" column,
@@ -108,12 +122,19 @@ export function parseMetaCsv(csvText: string): ParseResult {
   return { weeks, warnings };
 }
 
-/** Row count per week (by "Created Date") = lead count — no gym column in
- *  this export, so which gym it belongs to is chosen in the upload form,
- *  same as the Meta CSV. */
-export function parseLeadsCsv(csvText: string): ParseResult {
+/**
+ * Row count per week (by "Created Date") = lead count — no gym column in
+ * this export, so which gym it belongs to is chosen in the upload form,
+ * same as the Meta CSV. Also extracts each row's own name/email (Stage 8
+ * only ever kept the count; the individual leads were thrown away) — a row
+ * still counts toward the weekly total even if its Lead ID or Email is
+ * missing, since the weekly CPL figure shouldn't regress just because lead
+ * detail can't be captured for that one row.
+ */
+export function parseLeadsCsv(csvText: string): LeadsParseResult {
   const parsed = Papa.parse<Record<string, string>>(csvText, { header: true, skipEmptyLines: true });
   const byWeek = new Map<string, number>();
+  const leads: LeadDraft[] = [];
   const warnings: string[] = [];
 
   for (const row of parsed.data) {
@@ -124,13 +145,27 @@ export function parseLeadsCsv(csvText: string): ParseResult {
     }
     const week = mondayOf(created);
     byWeek.set(week, (byWeek.get(week) ?? 0) + 1);
+
+    const leadSourceId = (row["Lead ID"] ?? "").trim();
+    const email = (row["Email"] ?? "").trim();
+    if (leadSourceId && email) {
+      leads.push({
+        leadSourceId,
+        firstName: (row["First Name"] ?? "").trim(),
+        lastName: (row["Last Name"] ?? "").trim(),
+        email,
+        createdDate: created.toISOString().slice(0, 10),
+      });
+    } else {
+      warnings.push("Skipped lead detail for a row missing a Lead ID or Email (still counted in the weekly total).");
+    }
   }
 
   const weeks = [...byWeek.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([weekStarting, leads]) => ({ weekStarting, spendGbp: 0, clicks: 0, leads }));
+    .map(([weekStarting, leadsCount]) => ({ weekStarting, spendGbp: 0, clicks: 0, leads: leadsCount }));
 
-  return { weeks, warnings };
+  return { weeks, leads, warnings };
 }
 
 /**
