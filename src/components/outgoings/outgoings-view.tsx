@@ -3,10 +3,13 @@
 import { useState, useTransition } from "react";
 import { formatMonthLabel } from "@/lib/format";
 import type { GymName } from "@/lib/data/types";
-import type { PnlSummary, OutgoingEntry } from "@/lib/data/outgoings";
+import type { PnlSummary, OutgoingEntry, OutgoingTransaction, MonthlyOutgoingsTotal } from "@/lib/data/outgoings";
 import { PnlSummary as PnlSummaryTiles } from "./pnl-summary";
 import { PnlByGymTable } from "./pnl-by-gym-table";
 import { OutgoingsBreakdownTable } from "./outgoings-breakdown-table";
+import { BankCsvUploadForm } from "./bank-csv-upload-form";
+import { OutgoingTransactionsTable } from "./outgoing-transactions-table";
+import { OutgoingsHistoryChart } from "./outgoings-history-chart";
 import { GymSelect } from "@/components/ui/gym-select";
 
 // Duplicated rather than imported from lib/data/dashboard — that module is
@@ -32,13 +35,25 @@ interface OutgoingsViewProps {
   initialGym: GymName | null;
   initialSummary: PnlSummary;
   initialHistory: OutgoingEntry[] | null;
+  initialTransactions: OutgoingTransaction[] | null;
+  initialMonthlyHistory: MonthlyOutgoingsTotal[] | null;
 }
 
-export function OutgoingsView({ role, initialMonth, initialGym, initialSummary, initialHistory }: OutgoingsViewProps) {
+export function OutgoingsView({
+  role,
+  initialMonth,
+  initialGym,
+  initialSummary,
+  initialHistory,
+  initialTransactions,
+  initialMonthlyHistory,
+}: OutgoingsViewProps) {
   const [month, setMonth] = useState(initialMonth);
   const [gym, setGym] = useState<GymName | null>(initialGym);
   const [summary, setSummary] = useState<PnlSummary | null>(initialSummary);
   const [history, setHistory] = useState<OutgoingEntry[] | null>(initialHistory);
+  const [transactions, setTransactions] = useState<OutgoingTransaction[] | null>(initialTransactions);
+  const [monthlyHistory, setMonthlyHistory] = useState<MonthlyOutgoingsTotal[] | null>(initialMonthlyHistory);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -56,14 +71,20 @@ export function OutgoingsView({ role, initialMonth, initialGym, initialSummary, 
         if (body.status !== "ok") {
           setSummary(null);
           setHistory(null);
+          setTransactions(null);
+          setMonthlyHistory(null);
           setError(body.message ?? "Could not load P&L data.");
           return;
         }
         setSummary(body.summary);
         setHistory(body.history);
+        setTransactions(body.transactions);
+        setMonthlyHistory(body.monthlyHistory);
       } catch {
         setSummary(null);
         setHistory(null);
+        setTransactions(null);
+        setMonthlyHistory(null);
         setError("Something went wrong. Try again.");
       }
     });
@@ -129,13 +150,22 @@ export function OutgoingsView({ role, initialMonth, initialGym, initialSummary, 
           )}
 
           {summary.single && singleGym && history && (
-            <OutgoingsBreakdownTable
-              gym={singleGym}
-              categoryBreakdown={summary.single.categoryBreakdown}
-              history={history}
-              isAdmin={role === "admin"}
-              onSubmitted={() => refetch(month, gym)}
-            />
+            <>
+              {monthlyHistory && <OutgoingsHistoryChart data={monthlyHistory} />}
+              <BankCsvUploadForm
+                gym={singleGym}
+                isAdmin={role === "admin"}
+                onSaved={() => refetch(month, gym)}
+              />
+              <OutgoingsBreakdownTable
+                gym={singleGym}
+                categoryBreakdown={summary.single.categoryBreakdown}
+                history={history}
+                isAdmin={role === "admin"}
+                onSubmitted={() => refetch(month, gym)}
+              />
+              {transactions && <OutgoingTransactionsTable transactions={transactions} />}
+            </>
           )}
         </div>
       )}

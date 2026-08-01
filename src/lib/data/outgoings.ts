@@ -2,7 +2,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { GYM_NAMES, OUTGOING_CATEGORIES, type GymName, type OutgoingCategory } from "./types";
 import type { GymScope } from "@/lib/auth/gym-scope";
-import { getRevenueByGym, sumRevenue } from "./dashboard";
+import { getRevenueByGym, sumRevenue, getDefaultReportMonth } from "./dashboard";
 
 export interface OutgoingEntry {
   id: number;
@@ -68,10 +68,14 @@ async function fetchOutgoingsRows(gym: GymName): Promise<
  * that month's effective amount — "changing" a value means inserting a new
  * row with a later effective_from, not editing the old one, so history is
  * never lost. A category with no row yet contributes £0 (normal onboarding
- * state, not a data gap worth flagging).
+ * state, not a data gap worth flagging). Split out from getCategoryBreakdown
+ * so getOutgoingsMonthlyHistory can reuse it against one already-fetched
+ * row set instead of re-querying per month.
  */
-async function getCategoryBreakdown(gym: GymName, month: string): Promise<CategoryAmount[]> {
-  const rows = await fetchOutgoingsRows(gym);
+function computeCategoryBreakdown(
+  rows: { category: OutgoingCategory; amount_gbp: number; effective_from: string }[],
+  month: string
+): CategoryAmount[] {
   const latestByCategory = new Map<OutgoingCategory, { amount_gbp: number; effective_from: string }>();
 
   for (const row of rows) {
@@ -86,6 +90,40 @@ async function getCategoryBreakdown(gym: GymName, month: string): Promise<Catego
     category,
     amountGbp: Number(latestByCategory.get(category)?.amount_gbp ?? 0),
   }));
+}
+
+async function getCategoryBreakdown(gym: GymName, month: string): Promise<CategoryAmount[]> {
+  const rows = await fetchOutgoingsRows(gym);
+  return computeCategoryBreakdown(rows, month);
+}
+
+export interface MonthlyOutgoingsTotal {
+  month: string;
+  totalGbp: number;
+}
+
+/**
+ * Total outgoings (summed across every category, using the same
+ * most-recent-row-at-or-before-month logic as the P&L figures) for each of
+ * the last `monthsBack` months up to and including the latest completed
+ * month — the history trend chart on the Outgoings page. One row fetch,
+ * not one query per month.
+ */
+export async function getOutgoingsMonthlyHistory(gym: GymName, monthsBack = 12): Promise<MonthlyOutgoingsTotal[]> {
+  const rows = await fetchOutgoingsRows(gym);
+  const endMonth = getDefaultReportMonth();
+  const [endYear, endMon] = endMonth.split("-").map(Number);
+
+  const months: string[] = [];
+  for (let i = monthsBack - 1; i >= 0; i--) {
+    const d = new Date(Date.UTC(endYear, endMon - 1 - i, 1));
+    months.push(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`);
+  }
+
+  return months.map((month) => {
+    const breakdown = computeCategoryBreakdown(rows, month);
+    return { month, totalGbp: breakdown.reduce((sum, c) => sum + c.amountGbp, 0) };
+  });
 }
 
 /**
@@ -117,6 +155,86 @@ export async function insertOutgoing(
     created_by: createdBy,
   });
   if (error) throw error;
+}
+
+/**
+ * One row per category+month, each summing every matching transaction in
+ * that bucket — gym_outgoings is a monthly-total table (see insertOutgoing
+ * above), not a transaction ledger, so a bank statement's many rows collapse
+ * into however many category/month combinations it actually touched. Same
+ * append-only convention as insertOutgoing: no upsert, history is never
+ * overwritten.
+ */
+export async function insertOutgoingsBatch(
+  gym: GymName,
+  entries: { category: OutgoingCategory; amountGbp: number; effectiveFrom: string }[],
+  createdBy: string
+): Promise<number> {
+  const admin = createAdminClient();
+  const rows = entries.map((e) => ({
+    gym,
+    category: e.category,
+    amount_gbp: e.amountGbp,
+    effective_from: e.effectiveFrom,
+    created_by: createdBy,
+  }));
+  const { error } = await admin.from("gym_outgoings").insert(rows);
+  if (error) throw error;
+  return rows.length;
+}
+
+export interface OutgoingTransaction {
+  id: number;
+  date: string;
+  description: string;
+  amountGbp: number;
+  category: OutgoingCategory;
+  createdAt: string;
+}
+
+/**
+ * Per-transaction detail behind a bank-statement import (see
+ * gym_outgoing_transactions, migration 0007) — who/what an outgoing
+ * actually was, e.g. "HMRC" or a named one-off payment, which the
+ * category+month total in gym_outgoings alone can't show. Purely a
+ * drill-down log; never read by the P&L calculation.
+ */
+export async function insertOutgoingTransactions(
+  gym: GymName,
+  transactions: { date: string; description: string; amountGbp: number; category: OutgoingCategory }[],
+  createdBy: string
+): Promise<void> {
+  const admin = createAdminClient();
+  const rows = transactions.map((t) => ({
+    gym,
+    transaction_date: t.date,
+    description: t.description,
+    amount_gbp: t.amountGbp,
+    category: t.category,
+    created_by: createdBy,
+  }));
+  const { error } = await admin.from("gym_outgoing_transactions").insert(rows);
+  if (error) throw error;
+}
+
+export async function getOutgoingTransactions(gym: GymName, limit = 200): Promise<OutgoingTransaction[]> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("gym_outgoing_transactions")
+    .select("id, transaction_date, description, amount_gbp, category, created_at")
+    .eq("gym", gym)
+    .order("transaction_date", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+
+  return (data ?? []).map((row) => ({
+    id: row.id as number,
+    date: row.transaction_date as string,
+    description: row.description as string,
+    amountGbp: Number(row.amount_gbp),
+    category: row.category as OutgoingCategory,
+    createdAt: row.created_at as string,
+  }));
 }
 
 export async function getOutgoingsHistory(gym: GymName): Promise<OutgoingEntry[]> {
