@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createSessionClient } from "@/lib/supabase/server";
 import { getGymScope } from "@/lib/auth/gym-scope";
-import { getPnlSummary, getOutgoingsHistory } from "@/lib/data/outgoings";
+import { getPnlSummary, getOutgoingsHistory, getOutgoingTransactions, getOutgoingsMonthlyHistory } from "@/lib/data/outgoings";
 import { getDefaultReportMonth } from "@/lib/data/dashboard";
 import { pnlSummaryQuerySchema } from "@/lib/validation/outgoings";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -50,11 +50,26 @@ export async function GET(request: NextRequest) {
 
     const summary = await getPnlSummary(scope, gymFilter, month);
 
-    // History/entry-form only make sense for a single gym in view.
+    // History/entry-form/transaction-log/chart only make sense for a single
+    // gym in view.
     const historyGym = scope.role === "owner" ? scope.gym : gymFilter;
-    const history = historyGym ? await getOutgoingsHistory(historyGym) : null;
+    const [history, transactions, monthlyHistory] = historyGym
+      ? await Promise.all([
+          getOutgoingsHistory(historyGym),
+          getOutgoingTransactions(historyGym),
+          getOutgoingsMonthlyHistory(historyGym),
+        ])
+      : [null, null, null];
 
-    return NextResponse.json({ status: "ok", role: scope.role, gym: historyGym, summary, history });
+    return NextResponse.json({
+      status: "ok",
+      role: scope.role,
+      gym: historyGym,
+      summary,
+      history,
+      transactions,
+      monthlyHistory,
+    });
   } catch (err) {
     console.error("[api/outgoings/summary]", { userId: user.id, error: err instanceof Error ? err.message : err });
     return NextResponse.json(

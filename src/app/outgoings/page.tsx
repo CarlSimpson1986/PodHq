@@ -1,6 +1,6 @@
 import { createSessionClient } from "@/lib/supabase/server";
 import { getGymScope } from "@/lib/auth/gym-scope";
-import { getPnlSummary, getOutgoingsHistory } from "@/lib/data/outgoings";
+import { getPnlSummary, getOutgoingsHistory, getOutgoingTransactions, getOutgoingsMonthlyHistory } from "@/lib/data/outgoings";
 import { getDefaultReportMonth } from "@/lib/data/dashboard";
 import { OutgoingsView } from "@/components/outgoings/outgoings-view";
 import { AppShell } from "@/components/layout/app-shell";
@@ -34,7 +34,13 @@ export default async function OutgoingsPage() {
   const month = getDefaultReportMonth();
   const summary = await getPnlSummary(scope, null, month);
   const historyGym = scope.role === "owner" ? scope.gym : null;
-  const history = historyGym ? await getOutgoingsHistory(historyGym) : null;
+  const [history, transactions, monthlyHistory] = historyGym
+    ? await Promise.all([
+        getOutgoingsHistory(historyGym),
+        getOutgoingTransactions(historyGym),
+        getOutgoingsMonthlyHistory(historyGym),
+      ])
+    : [null, null, null];
 
   return (
     <AppShell role={scope.role}>
@@ -45,6 +51,8 @@ export default async function OutgoingsPage() {
           initialGym={scope.role === "owner" ? scope.gym : null}
           initialSummary={summary}
           initialHistory={history}
+          initialTransactions={transactions}
+          initialMonthlyHistory={monthlyHistory}
         />
       </div>
     </AppShell>
