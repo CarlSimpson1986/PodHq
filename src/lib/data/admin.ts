@@ -1,4 +1,5 @@
 import "server-only";
+import { randomBytes } from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logAuthEvent } from "@/lib/audit";
 import type { GymName } from "./types";
@@ -89,17 +90,23 @@ export async function getAllUsers(): Promise<AdminUserRow[]> {
 }
 
 /**
- * Invites a new owner by email (Supabase sends the invite; they land on
- * /auth/callback → /login/set-password — the same flow Stage 2 already
- * hardened, not a new one) and scopes them to one gym. Admin accounts are
- * deliberately not creatable from here — the most privileged role stays a
- * manual, out-of-band step.
+ * Creates the owner's Supabase Auth account directly with a generated
+ * one-time password and scopes them to one gym. Deliberately not using
+ * inviteUserByEmail — the project's shared mailer caps out at 2 emails/hour
+ * and a real invite send silently failed to arrive (see ROADMAP Stage 9),
+ * so PodHQ sends nothing itself; the caller hands the returned password to
+ * the owner out-of-band. Admin accounts are deliberately not creatable from
+ * here — the most privileged role stays a manual, out-of-band step.
  */
-export async function createOwnerAccount(email: string, gym: GymName, origin: string): Promise<void> {
+export async function createOwnerAccount(email: string, gym: GymName): Promise<{ password: string }> {
   const admin = createAdminClient();
+  const password = randomBytes(12).toString("base64url");
 
-  const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
-    redirectTo: `${origin}/auth/callback`,
+  const { data, error } = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    app_metadata: { must_change_password: true },
   });
   if (error) throw error;
 
@@ -107,6 +114,8 @@ export async function createOwnerAccount(email: string, gym: GymName, origin: st
     .from("users_gyms")
     .insert({ user_id: data.user.id, gym, role: "owner" });
   if (insertError) throw insertError;
+
+  return { password };
 }
 
 export async function setUserBanned(userId: string, banned: boolean): Promise<void> {

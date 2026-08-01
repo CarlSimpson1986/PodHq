@@ -12,13 +12,15 @@ export function CreateOwnerForm({ onCreated }: { onCreated: () => void }) {
   const [email, setEmail] = useState("");
   const [gym, setGym] = useState<GymName>(GYM_NAMES[0]);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [created, setCreated] = useState<{ email: string; password: string } | null>(null);
+  const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    setSuccess(null);
+    setCreated(null);
+    setCopied(false);
     setSaving(true);
     try {
       const res = await fetch("/api/admin/users", {
@@ -31,7 +33,7 @@ export function CreateOwnerForm({ onCreated }: { onCreated: () => void }) {
         setError(body.message ?? "Could not create this account.");
         return;
       }
-      setSuccess(`Invite sent to ${email}.`);
+      setCreated({ email, password: body.password });
       setEmail("");
       onCreated();
     } catch {
@@ -41,11 +43,18 @@ export function CreateOwnerForm({ onCreated }: { onCreated: () => void }) {
     }
   }
 
+  async function handleCopy() {
+    if (!created) return;
+    await navigator.clipboard.writeText(created.password);
+    setCopied(true);
+  }
+
   return (
     <div className="card-glass p-5">
       <p className="text-sm font-semibold text-foreground">Add a new franchisee owner</p>
       <p className="mt-1 text-xs text-muted-foreground">
-        Sends an email invite to set their own password. They&apos;ll only have access to the gym selected below.
+        Creates their login directly — PodHQ doesn&apos;t send anything. Copy the one-time password below and send it
+        to them yourself. They&apos;ll only have access to the gym selected below.
       </p>
 
       <form className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end" onSubmit={handleSubmit}>
@@ -81,12 +90,32 @@ export function CreateOwnerForm({ onCreated }: { onCreated: () => void }) {
           </select>
         </div>
         <button type="submit" disabled={saving} className={buttonClass}>
-          {saving ? "Sending..." : "Send invite"}
+          {saving ? "Creating..." : "Create account"}
         </button>
       </form>
 
       {error && <p className="mt-3 text-sm text-danger">{error}</p>}
-      {success && <p className="mt-3 text-sm text-accent">{success}</p>}
+
+      {created && (
+        <div className="mt-3 rounded-md border border-card-border bg-background p-3 text-sm">
+          <p className="text-foreground">
+            Account created for <span className="font-semibold">{created.email}</span>. Send them this password
+            yourself — nothing has been emailed.
+          </p>
+          <div className="mt-2 flex items-center gap-2">
+            <code className="flex-1 select-all rounded bg-card-border/30 px-2 py-1 font-mono text-xs text-foreground">
+              {created.password}
+            </code>
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="rounded-md border border-card-border px-2 py-1 text-xs text-foreground transition-colors hover:bg-card-border/20"
+            >
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

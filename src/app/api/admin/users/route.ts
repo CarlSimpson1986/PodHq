@@ -61,8 +61,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: "error", message: "Invalid email or gym." }, { status: 400 });
     }
 
-    await createOwnerAccount(parsed.data.email, parsed.data.gym, request.nextUrl.origin);
-    return NextResponse.json({ status: "ok" });
+    const { password } = await createOwnerAccount(parsed.data.email, parsed.data.gym);
+    return NextResponse.json({ status: "ok", password });
   } catch (err) {
     console.error("[api/admin/users POST]", { userId: user.id, error: err instanceof Error ? err.message : err });
     return NextResponse.json(
