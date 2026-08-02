@@ -118,6 +118,33 @@ export async function createOwnerAccount(email: string, gym: GymName): Promise<{
   return { password };
 }
 
+/**
+ * Generates a fresh random password for an existing account and forces the
+ * same must_change_password flow createOwnerAccount uses for a brand-new
+ * one — the admin hands the returned password to the user out-of-band,
+ * PodHQ never emails it, and it's rejected on next login until they choose
+ * their own.
+ */
+export async function resetUserPassword(userId: string): Promise<{ email: string; password: string }> {
+  const admin = createAdminClient();
+  const password = randomBytes(12).toString("base64url");
+
+  const { data, error } = await admin.auth.admin.updateUserById(userId, {
+    password,
+    app_metadata: { must_change_password: true },
+  });
+  if (error) throw error;
+  if (!data.user?.email) throw new Error("User has no email on record.");
+
+  await logAuthEvent({
+    email: data.user.email,
+    userId,
+    eventType: "admin_password_reset",
+  });
+
+  return { email: data.user.email, password };
+}
+
 export async function setUserBanned(userId: string, banned: boolean): Promise<void> {
   const admin = createAdminClient();
   const { error } = await admin.auth.admin.updateUserById(userId, {

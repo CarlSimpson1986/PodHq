@@ -10,7 +10,8 @@ export type AuthEventType =
   | "mfa_challenge_success"
   | "mfa_challenge_failure"
   | "account_locked"
-  | "admin_lockout_reset";
+  | "admin_lockout_reset"
+  | "admin_password_reset";
 
 interface LogAuthEventInput {
   email: string;
