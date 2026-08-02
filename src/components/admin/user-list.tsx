@@ -19,6 +19,8 @@ export function UserList({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showDeactivated, setShowDeactivated] = useState(false);
+  const [resetResult, setResetResult] = useState<{ email: string; password: string } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const deactivatedCount = users.filter((u) => u.banned).length;
   const visibleUsers = showDeactivated ? users : users.filter((u) => !u.banned);
@@ -45,6 +47,27 @@ export function UserList({
     }
   }
 
+  async function resetPassword(userId: string, email: string) {
+    if (!confirm(`Reset the password for ${email}? Their current password stops working immediately.`)) return;
+    setError(null);
+    setResetResult(null);
+    setCopied(false);
+    setBusyId(userId);
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/reset-password`, { method: "POST" });
+      const body = await res.json();
+      if (body.status !== "ok") {
+        setError(body.message ?? "Could not reset this account's password.");
+        return;
+      }
+      setResetResult({ email: body.email, password: body.password });
+    } catch {
+      setError("Something went wrong. Try again.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function clearLockout(userId: string) {
     setError(null);
     setBusyId(userId);
@@ -63,6 +86,12 @@ export function UserList({
     }
   }
 
+  async function handleCopy() {
+    if (!resetResult) return;
+    await navigator.clipboard.writeText(resetResult.password);
+    setCopied(true);
+  }
+
   return (
     <div className="card-glass p-5">
       <div className="flex items-center justify-between">
@@ -78,6 +107,36 @@ export function UserList({
         )}
       </div>
       {error && <p className="mt-2 text-sm text-danger">{error}</p>}
+
+      {resetResult && (
+        <div className="mt-3 rounded-md border border-card-border bg-background p-3 text-sm">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-foreground">
+              New password for <span className="font-semibold">{resetResult.email}</span>. Send it to them
+              yourself — nothing has been emailed, and their old password no longer works.
+            </p>
+            <button
+              type="button"
+              onClick={() => setResetResult(null)}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              Dismiss
+            </button>
+          </div>
+          <div className="mt-2 flex items-center gap-2">
+            <code className="flex-1 select-all rounded bg-card-border/30 px-2 py-1 font-mono text-xs text-foreground">
+              {resetResult.password}
+            </code>
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="rounded-md border border-card-border px-2 py-1 text-xs text-foreground transition-colors hover:bg-card-border/20"
+            >
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="mt-4 overflow-x-auto">
         <table className="w-full text-sm">
@@ -116,6 +175,15 @@ export function UserList({
                         title="Clear a login lockout so the account can sign in with its password again"
                       >
                         {busyId === u.userId ? "..." : "Clear lockout"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busyId === u.userId}
+                        onClick={() => resetPassword(u.userId, u.email)}
+                        className={secondaryButtonClass}
+                        title="Generate a new random password and force this account to set its own on next login"
+                      >
+                        {busyId === u.userId ? "..." : "Reset password"}
                       </button>
                       <button
                         type="button"
