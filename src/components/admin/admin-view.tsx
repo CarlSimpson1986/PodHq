@@ -5,6 +5,7 @@ import type { AdminUserRow, SystemStatus } from "@/lib/data/admin";
 import { SystemStatusCard } from "./system-status-card";
 import { CreateOwnerForm } from "./create-owner-form";
 import { UserList } from "./user-list";
+import { ExportReportsCard } from "./export-reports-card";
 
 interface AdminViewProps {
   currentUserId: string;
@@ -50,6 +51,7 @@ export function AdminView({ currentUserId, initialUsers, initialStatus }: AdminV
         <SystemStatusCard status={status} />
         <CreateOwnerForm onCreated={refetch} />
         <UserList users={users} currentUserId={currentUserId} onChanged={refetch} />
+        <ExportReportsCard />
       </div>
     </div>
   );

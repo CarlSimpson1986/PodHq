@@ -22,6 +22,18 @@ export const pnlSummaryQuerySchema = z
   })
   .strict();
 
+// A PDF export is always for exactly one gym (no "all gyms" case) and a
+// date-range preset, mirroring revenueSummaryQuerySchema — a franchisee
+// report needs the same Last Month/QTD/Last Quarter/YTD/Full Year shape as
+// the /revenue page, not a single-month lookup.
+export const pnlExportQuerySchema = z
+  .object({
+    preset: z.enum(["last_month", "qtd", "last_quarter", "ytd", "full_year"]).default("last_month"),
+    year: z.coerce.number().int().min(2020).max(2100).optional(),
+    gym: z.enum(GYM_NAMES),
+  })
+  .strict();
+
 export const columnMappingSchema = z
   .object({
     dateColumn: z.string().min(1),
