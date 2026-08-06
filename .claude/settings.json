@@ -2,11 +2,11 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Read|Grep|Glob",
+        "matcher": "Read|Grep|Glob|Bash|PowerShell",
         "hooks": [
           {
             "type": "command",
-            "command": "node -e \"let f=JSON.parse(require('fs').readFileSync(0,'utf8')).tool_input?.file_path||''; if(/\\.env/.test(f)){console.log(JSON.stringify({hookSpecificOutput:{hookEventName:'PreToolUse',permissionDecision:'deny',permissionDecisionReason:'Never read .env files — secrets must stay secret'}}))}\"",
+            "command": "node -e \"let d=JSON.parse(require('fs').readFileSync(0,'utf8')); let fp=d.tool_input?.file_path||''; let c=d.tool_input?.command||''; let hit=/\\.env/i.test(fp) || /\\b(cat|type|less|more|head|tail|bat|Get-Content|gc|readFileSync|readFile|open)\\b[^\\n|;&]*\\.env\\S*/i.test(c) || /<\\s*\\.env\\S*/i.test(c); if(hit){console.log(JSON.stringify({hookSpecificOutput:{hookEventName:'PreToolUse',permissionDecision:'deny',permissionDecisionReason:'Never read .env files — secrets must stay secret'}}))}\"",
             "timeout": 3
           }
         ]
