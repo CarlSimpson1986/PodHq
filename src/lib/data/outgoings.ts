@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { GYM_NAMES, OUTGOING_CATEGORIES, type GymName, type OutgoingCategory } from "./types";
 import type { GymScope } from "@/lib/auth/gym-scope";
 import { getRevenueByGym, sumRevenue, getDefaultReportMonth } from "./dashboard";
+import { sumRevenueForRange, type MonthRange } from "./revenue";
 
 export interface OutgoingEntry {
   id: number;
@@ -95,6 +96,40 @@ function computeCategoryBreakdown(
 async function getCategoryBreakdown(gym: GymName, month: string): Promise<CategoryAmount[]> {
   const rows = await fetchOutgoingsRows(gym);
   return computeCategoryBreakdown(rows, month);
+}
+
+function monthsBetween(range: MonthRange): string[] {
+  const [startYear, startMon] = range.start.split("-").map(Number);
+  const [endYear, endMon] = range.end.split("-").map(Number);
+  const count = (endYear - startYear) * 12 + (endMon - startMon) + 1;
+  return Array.from({ length: count }, (_, i) => {
+    const d = new Date(Date.UTC(startYear, startMon - 1 + i, 1));
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+  });
+}
+
+/**
+ * Sums each month's carry-forward-resolved category breakdown across the
+ * range — a category's monthly rate applies until changed, so a multi-month
+ * total is the sum of what was actually effective each month, not one
+ * lookup against the range's end month.
+ */
+function computeCategoryBreakdownForRange(
+  rows: { category: OutgoingCategory; amount_gbp: number; effective_from: string }[],
+  range: MonthRange
+): CategoryAmount[] {
+  const totals = new Map<OutgoingCategory, number>();
+  for (const month of monthsBetween(range)) {
+    for (const { category, amountGbp } of computeCategoryBreakdown(rows, month)) {
+      totals.set(category, (totals.get(category) ?? 0) + amountGbp);
+    }
+  }
+  return OUTGOING_CATEGORIES.map((category) => ({ category, amountGbp: totals.get(category) ?? 0 }));
+}
+
+async function getCategoryBreakdownForRange(gym: GymName, range: MonthRange): Promise<CategoryAmount[]> {
+  const rows = await fetchOutgoingsRows(gym);
+  return computeCategoryBreakdownForRange(rows, range);
 }
 
 export interface MonthlyOutgoingsTotal {
@@ -237,6 +272,42 @@ export async function getOutgoingTransactions(gym: GymName, limit = 200): Promis
   }));
 }
 
+/**
+ * Transaction-level detail for a date range, grouped for display by
+ * ordering category-then-date rather than a hard row limit — this is a
+ * drill-down list behind the export PDF's category totals, not the P&L
+ * calculation itself (see insertOutgoingTransactions above). Only ever
+ * populated for categories that came in via a bank-statement import; a
+ * manually-entered category total has no transactions behind it, which is
+ * expected, not a gap.
+ */
+export async function getOutgoingTransactionsForRange(gym: GymName, range: MonthRange): Promise<OutgoingTransaction[]> {
+  const [startYear, startMon] = range.start.split("-").map(Number);
+  const [endYear, endMon] = range.end.split("-").map(Number);
+  const rangeStart = `${startYear}-${String(startMon).padStart(2, "0")}-01`;
+  const rangeEnd = new Date(Date.UTC(endYear, endMon, 1)).toISOString().slice(0, 10);
+
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("gym_outgoing_transactions")
+    .select("id, transaction_date, description, amount_gbp, category, created_at")
+    .eq("gym", gym)
+    .gte("transaction_date", rangeStart)
+    .lt("transaction_date", rangeEnd)
+    .order("category", { ascending: true })
+    .order("transaction_date", { ascending: true });
+  if (error) throw error;
+
+  return (data ?? []).map((row) => ({
+    id: row.id as number,
+    date: row.transaction_date as string,
+    description: row.description as string,
+    amountGbp: Number(row.amount_gbp),
+    category: row.category as OutgoingCategory,
+    createdAt: row.created_at as string,
+  }));
+}
+
 export async function getOutgoingsHistory(gym: GymName): Promise<OutgoingEntry[]> {
   const rows = await fetchOutgoingsRows(gym);
   return rows.map((row) => ({
@@ -271,8 +342,49 @@ async function sumAdSpend(gym: GymName, month: string): Promise<number> {
   return ((data ?? []) as { spend_gbp: number }[]).reduce((sum, row) => sum + Number(row.spend_gbp), 0);
 }
 
+async function sumAdSpendForRange(gym: GymName, range: MonthRange): Promise<number> {
+  const [startYear, startMon] = range.start.split("-").map(Number);
+  const [endYear, endMon] = range.end.split("-").map(Number);
+  const rangeStart = `${startYear}-${String(startMon).padStart(2, "0")}-01`;
+  const rangeEnd = new Date(Date.UTC(endYear, endMon, 1)).toISOString().slice(0, 10);
+
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("ad_spend")
+    .select("spend_gbp")
+    .eq("gym", gym)
+    .gte("week_starting", rangeStart)
+    .lt("week_starting", rangeEnd);
+  if (error) throw error;
+
+  return ((data ?? []) as { spend_gbp: number }[]).reduce((sum, row) => sum + Number(row.spend_gbp), 0);
+}
+
 async function getPnlFiguresForGym(gym: GymName, month: string, revenue: number): Promise<PnlFigures> {
   const [categoryBreakdown, adSpend] = await Promise.all([getCategoryBreakdown(gym, month), sumAdSpend(gym, month)]);
+  const outgoings = categoryBreakdown.reduce((sum, c) => sum + c.amountGbp, 0);
+
+  return {
+    gym,
+    revenue,
+    outgoings,
+    categoryBreakdown,
+    adSpend,
+    net: revenue - outgoings - adSpend,
+  };
+}
+
+/**
+ * Range equivalent of getPnlFiguresForGym — used by the admin PDF export
+ * (always exactly one admin-selected gym, never owner/all-gyms, so no scope
+ * branching is needed here unlike getPnlSummary below).
+ */
+export async function getPnlFiguresForRange(gym: GymName, range: MonthRange): Promise<PnlFigures> {
+  const [revenue, categoryBreakdown, adSpend] = await Promise.all([
+    sumRevenueForRange(gym, range),
+    getCategoryBreakdownForRange(gym, range),
+    sumAdSpendForRange(gym, range),
+  ]);
   const outgoings = categoryBreakdown.reduce((sum, c) => sum + c.amountGbp, 0);
 
   return {

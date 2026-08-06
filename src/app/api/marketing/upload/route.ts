@@ -4,6 +4,7 @@ import { getGymScope } from "@/lib/auth/gym-scope";
 import { upsertAdSpend, upsertLeads } from "@/lib/data/marketing";
 import { confirmAdSpendSchema } from "@/lib/validation/marketing";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { syncLeadsToBrevo } from "@/lib/marketing/brevo";
 
 export async function POST(request: NextRequest) {
   const supabase = await createSessionClient();
@@ -48,6 +49,7 @@ export async function POST(request: NextRequest) {
     await upsertAdSpend(gym, parsed.data.weeks, user.id);
     if (parsed.data.leads) {
       await upsertLeads(gym, parsed.data.leads, user.id);
+      await syncLeadsToBrevo(gym, parsed.data.leads);
     }
 
     return NextResponse.json({ status: "ok" });

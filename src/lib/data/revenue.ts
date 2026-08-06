@@ -114,7 +114,7 @@ async function fetchRevenueRowsForRange<T>(
   return rows;
 }
 
-async function sumRevenueForRange(gym: GymName | null, range: MonthRange): Promise<number> {
+export async function sumRevenueForRange(gym: GymName | null, range: MonthRange): Promise<number> {
   const rows = await fetchRevenueRowsForRange<{ amount_inc_tax: number }>(gym, range, "amount_inc_tax");
   return rows.reduce((sum, row) => sum + Number(row.amount_inc_tax), 0);
 }
