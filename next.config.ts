@@ -1,7 +1,4 @@
 import type { NextConfig } from "next";
-import withPWAInit from "@ducanh2912/next-pwa";
-
-const isProd = process.env.NODE_ENV === "production";
 
 // Content-Security-Policy is set per-request in src/proxy.ts instead of
 // here — it needs a fresh nonce on every request (see proxy.ts for why),
@@ -34,13 +31,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-const withPWA = withPWAInit({
-  dest: "public",
-  disable: !isProd,
-  register: true,
-  workboxOptions: {
-    disableDevLogs: true,
-  },
-});
-
-export default withPWA(nextConfig);
+export default nextConfig;

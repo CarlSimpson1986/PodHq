@@ -145,6 +145,35 @@ export async function resetUserPassword(userId: string): Promise<{ email: string
   return { email: data.user.email, password };
 }
 
+/**
+ * Permanently deletes an owner's Supabase Auth account, freeing the email
+ * up for re-use (e.g. re-inviting the same franchisee later) — unlike
+ * deactivate/reactivate, which bans the account but leaves it, and its
+ * email, in place forever. Logged before the delete rather than after:
+ * once the auth user is gone, a fresh auth_events row can no longer carry
+ * a user_id referencing it (FK requires the referenced row to exist at
+ * insert time, independent of its own on-delete behaviour). The
+ * users_gyms row cascades automatically (0005_users_gyms_cascade_fix.sql);
+ * existing auth_events rows survive with user_id nulled out rather than
+ * being deleted (0011_auth_events_set_null_on_delete.sql) — the audit
+ * trail is kept, just detached from the now-gone account.
+ */
+export async function deleteUserAccount(userId: string): Promise<void> {
+  const admin = createAdminClient();
+  const { data: existing, error: lookupError } = await admin.auth.admin.getUserById(userId);
+  if (lookupError) throw lookupError;
+  if (!existing.user?.email) throw new Error("User has no email on record.");
+
+  await logAuthEvent({
+    email: existing.user.email,
+    userId,
+    eventType: "admin_account_deleted",
+  });
+
+  const { error } = await admin.auth.admin.deleteUser(userId);
+  if (error) throw error;
+}
+
 export async function setUserBanned(userId: string, banned: boolean): Promise<void> {
   const admin = createAdminClient();
   const { error } = await admin.auth.admin.updateUserById(userId, {

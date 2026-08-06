@@ -7,6 +7,9 @@ import type { AdminUserRow } from "@/lib/data/admin";
 const secondaryButtonClass =
   "rounded-md border border-card-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-background disabled:opacity-50";
 
+const dangerButtonClass =
+  "rounded-md border border-danger/50 px-3 py-1.5 text-xs font-medium text-danger transition-colors hover:bg-danger/10 disabled:opacity-50";
+
 export function UserList({
   users,
   currentUserId,
@@ -21,6 +24,8 @@ export function UserList({
   const [showDeactivated, setShowDeactivated] = useState(false);
   const [resetResult, setResetResult] = useState<{ email: string; password: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ userId: string; email: string } | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   const deactivatedCount = users.filter((u) => u.banned).length;
   const visibleUsers = showDeactivated ? users : users.filter((u) => !u.banned);
@@ -86,6 +91,27 @@ export function UserList({
     }
   }
 
+  async function confirmDelete() {
+    if (!deleteTarget || deleteConfirmText !== deleteTarget.email) return;
+    setError(null);
+    setBusyId(deleteTarget.userId);
+    try {
+      const res = await fetch(`/api/admin/users/${deleteTarget.userId}`, { method: "DELETE" });
+      const body = await res.json();
+      if (body.status !== "ok") {
+        setError(body.message ?? "Could not delete this account.");
+        return;
+      }
+      setDeleteTarget(null);
+      setDeleteConfirmText("");
+      onChanged();
+    } catch {
+      setError("Something went wrong. Try again.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function handleCopy() {
     if (!resetResult) return;
     await navigator.clipboard.writeText(resetResult.password);
@@ -107,6 +133,47 @@ export function UserList({
         )}
       </div>
       {error && <p className="mt-2 text-sm text-danger">{error}</p>}
+
+      {deleteTarget && (
+        <div className="mt-3 rounded-md border border-danger/50 bg-danger/5 p-3 text-sm">
+          <p className="text-foreground">
+            Permanently delete <span className="font-semibold">{deleteTarget.email}</span>? This removes their
+            login entirely and frees the email up to be re-added later — unlike Deactivate, it can&apos;t be
+            undone. Their gym assignment goes with it; audit history is kept but no longer tied to the account.
+          </p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Type <span className="font-mono">{deleteTarget.email}</span> to confirm.
+          </p>
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              className="flex-1 rounded-md border border-card-border bg-background px-2 py-1.5 text-xs text-foreground"
+              placeholder={deleteTarget.email}
+              autoFocus
+            />
+            <button
+              type="button"
+              disabled={deleteConfirmText !== deleteTarget.email || busyId === deleteTarget.userId}
+              onClick={confirmDelete}
+              className={dangerButtonClass}
+            >
+              {busyId === deleteTarget.userId ? "Deleting..." : "Delete permanently"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setDeleteTarget(null);
+                setDeleteConfirmText("");
+              }}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {resetResult && (
         <div className="mt-3 rounded-md border border-card-border bg-background p-3 text-sm">
@@ -193,6 +260,21 @@ export function UserList({
                       >
                         {busyId === u.userId ? "..." : u.banned ? "Reactivate" : "Deactivate"}
                       </button>
+                      {u.role === "owner" && (
+                        <button
+                          type="button"
+                          disabled={busyId === u.userId}
+                          onClick={() => {
+                            setDeleteTarget({ userId: u.userId, email: u.email });
+                            setDeleteConfirmText("");
+                            setError(null);
+                          }}
+                          className={dangerButtonClass}
+                          title="Permanently delete this account so the email can be re-added later"
+                        >
+                          Delete
+                        </button>
+                      )}
                     </div>
                   )}
                 </td>
