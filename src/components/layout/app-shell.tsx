@@ -62,6 +62,16 @@ const NAV_ITEMS = [
     ),
   },
   {
+    href: "/pods",
+    label: "Pods",
+    icon: (
+      <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.5}>
+        <rect x="3" y="7" width="14" height="9" rx="2" />
+        <path d="M7 7V5.5a3 3 0 0 1 6 0V7" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
     href: "/admin",
     label: "Admin",
     icon: (

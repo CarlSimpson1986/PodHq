@@ -67,6 +67,19 @@ before moving to the next. Don't jump ahead to a later stage unprompted.
 
     **Unrelated incident, same session: admin login blocked by a dead MFA factor on `carlsimpson83@yahoo.co.uk`.** Existing authenticator codes stopped validating even with the phone's clock on automatic/network time, so clock drift (the usual cause) was ruled out without a confirmed alternative explanation. Fixed by removing the verified factor (created 2026-08-01) via a one-off script and re-enrolling fresh through the normal `/login/mfa` flow — resolved, but the root cause of why a previously-working verified factor stopped validating is **not actually confirmed**, just worked around. Separately, read-only checking during this surfaced that the *other* admin account, `admin@myfitpod.co.uk`, has only an unverified MFA factor from 2026-08-04 (enrolment started, never completed) — not a bug, just means that account will get a clean QR code on its next login rather than being stuck.
 
+15. **Pods admin backend** (`/pods`, admin + owner) — added to the roadmap 2026-08-11 at the user's request: staff need to manually book a member into a pod session and configure per-gym limits, rather than every booking going through the member-facing podhq-client app alone. Written 2026-08-11, **not yet applied/live-tested** (blocked on `0018_pod_capacity_and_hours.sql`, see Database schema below).
+
+    Same gym-scoping convention as every other page in this app: owner locked to their own gym, admin picks any gym via `GymSelect` (defaulted to Aylesbury Berryfields, the only gym with a pod configured so far, rather than an empty state). New `src/lib/data/pods.ts` (`getPodSettings`/`updatePodSettings`/`getMembersForGym`/`getBookingsForGymAndDate`/`createManualBooking`), `src/lib/validation/pods.ts`, three routes under `/api/pods/` (`settings`, `bookings`, `members`), `/pods` page + `PodsView`, and a new sidebar nav entry in `AppShell` (visible to both roles, unlike Admin which is admin-only).
+
+    **Scope decisions, confirmed with the user before building:**
+    - A manually-created booking deducts a credit exactly like a self-service one, reusing the same `create_booking()` RPC — no special admin bypass. If the member has no credit, staff grant one first (existing `manual_grant` reason), same as today.
+    - "Set limits on sessions" meant **pod capacity per slot** (a gym can now be configured to hold more than one concurrent booking, not hard-capped at 1) and **bookable hours** (which hours of the day self-service booking allows) — both configurable per gym from `/pods`, not a fixed global rule.
+    - Bookable-hours is deliberately a **self-service-only** restriction — a manual booking from `/pods` can go outside the configured hours (a genuine staff override), but capacity is a **hard physical constraint that applies to every booking regardless of who makes it**, manual or self-service, since the room genuinely can't hold more people than it can hold.
+
+    **Real bug caught during design, fixed before it shipped**: the self-service hours check in podhq-client's `/api/bookings` initially read the slot's hour via a plain server-side `.getHours()` — but Vercel's serverless functions run in UTC internally regardless of the `lhr1` region pin (confirmed: region only affects where the function executes, not its OS timezone), so during BST this would have been off by exactly one hour against the UK wall-clock hours staff configure in `/pods`. Fixed using `Intl.DateTimeFormat` with `timeZone: "Europe/London"` instead of relying on the server's own local time — see podhq-client's ROADMAP.md for the full note.
+
+    **Not yet live-tested** — pending the migration being applied via Supabase's SQL editor.
+
 ## Database schema
 
 Two tables pre-date this project and were never created by our migrations — they
@@ -87,14 +100,30 @@ podhq-client's ROADMAP.md Stage 8 for the feature this supports. Flagged here
 per that project's shared-schema rule: a change to this shared DB needs
 noting on both sides, not just wherever it was made.
 
-**`0017_pod_member_access.sql` written 2026-08-11, not yet applied**: adds 8
-nullable columns to `members` (`mobile_number`, `gender`, `address_line1/2`,
+**`0017_pod_member_access.sql` applied 2026-08-11**: adds 8 nullable
+columns to `members` (`mobile_number`, `gender`, `address_line1/2`,
 `address_city`, `address_postcode`, `waiver_signed_name`,
-`waiver_signed_at`) for podhq-client's new "Access" onboarding flow (mobile
-+ gender, address, signed waiver) that gates the physical door Unlock — see
+`waiver_signed_at`) for podhq-client's "Access" onboarding flow (mobile +
+gender, address, signed waiver) that gates the physical door Unlock — see
 podhq-client's ROADMAP.md "Access onboarding" section. No CHECK constraint
-on `gender`, validated app-side instead. Needs applying via Supabase's SQL
-editor before that feature can be live-tested.
+on `gender`, validated app-side instead.
+
+**`0018_pod_capacity_and_hours.sql` written 2026-08-11, not yet applied**:
+adds `pod_capacity` (default 1), `open_hour` (default 0), `close_hour`
+(default 24) to `gym_kisi_mapping`, for this app's new `/pods` admin page
+(see Stage 15 below) — lets staff configure how many concurrent bookings a
+gym's pod can hold and which hours are open to self-service booking.
+Drops the old partial unique index on `bookings (gym, slot_start)` (it
+hard-capped every gym at exactly 1 concurrent booking, too strict once
+capacity can be >1) and replaces `create_booking()` with a version that
+enforces capacity itself, serialized via `pg_advisory_xact_lock` so two
+concurrent booking attempts for the same gym+slot can't both slip past a
+plain row-count check. Every existing gym keeps `pod_capacity = 1`
+(unchanged default), so no gym's real behaviour changes until this is
+applied *and* explicitly reconfigured via `/pods`. Needs applying via
+Supabase's SQL editor before Stage 15 can be live-tested — see
+podhq-client's ROADMAP.md for the matching self-service-side changes
+(hours filtering, `slot_full` handling).
 
 **`Revenue`** (capital R — quote in SQL: `public."Revenue"`)
 
