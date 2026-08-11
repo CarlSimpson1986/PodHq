@@ -132,22 +132,31 @@ gender, address, signed waiver) that gates the physical door Unlock — see
 podhq-client's ROADMAP.md "Access onboarding" section. No CHECK constraint
 on `gender`, validated app-side instead.
 
-**`0018_pod_capacity_and_hours.sql` written 2026-08-11, not yet applied**:
-adds `pod_capacity` (default 1), `open_hour` (default 0), `close_hour`
-(default 24) to `gym_kisi_mapping`, for this app's new `/pods` admin page
-(see Stage 15 below) — lets staff configure how many concurrent bookings a
-gym's pod can hold and which hours are open to self-service booking.
-Drops the old partial unique index on `bookings (gym, slot_start)` (it
-hard-capped every gym at exactly 1 concurrent booking, too strict once
-capacity can be >1) and replaces `create_booking()` with a version that
-enforces capacity itself, serialized via `pg_advisory_xact_lock` so two
-concurrent booking attempts for the same gym+slot can't both slip past a
-plain row-count check. Every existing gym keeps `pod_capacity = 1`
-(unchanged default), so no gym's real behaviour changes until this is
-applied *and* explicitly reconfigured via `/pods`. Needs applying via
-Supabase's SQL editor before Stage 15 can be live-tested — see
-podhq-client's ROADMAP.md for the matching self-service-side changes
-(hours filtering, `slot_full` handling).
+**`0018_pod_capacity_and_hours.sql` applied 2026-08-11**: adds
+`pod_capacity` (default 1), `open_hour` (default 0), `close_hour`
+(default 24) to `gym_kisi_mapping`, for this app's `/pods` admin page (see
+Stage 15) — lets staff configure how many concurrent bookings a gym's pod
+can hold and which hours are open to self-service booking. Drops the old
+partial unique index on `bookings (gym, slot_start)` (it hard-capped every
+gym at exactly 1 concurrent booking, too strict once capacity can be >1)
+and replaces `create_booking()` with a version that enforces capacity
+itself, serialized via `pg_advisory_xact_lock` so two concurrent booking
+attempts for the same gym+slot can't both slip past a plain row-count
+check. Every existing gym keeps `pod_capacity = 1` (unchanged default), so
+no gym's real behaviour changed until explicitly reconfigured via `/pods`.
+
+**`0019_get_credit_balance_function.sql` applied 2026-08-11**: adds
+`get_credit_balance(p_member_id)`, a Postgres-side sum over `credits`
+replacing podhq-client's old pattern of fetching every ledger row and
+summing in JS — found during a load/scaling review prompted by the user's
+"replace GymFlow entirely" ambition (see podhq-client's ROADMAP.md for the
+full note): `credits` is append-only (one row per booking/purchase/
+renewal), so a long-tenured member's row count isn't bounded, and
+PostgREST silently truncates any single request past 1000 rows with no
+error — against a ledger sum specifically, that means a genuinely wrong
+balance, not just an incomplete list, once a member's history gets long
+enough. Same pattern `create_booking()` already used internally for its
+own balance check.
 
 **`Revenue`** (capital R — quote in SQL: `public."Revenue"`)
 
