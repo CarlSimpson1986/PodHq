@@ -87,6 +87,15 @@ podhq-client's ROADMAP.md Stage 8 for the feature this supports. Flagged here
 per that project's shared-schema rule: a change to this shared DB needs
 noting on both sides, not just wherever it was made.
 
+**`0017_pod_member_access.sql` written 2026-08-11, not yet applied**: adds 8
+nullable columns to `members` (`mobile_number`, `gender`, `address_line1/2`,
+`address_city`, `address_postcode`, `waiver_signed_name`,
+`waiver_signed_at`) for podhq-client's new "Access" onboarding flow (mobile
++ gender, address, signed waiver) that gates the physical door Unlock — see
+podhq-client's ROADMAP.md "Access onboarding" section. No CHECK constraint
+on `gender`, validated app-side instead. Needs applying via Supabase's SQL
+editor before that feature can be live-tested.
+
 **`Revenue`** (capital R — quote in SQL: `public."Revenue"`)
 
 | Column | Type | Notes |
