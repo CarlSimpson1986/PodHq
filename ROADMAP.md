@@ -73,6 +73,20 @@ Two tables pre-date this project and were never created by our migrations — th
 came already populated from GymFlow. Everything else was created in
 `supabase/migrations/0001_core_schema.sql`.
 
+**Shared with `podhq-client`:** that app is a separate repo/deploy but uses
+this same Supabase project, and its migrations (`0009_pod_booking.sql`
+onward — `members`, `credits`, `bookings`, `gym_kisi_mapping`,
+`pod_access_events`) live in this folder rather than a duplicated one — see
+its own ROADMAP.md for what those tables are for. **`0014_pod_memberships.sql`
+applied 2026-08-11**: widens `credits.reason` to also allow `'membership'`
+(alongside the existing manual_grant/booking_used/booking_refund/purchase),
+and adds a new `memberships` table (member_id unique, tier_id/tier_name/
+credits_per_period, stripe_subscription_id unique, status, current_period_end)
+tracking each pod member's recurring monthly-credit subscription — see
+podhq-client's ROADMAP.md Stage 8 for the feature this supports. Flagged here
+per that project's shared-schema rule: a change to this shared DB needs
+noting on both sides, not just wherever it was made.
+
 **`Revenue`** (capital R — quote in SQL: `public."Revenue"`)
 
 | Column | Type | Notes |
