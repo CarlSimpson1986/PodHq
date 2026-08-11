@@ -78,7 +78,31 @@ before moving to the next. Don't jump ahead to a later stage unprompted.
 
     **Real bug caught during design, fixed before it shipped**: the self-service hours check in podhq-client's `/api/bookings` initially read the slot's hour via a plain server-side `.getHours()` — but Vercel's serverless functions run in UTC internally regardless of the `lhr1` region pin (confirmed: region only affects where the function executes, not its OS timezone), so during BST this would have been off by exactly one hour against the UK wall-clock hours staff configure in `/pods`. Fixed using `Intl.DateTimeFormat` with `timeZone: "Europe/London"` instead of relying on the server's own local time — see podhq-client's ROADMAP.md for the full note.
 
-    **Not yet live-tested** — pending the migration being applied via Supabase's SQL editor.
+    **Migration applied and DB-level behaviour fully live-verified 2026-08-11.**
+    Confirmed `gym_kisi_mapping` has the new columns with correct defaults
+    (`pod_capacity: 1`, `open_hour: 0`, `close_hour: 24`) for Aylesbury
+    Berryfields. Called `create_booking()` directly against production with
+    throwaway test members: at the default capacity (1), a second member's
+    booking attempt for an already-booked slot correctly failed with
+    `slot_full`; raising `pod_capacity` to 2 let a second concurrent booking
+    through and correctly rejected a third at 2/2. **Concurrency-tested the
+    actual reason the advisory lock exists**: fired two simultaneous
+    `create_booking()` calls at the same slot with capacity back at 1 —
+    exactly one succeeded, the other correctly got `slot_full`, and the DB
+    confirmed only one `booked` row exists for that slot, not two. All test
+    members/bookings/credits deleted afterward, gym config reset to
+    defaults.
+
+    **`/pods` page itself not click-tested** — logging into podHq as admin
+    requires MFA, which can't be scripted (same limitation noted for Stage
+    14's testing). The manual-booking UI, settings form, and gym-scoping
+    should be exercised through a real logged-in session before relying on
+    it for real staff use; the underlying `create_booking()` RPC and
+    `/api/pods/*` route logic it calls are verified as above.
+
+    See podhq-client's ROADMAP.md for the matching self-service-side live
+    verification (hours filtering, the BST timezone fix, regression check
+    on normal all-day bookings).
 
 ## Database schema
 
