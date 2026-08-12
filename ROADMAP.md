@@ -158,6 +158,17 @@ balance, not just an incomplete list, once a member's history gets long
 enough. Same pattern `create_booking()` already used internally for its
 own balance check.
 
+**`0020_cancel_booking_function.sql` written and applied 2026-08-12**
+(per the shared-schema rule — flagged here so a podHq session isn't
+surprised by the new function): adds `cancel_booking(p_member_id,
+p_booking_id)` for podhq-client's new member-facing cancel feature (see
+its own ROADMAP.md for the full build). Enforces a 2-hour cancellation
+policy — refunds the credit (`credits.reason = 'booking_refund'`, allowed
+since 0009 but unused until now) if cancelled more than 2 hours before
+`slot_start`, forfeits it otherwise — atomically via `for update` on the
+booking row, same race-safety concern `create_booking()` already handles
+with its advisory lock. No table/column changes, function-only.
+
 **`Revenue`** (capital R — quote in SQL: `public."Revenue"`)
 
 | Column | Type | Notes |
