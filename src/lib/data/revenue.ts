@@ -1,7 +1,8 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { GymName } from "./types";
+import { GYM_NAMES, type GymName } from "./types";
 import { getDefaultReportMonth, getRevenueTrend, shiftMonth } from "./dashboard";
+import { sumOtherIncomeForRange } from "./other-income";
 
 export type DateRangePreset = "last_month" | "qtd" | "last_quarter" | "ytd" | "full_year";
 
@@ -14,6 +15,16 @@ export interface RevenueRangeSummary {
   range: MonthRange;
   label: string;
   total: number;
+  /**
+   * Franchisee-entered income from gym_other_income (room rental, vending
+   * commission, PT, etc.) — deliberately NOT part of `total` or any of the
+   * GymFlow-derived breakdowns below (categoryBreakdown, topCustomers,
+   * categoryTrend, trend): those all key on Revenue's sold_to/category
+   * fields, which this income has no equivalent of. Shown as a separate,
+   * additive figure so a franchisee sees their true combined revenue
+   * without corrupting the GymFlow-only analytics.
+   */
+  otherIncome: number;
   previousPeriod: { range: MonthRange; total: number; percentChange: number | null } | null;
   /** Always populated, unlike previousPeriod — "same range, 12 months back" is meaningful for every preset. */
   sameRangeLastYear: { range: MonthRange; total: number; percentChange: number | null };
@@ -247,6 +258,13 @@ async function getRevenueTrendWithYoy(gym: GymName | null, months: number, endin
   return current.map((row, i) => ({ month: row.month, current: row.total, priorYear: priorYear[i].total }));
 }
 
+/** Sums other-income across every gym when `gym` is null ("all gyms"), or just the one gym otherwise. */
+async function sumOtherIncomeForRangeAnyGym(gym: GymName | null, range: MonthRange): Promise<number> {
+  if (gym) return sumOtherIncomeForRange(gym, range);
+  const totals = await Promise.all(GYM_NAMES.map((g) => sumOtherIncomeForRange(g, range)));
+  return totals.reduce((sum, t) => sum + t, 0);
+}
+
 /**
  * `gym` must already be security-resolved by the caller: an owner's own
  * gym always, regardless of what a client asked for; an admin's explicit
@@ -286,6 +304,7 @@ export async function getRevenueSummaryForRange(
     topCustomers,
     trend,
     transactionCount,
+    otherIncome,
   ] = await Promise.all([
     getCategoryBreakdown(gym, range),
     sumRevenueForRange(gym, sameRangeLastYear),
@@ -295,6 +314,7 @@ export async function getRevenueSummaryForRange(
     getTopCustomers(gym, range, 10),
     getRevenueTrendWithYoy(gym, 12, refMonth),
     countTransactionsForRange(gym, range),
+    sumOtherIncomeForRangeAnyGym(gym, range),
   ]);
 
   const total = categoryBreakdown.membership + categoryBreakdown.creditPack;
@@ -303,6 +323,7 @@ export async function getRevenueSummaryForRange(
     range,
     label,
     total,
+    otherIncome,
     previousPeriod:
       previousPeriod && previousPeriodTotal !== null
         ? { range: previousPeriod, total: previousPeriodTotal, percentChange: percentChange(total, previousPeriodTotal) }
