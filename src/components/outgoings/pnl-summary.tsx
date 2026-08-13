@@ -3,10 +3,14 @@ import type { PnlTotals } from "@/lib/data/outgoings";
 
 export function PnlSummary({ figures }: { figures: PnlTotals }) {
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+    <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
       <div className="card-glass p-5">
         <p className="text-sm text-muted-foreground">Revenue</p>
         <p className="mt-2 text-xl font-semibold text-foreground">{formatGBP(figures.revenue)}</p>
+      </div>
+      <div className="card-glass p-5">
+        <p className="text-sm text-muted-foreground">Other income</p>
+        <p className="mt-2 text-xl font-semibold text-foreground">{formatGBP(figures.otherIncome)}</p>
       </div>
       <div className="card-glass p-5">
         <p className="text-sm text-muted-foreground">Outgoings</p>

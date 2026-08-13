@@ -4,6 +4,8 @@ import { GYM_NAMES, OUTGOING_CATEGORIES, type GymName, type OutgoingCategory } f
 import type { GymScope } from "@/lib/auth/gym-scope";
 import { getRevenueByGym, sumRevenue, getDefaultReportMonth } from "./dashboard";
 import { sumRevenueForRange, type MonthRange } from "./revenue";
+import { getOtherIncomeCategoryBreakdown, getOtherIncomeForRange, type OtherIncomeCategoryAmount } from "./other-income";
+import { OTHER_INCOME_CATEGORIES } from "./types";
 
 export interface OutgoingEntry {
   id: number;
@@ -20,6 +22,8 @@ export interface CategoryAmount {
 
 export interface PnlTotals {
   revenue: number;
+  otherIncome: number;
+  otherIncomeBreakdown: OtherIncomeCategoryAmount[];
   outgoings: number;
   categoryBreakdown: CategoryAmount[];
   adSpend: number;
@@ -361,16 +365,23 @@ async function sumAdSpendForRange(gym: GymName, range: MonthRange): Promise<numb
 }
 
 async function getPnlFiguresForGym(gym: GymName, month: string, revenue: number): Promise<PnlFigures> {
-  const [categoryBreakdown, adSpend] = await Promise.all([getCategoryBreakdown(gym, month), sumAdSpend(gym, month)]);
+  const [categoryBreakdown, adSpend, otherIncomeBreakdown] = await Promise.all([
+    getCategoryBreakdown(gym, month),
+    sumAdSpend(gym, month),
+    getOtherIncomeCategoryBreakdown(gym, month),
+  ]);
   const outgoings = categoryBreakdown.reduce((sum, c) => sum + c.amountGbp, 0);
+  const otherIncome = otherIncomeBreakdown.reduce((sum, c) => sum + c.amountGbp, 0);
 
   return {
     gym,
     revenue,
+    otherIncome,
+    otherIncomeBreakdown,
     outgoings,
     categoryBreakdown,
     adSpend,
-    net: revenue - outgoings - adSpend,
+    net: revenue + otherIncome - outgoings - adSpend,
   };
 }
 
@@ -380,25 +391,30 @@ async function getPnlFiguresForGym(gym: GymName, month: string, revenue: number)
  * branching is needed here unlike getPnlSummary below).
  */
 export async function getPnlFiguresForRange(gym: GymName, range: MonthRange): Promise<PnlFigures> {
-  const [revenue, categoryBreakdown, adSpend] = await Promise.all([
+  const [revenue, categoryBreakdown, adSpend, otherIncomeBreakdown] = await Promise.all([
     sumRevenueForRange(gym, range),
     getCategoryBreakdownForRange(gym, range),
     sumAdSpendForRange(gym, range),
+    getOtherIncomeForRange(gym, range),
   ]);
   const outgoings = categoryBreakdown.reduce((sum, c) => sum + c.amountGbp, 0);
+  const otherIncome = otherIncomeBreakdown.reduce((sum, c) => sum + c.amountGbp, 0);
 
   return {
     gym,
     revenue,
+    otherIncome,
+    otherIncomeBreakdown,
     outgoings,
     categoryBreakdown,
     adSpend,
-    net: revenue - outgoings - adSpend,
+    net: revenue + otherIncome - outgoings - adSpend,
   };
 }
 
 function sumFigures(rows: PnlFigures[]): PnlTotals {
   const revenue = rows.reduce((sum, r) => sum + r.revenue, 0);
+  const otherIncome = rows.reduce((sum, r) => sum + r.otherIncome, 0);
   const outgoings = rows.reduce((sum, r) => sum + r.outgoings, 0);
   const adSpend = rows.reduce((sum, r) => sum + r.adSpend, 0);
   const categoryBreakdown = OUTGOING_CATEGORIES.map((category) => ({
@@ -408,8 +424,23 @@ function sumFigures(rows: PnlFigures[]): PnlTotals {
       0
     ),
   }));
+  const otherIncomeBreakdown = OTHER_INCOME_CATEGORIES.map((category) => ({
+    category,
+    amountGbp: rows.reduce(
+      (sum, r) => sum + (r.otherIncomeBreakdown.find((c) => c.category === category)?.amountGbp ?? 0),
+      0
+    ),
+  }));
 
-  return { revenue, outgoings, categoryBreakdown, adSpend, net: revenue - outgoings - adSpend };
+  return {
+    revenue,
+    otherIncome,
+    otherIncomeBreakdown,
+    outgoings,
+    categoryBreakdown,
+    adSpend,
+    net: revenue + otherIncome - outgoings - adSpend,
+  };
 }
 
 /**

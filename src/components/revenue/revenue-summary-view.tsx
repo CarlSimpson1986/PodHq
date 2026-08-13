@@ -155,6 +155,33 @@ export function RevenueSummaryView({ role, initialPreset, initialGym, initialSum
             </div>
           </section>
 
+          {summary.otherIncome > 0 && (
+            <section className="mt-4 card-glass p-5">
+              <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
+                <div>
+                  <p className="text-sm text-muted-foreground">GymFlow revenue</p>
+                  <p className="mt-1 text-lg font-semibold text-foreground">{formatGBP(summary.total)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Other income</p>
+                  <p className="mt-1 text-lg font-semibold text-foreground">{formatGBP(summary.otherIncome)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Combined total</p>
+                  <p className="mt-1 text-lg font-semibold text-accent">
+                    {formatGBP(summary.total + summary.otherIncome)}
+                  </p>
+                </div>
+              </div>
+              <p className="mt-3 text-xs text-muted-foreground">
+                Other income (room rental, vending, PT, etc. — entered on the Outgoings &amp; P&amp;L page) isn&apos;t
+                GymFlow data, so it&apos;s kept out of the figures above and every chart on this page — the
+                vs-previous-period/YoY comparisons, category split, and top products/customers all reflect GymFlow
+                revenue only.
+              </p>
+            </section>
+          )}
+
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="card-glass p-5">
               <p className="text-sm text-muted-foreground">Transactions</p>

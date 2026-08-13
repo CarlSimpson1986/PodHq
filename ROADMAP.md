@@ -104,6 +104,76 @@ before moving to the next. Don't jump ahead to a later stage unprompted.
     verification (hours filtering, the BST timezone fix, regression check
     on normal all-day bookings).
 
+16. **Franchisee other income** (`/outgoings` entry form + `/revenue` card) —
+    added to the roadmap 2026-08-13 at the user's request: franchisees have
+    real income GymFlow never sees (room/space rental, vending commission,
+    corporate/wellness contracts, PT, retail, events) and had no way to
+    record it. New `gym_other_income` table, app-managed, deliberately kept
+    **out** of `Revenue` itself — `Revenue` stays 100% GymFlow-pipeline-only
+    with zero manual writes anywhere in this app's history (see the Data
+    pipeline section below), and its per-customer/category calculations
+    (LTV, top customers, category pie) key on `sold_to`/category fields that
+    don't map onto things like a vending machine.
+
+    **Scope decisions, confirmed with the user before building:**
+    - Two category behaviours, not one: **recurring** categories (Room/Space
+      Rental, Vending Commission, Corporate/Wellness Contract, Other
+      Recurring Income) carry forward month to month exactly like
+      `gym_outgoings` — enter once, it applies until changed. **One-off**
+      categories (Personal Training, Retail Sales, Event Income, Other
+      One-off Income) only count for the exact month entered — carrying a
+      variable figure forward would silently overstate a quiet month. Which
+      list a category belongs to is fixed in code
+      (`RECURRING_INCOME_CATEGORIES`, `src/lib/data/types.ts`), not a
+      per-entry choice.
+    - No free-text category (would break cross-gym comparability, same
+      reasoning as `gym_outgoings`' fixed list) — but every entry does get
+      an optional free-text `label` (e.g. "Xyz Corp contract") purely as a
+      memo, never used for grouping or totals.
+    - Feeds **both** places, not one or the other: the Outgoings/P&L net
+      figure (`net = revenue + otherIncome - outgoings - adSpend`, same
+      pattern `ad_spend` already established — its own page plus a P&L
+      contribution) and a separate, clearly-labelled "Other income" card on
+      `/revenue` (GymFlow revenue + other income = combined total).
+      Deliberately **not** blended into `/revenue`'s category pie, top
+      products/customers, or the vs-previous-period/YoY trend lines — those
+      are all GymFlow-only concepts.
+    - Same gym-scoping as outgoings: owner locked to their own gym; admin
+      has fallback edit access to whichever gym they select.
+
+    **Two build issues found and fixed, both repeats of documented project
+    lessons:**
+    - `create table if not exists` silently no-ops against a table that
+      already exists — an early ad-hoc version of the table (created before
+      the `label` column was added to the design) meant the real migration's
+      `create table if not exists` never actually added `label`, and the
+      column was missing until fixed with a direct `alter table ... add
+      column`. Same class of bug as `0005`/`0011`'s FK-cascade drift, same
+      root cause.
+    - The migration file was originally numbered `0024_gym_other_income.sql`
+      but collided with `0024_waitlist.sql` from a concurrent, unrelated
+      session working in the same repo (a leads/waitlist feature,
+      migrations `0021`–`0024`) — neither session could see the other's
+      uncommitted file. Renamed to `0025_gym_other_income.sql`; no overlap
+      with that feature's tables or files otherwise.
+
+    **Verified live 2026-08-13** against Aylesbury Berryfields (admin
+    session; owner-role gym-lock not re-tested here since it's the same
+    code path already proven for `gym_outgoings` — see the note on Stage
+    15's untested `/pods` UI for why owner sessions can't be scripted).
+    Entered a recurring Vending Commission row effective 2026-06 (£150) and
+    a one-off Personal Training row for the same month (£80): July's Other
+    income tile correctly showed only the carried-forward £150 (Personal
+    Training correctly excluded), the monthly trend chart showed £230 for
+    June and £150 for July, and Net P&L math checked out exactly
+    (`revenue + otherIncome - outgoings - adSpend`). `/revenue`'s combined
+    card showed GymFlow revenue, other income, and their sum correctly
+    aggregated across all gyms, with the category pie/top products/top
+    customers unchanged from before the entries existed — confirming the
+    "additive but never blended in" design held. Test rows deleted
+    afterward via direct SQL (`delete from gym_other_income where gym =
+    'Aylesbury Berryfields'`), confirmed back to £0 across the board.
+
 ## Database schema
 
 Two tables pre-date this project and were never created by our migrations — they

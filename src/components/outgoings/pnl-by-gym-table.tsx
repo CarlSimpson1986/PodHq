@@ -11,6 +11,7 @@ export function PnlByGymTable({ perGym, consolidated }: { perGym: PnlFigures[]; 
             <tr className="border-b border-card-border text-left text-xs text-muted-foreground">
               <th className="py-2 pr-3 font-normal">Gym</th>
               <th className="py-2 pr-3 text-right font-normal">Revenue</th>
+              <th className="py-2 pr-3 text-right font-normal">Other income</th>
               <th className="py-2 pr-3 text-right font-normal">Outgoings</th>
               <th className="py-2 pr-3 text-right font-normal">Ad spend</th>
               <th className="py-2 text-right font-normal">Net P&amp;L</th>
@@ -21,6 +22,7 @@ export function PnlByGymTable({ perGym, consolidated }: { perGym: PnlFigures[]; 
               <tr key={row.gym} className="border-b border-card-border last:border-0">
                 <td className="py-2 pr-3 text-foreground">{row.gym}</td>
                 <td className="py-2 pr-3 text-right tabular-nums text-foreground">{formatGBP(row.revenue)}</td>
+                <td className="py-2 pr-3 text-right tabular-nums text-foreground">{formatGBP(row.otherIncome)}</td>
                 <td className="py-2 pr-3 text-right tabular-nums text-foreground">{formatGBP(row.outgoings)}</td>
                 <td className="py-2 pr-3 text-right tabular-nums text-foreground">{formatGBP(row.adSpend)}</td>
                 <td
@@ -35,6 +37,9 @@ export function PnlByGymTable({ perGym, consolidated }: { perGym: PnlFigures[]; 
             <tr className="font-semibold">
               <td className="py-2 pr-3 text-foreground">All gyms (consolidated)</td>
               <td className="py-2 pr-3 text-right tabular-nums text-foreground">{formatGBP(consolidated.revenue)}</td>
+              <td className="py-2 pr-3 text-right tabular-nums text-foreground">
+                {formatGBP(consolidated.otherIncome)}
+              </td>
               <td className="py-2 pr-3 text-right tabular-nums text-foreground">
                 {formatGBP(consolidated.outgoings)}
               </td>

@@ -4,9 +4,12 @@ import { useState, useTransition } from "react";
 import { formatMonthLabel } from "@/lib/format";
 import type { GymName } from "@/lib/data/types";
 import type { PnlSummary, OutgoingEntry, OutgoingTransaction, MonthlyOutgoingsTotal } from "@/lib/data/outgoings";
+import type { OtherIncomeEntry, MonthlyOtherIncomeTotal } from "@/lib/data/other-income";
 import { PnlSummary as PnlSummaryTiles } from "./pnl-summary";
 import { PnlByGymTable } from "./pnl-by-gym-table";
 import { OutgoingsBreakdownTable } from "./outgoings-breakdown-table";
+import { OtherIncomeBreakdownTable } from "./other-income-breakdown-table";
+import { OtherIncomeHistoryChart } from "./other-income-history-chart";
 import { BankCsvUploadForm } from "./bank-csv-upload-form";
 import { OutgoingTransactionsTable } from "./outgoing-transactions-table";
 import { OutgoingsHistoryChart } from "./outgoings-history-chart";
@@ -37,6 +40,8 @@ interface OutgoingsViewProps {
   initialHistory: OutgoingEntry[] | null;
   initialTransactions: OutgoingTransaction[] | null;
   initialMonthlyHistory: MonthlyOutgoingsTotal[] | null;
+  initialOtherIncomeHistory: OtherIncomeEntry[] | null;
+  initialOtherIncomeMonthlyHistory: MonthlyOtherIncomeTotal[] | null;
 }
 
 export function OutgoingsView({
@@ -47,6 +52,8 @@ export function OutgoingsView({
   initialHistory,
   initialTransactions,
   initialMonthlyHistory,
+  initialOtherIncomeHistory,
+  initialOtherIncomeMonthlyHistory,
 }: OutgoingsViewProps) {
   const [month, setMonth] = useState(initialMonth);
   const [gym, setGym] = useState<GymName | null>(initialGym);
@@ -54,6 +61,10 @@ export function OutgoingsView({
   const [history, setHistory] = useState<OutgoingEntry[] | null>(initialHistory);
   const [transactions, setTransactions] = useState<OutgoingTransaction[] | null>(initialTransactions);
   const [monthlyHistory, setMonthlyHistory] = useState<MonthlyOutgoingsTotal[] | null>(initialMonthlyHistory);
+  const [otherIncomeHistory, setOtherIncomeHistory] = useState<OtherIncomeEntry[] | null>(initialOtherIncomeHistory);
+  const [otherIncomeMonthlyHistory, setOtherIncomeMonthlyHistory] = useState<MonthlyOtherIncomeTotal[] | null>(
+    initialOtherIncomeMonthlyHistory
+  );
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -73,6 +84,8 @@ export function OutgoingsView({
           setHistory(null);
           setTransactions(null);
           setMonthlyHistory(null);
+          setOtherIncomeHistory(null);
+          setOtherIncomeMonthlyHistory(null);
           setError(body.message ?? "Could not load P&L data.");
           return;
         }
@@ -80,11 +93,15 @@ export function OutgoingsView({
         setHistory(body.history);
         setTransactions(body.transactions);
         setMonthlyHistory(body.monthlyHistory);
+        setOtherIncomeHistory(body.otherIncomeHistory);
+        setOtherIncomeMonthlyHistory(body.otherIncomeMonthlyHistory);
       } catch {
         setSummary(null);
         setHistory(null);
         setTransactions(null);
         setMonthlyHistory(null);
+        setOtherIncomeHistory(null);
+        setOtherIncomeMonthlyHistory(null);
         setError("Something went wrong. Try again.");
       }
     });
@@ -165,6 +182,16 @@ export function OutgoingsView({
                 onSubmitted={() => refetch(month, gym)}
               />
               {transactions && <OutgoingTransactionsTable transactions={transactions} />}
+              {otherIncomeMonthlyHistory && <OtherIncomeHistoryChart data={otherIncomeMonthlyHistory} />}
+              {otherIncomeHistory && (
+                <OtherIncomeBreakdownTable
+                  gym={singleGym}
+                  categoryBreakdown={summary.single.otherIncomeBreakdown}
+                  history={otherIncomeHistory}
+                  isAdmin={role === "admin"}
+                  onSubmitted={() => refetch(month, gym)}
+                />
+              )}
             </>
           )}
         </div>

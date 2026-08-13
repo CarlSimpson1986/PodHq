@@ -1,6 +1,7 @@
 import { createSessionClient } from "@/lib/supabase/server";
 import { getGymScope } from "@/lib/auth/gym-scope";
 import { getPnlSummary, getOutgoingsHistory, getOutgoingTransactions, getOutgoingsMonthlyHistory } from "@/lib/data/outgoings";
+import { getOtherIncomeHistory, getOtherIncomeMonthlyHistory } from "@/lib/data/other-income";
 import { getDefaultReportMonth } from "@/lib/data/dashboard";
 import { OutgoingsView } from "@/components/outgoings/outgoings-view";
 import { AppShell } from "@/components/layout/app-shell";
@@ -34,13 +35,15 @@ export default async function OutgoingsPage() {
   const month = getDefaultReportMonth();
   const summary = await getPnlSummary(scope, null, month);
   const historyGym = scope.role === "owner" ? scope.gym : null;
-  const [history, transactions, monthlyHistory] = historyGym
+  const [history, transactions, monthlyHistory, otherIncomeHistory, otherIncomeMonthlyHistory] = historyGym
     ? await Promise.all([
         getOutgoingsHistory(historyGym),
         getOutgoingTransactions(historyGym),
         getOutgoingsMonthlyHistory(historyGym),
+        getOtherIncomeHistory(historyGym),
+        getOtherIncomeMonthlyHistory(historyGym),
       ])
-    : [null, null, null];
+    : [null, null, null, null, null];
 
   return (
     <AppShell role={scope.role}>
@@ -53,6 +56,8 @@ export default async function OutgoingsPage() {
           initialHistory={history}
           initialTransactions={transactions}
           initialMonthlyHistory={monthlyHistory}
+          initialOtherIncomeHistory={otherIncomeHistory}
+          initialOtherIncomeMonthlyHistory={otherIncomeMonthlyHistory}
         />
       </div>
     </AppShell>

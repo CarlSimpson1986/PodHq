@@ -68,6 +68,10 @@ export function PnlExportDocument({ gym, range, rangeLabel, figures, transaction
             <Text style={styles.summaryValue}>{formatGBP(figures.revenue)}</Text>
           </View>
           <View style={styles.summaryTile}>
+            <Text style={styles.summaryLabel}>Other income</Text>
+            <Text style={styles.summaryValue}>{formatGBP(figures.otherIncome)}</Text>
+          </View>
+          <View style={styles.summaryTile}>
             <Text style={styles.summaryLabel}>Outgoings</Text>
             <Text style={styles.summaryValue}>{formatGBP(figures.outgoings)}</Text>
           </View>
@@ -80,6 +84,26 @@ export function PnlExportDocument({ gym, range, rangeLabel, figures, transaction
             <Text style={styles.summaryValue}>{formatGBP(figures.net)}</Text>
           </View>
         </View>
+
+        {figures.otherIncome > 0 && (
+          <>
+            <Text style={styles.sectionTitle}>Other income by category</Text>
+            <View style={styles.table}>
+              {figures.otherIncomeBreakdown
+                .filter((row) => row.amountGbp > 0)
+                .map((row) => (
+                  <View style={styles.tableRow} key={row.category}>
+                    <Text style={styles.cellCategory}>{row.category}</Text>
+                    <Text style={styles.cellAmount}>{formatGBP(row.amountGbp)}</Text>
+                  </View>
+                ))}
+              <View style={styles.tableRowLast}>
+                <Text style={styles.totalLabel}>Total other income</Text>
+                <Text style={styles.totalAmount}>{formatGBP(figures.otherIncome)}</Text>
+              </View>
+            </View>
+          </>
+        )}
 
         <Text style={styles.sectionTitle}>Outgoings by category</Text>
         <View style={styles.table}>

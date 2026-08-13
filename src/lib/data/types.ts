@@ -26,6 +26,32 @@ export const OUTGOING_CATEGORIES = [
 
 export type OutgoingCategory = (typeof OUTGOING_CATEGORIES)[number];
 
+// Recurring categories carry forward month to month (same convention as
+// OUTGOING_CATEGORIES) until a new value is entered — a fixed
+// rental/contract/commission amount that's genuinely the same most months.
+// One-off categories are looked up for the exact month only; no entry means
+// £0 that month, since this income is expected to vary and a stale
+// carried-forward figure would overstate a quiet month.
+export const OTHER_INCOME_CATEGORIES = [
+  "Room / Space Rental",
+  "Vending Commission",
+  "Corporate / Wellness Contract",
+  "Other Recurring Income",
+  "Personal Training",
+  "Retail Sales",
+  "Event Income",
+  "Other One-off Income",
+] as const;
+
+export type OtherIncomeCategory = (typeof OTHER_INCOME_CATEGORIES)[number];
+
+export const RECURRING_INCOME_CATEGORIES: ReadonlySet<OtherIncomeCategory> = new Set([
+  "Room / Space Rental",
+  "Vending Commission",
+  "Corporate / Wellness Contract",
+  "Other Recurring Income",
+]);
+
 export interface RevenueRow {
   id: number;
   gym: string;
