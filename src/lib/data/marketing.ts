@@ -1,6 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { GymName } from "./types";
+import type { GymName, LeadStatus } from "./types";
 import { fetchAllRevenueForLtv, computeLtv } from "./members";
 import type { WeeklyAdSpendDraft, LeadDraft } from "@/lib/marketing/parse";
 
@@ -21,7 +21,20 @@ export interface RecentLead {
   lastName: string;
   email: string;
   createdDate: string;
+  status: LeadStatus;
+  memberId: number | null;
 }
+
+// A lead converts only on a real money-moving event against their own
+// ledger: a Stripe credit-pack purchase or membership subscription
+// (podhq-client's webhooks/stripe/route.ts, reason: "purchase" /
+// "membership"). Deliberately excludes manual_grant (a staff comp, not a
+// purchase), booking_used/booking_refund (consumption/reversal, not
+// acquisition), and gift_voucher (written on the *redeemer's* ledger when
+// they spend someone else's gifted code — the purchaser's own ledger
+// already gets counted via "purchase", so counting the redeemer too would
+// double up on one real sale).
+const CONVERTED_REASONS = ["purchase", "membership"] as const;
 
 export interface MarketingSummary {
   gym: GymName | null;
@@ -145,23 +158,76 @@ export async function getMarketingSummary(gym: GymName | null): Promise<Marketin
 
 const RECENT_LEADS_LIMIT = 100;
 
+/**
+ * Leads whose linked member has since made a real purchase are excluded
+ * here, not flagged/updated anywhere — "converted" is a computed fact
+ * (checked fresh on every read), never a stored status a webhook has to
+ * remember to flip. Nothing about the underlying row is ever mutated by
+ * this filter; a converted lead's own `status` column stays exactly
+ * whatever it last was.
+ *
+ * Two queries in JS rather than a Postgres view/RPC: getRecentLeads is
+ * already capped at RECENT_LEADS_LIMIT, so the input is bounded by
+ * construction — this isn't the unbounded-ledger problem
+ * get_credit_balance() exists to solve (PostgREST's silent 1000-row
+ * truncation producing a *wrong number*), so there's no correctness reason
+ * to push this into the database. CSV-imported rows (member_id always
+ * null) are structurally unaffected — they can never appear in the
+ * converted set.
+ */
 export async function getRecentLeads(gym: GymName): Promise<RecentLead[]> {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("leads")
-    .select("id, first_name, last_name, email, created_date")
+    .select("id, first_name, last_name, email, created_date, status, member_id")
     .eq("gym", gym)
     .order("created_date", { ascending: false })
     .limit(RECENT_LEADS_LIMIT);
   if (error) throw error;
 
-  return (data ?? []).map((row) => ({
-    id: row.id as number,
-    firstName: row.first_name as string,
-    lastName: row.last_name as string,
-    email: row.email as string,
-    createdDate: row.created_date as string,
-  }));
+  const rows = data ?? [];
+  const memberIds = [...new Set(rows.map((r) => r.member_id as number | null).filter((id): id is number => id !== null))];
+
+  let convertedIds = new Set<number>();
+  if (memberIds.length > 0) {
+    const { data: creditRows, error: creditsError } = await admin
+      .from("credits")
+      .select("member_id")
+      .in("member_id", memberIds)
+      .in("reason", CONVERTED_REASONS);
+    if (creditsError) throw creditsError;
+    convertedIds = new Set((creditRows ?? []).map((r) => r.member_id as number));
+  }
+
+  return rows
+    .filter((row) => row.member_id === null || !convertedIds.has(row.member_id as number))
+    .map((row) => ({
+      id: row.id as number,
+      firstName: row.first_name as string,
+      lastName: row.last_name as string,
+      email: row.email as string,
+      createdDate: row.created_date as string,
+      status: row.status as LeadStatus,
+      memberId: row.member_id as number | null,
+    }));
+}
+
+/**
+ * `.eq("id", id).eq("gym", gym)` ownership-scopes the update the same way
+ * deleteOutgoing does — an owner can't change another gym's lead just by
+ * guessing an id. Returns whether a row actually matched, so the route can
+ * 404 instead of silently no-op'ing.
+ */
+export async function updateLeadStatus(id: number, gym: GymName, status: LeadStatus): Promise<boolean> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("leads")
+    .update({ status })
+    .eq("id", id)
+    .eq("gym", gym)
+    .select("id");
+  if (error) throw error;
+  return (data ?? []).length > 0;
 }
 
 /**

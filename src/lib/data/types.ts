@@ -52,6 +52,10 @@ export const RECURRING_INCOME_CATEGORIES: ReadonlySet<OtherIncomeCategory> = new
   "Other Recurring Income",
 ]);
 
+export const LEAD_STATUSES = ["new_lead", "contacted", "trial"] as const;
+
+export type LeadStatus = (typeof LEAD_STATUSES)[number];
+
 export interface RevenueRow {
   id: number;
   gym: string;
