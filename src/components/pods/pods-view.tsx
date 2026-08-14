@@ -1,10 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { GymSelect } from "@/components/ui/gym-select";
 import type { GymName } from "@/lib/data/types";
-import type { PodBooking, PodMember, PodSettings } from "@/lib/data/pods";
+import type { AccessEvent, PodBooking, PodMember, PodSettings } from "@/lib/data/pods";
+
+// Access events poll rather than push (no websocket/Realtime plumbing
+// elsewhere in this app) — 15s keeps the log feeling "live" for the
+// door-entry use case without adding new infrastructure.
+const ACCESS_POLL_INTERVAL_MS = 15_000;
+
+type AccessFilter = "all" | "success" | "blocked";
+
+function todayDateParam(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function formatEventTime(iso: string) {
+  return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+}
 
 const inputClass = "rounded-md border border-card-border bg-background px-2 py-1.5 text-sm text-foreground";
 const buttonClass =
@@ -32,6 +48,7 @@ export function PodsView({
   initialSettings,
   initialBookings,
   initialMembers,
+  initialAccessEvents,
 }: {
   role: "admin" | "owner";
   initialGym: GymName;
@@ -39,6 +56,7 @@ export function PodsView({
   initialSettings: PodSettings | null;
   initialBookings: PodBooking[];
   initialMembers: PodMember[];
+  initialAccessEvents: AccessEvent[];
 }) {
   const [gym, setGym] = useState<GymName>(initialGym);
   const [date, setDate] = useState(initialDate);
@@ -46,6 +64,30 @@ export function PodsView({
   const [bookings, setBookings] = useState(initialBookings);
   const [members, setMembers] = useState(initialMembers);
   const [loading, setLoading] = useState(false);
+
+  const [accessEvents, setAccessEvents] = useState(initialAccessEvents);
+  const [accessFilter, setAccessFilter] = useState<AccessFilter>("all");
+
+  async function fetchAccessEvents(nextGym: GymName, nextDate: string) {
+    const res = await fetch(`/api/pods/access-events?gym=${encodeURIComponent(nextGym)}&date=${nextDate}`);
+    const body = await res.json();
+    setAccessEvents(body.status === "ok" ? body.events : []);
+  }
+
+  // Only poll when viewing today — a past date's log is static, no point
+  // re-fetching it every 15s.
+  useEffect(() => {
+    if (date !== todayDateParam()) return;
+    const interval = setInterval(() => fetchAccessEvents(gym, date), ACCESS_POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gym, date]);
+
+  const filteredAccessEvents = accessEvents.filter((e) => {
+    if (accessFilter === "success") return e.success;
+    if (accessFilter === "blocked") return !e.success;
+    return true;
+  });
 
   const [selectedMemberId, setSelectedMemberId] = useState<number | "">("");
   const [selectedHour, setSelectedHour] = useState(9);
@@ -79,6 +121,7 @@ export function PodsView({
       setCloseHourDraft(nextSettings?.closeHour ?? 24);
       setBookings(bookingsBody.status === "ok" ? bookingsBody.bookings : []);
       setMembers(membersBody.status === "ok" ? membersBody.members : []);
+      await fetchAccessEvents(nextGym, nextDate);
     } finally {
       setLoading(false);
     }
@@ -159,7 +202,7 @@ export function PodsView({
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <h1 className="text-xl font-semibold text-foreground">Pods</h1>
+          <h1 className="text-xl font-semibold text-foreground">Access</h1>
           <Link href="/pods/transactions" className="text-xs text-accent hover:underline">
             Transactions & refunds
           </Link>
@@ -178,6 +221,56 @@ export function PodsView({
           />
         </div>
       </div>
+
+      <section className="rounded-lg border border-card-border bg-card p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">
+              Access log{date === todayDateParam() && <span className="ml-2 text-xs font-normal text-success">● Live</span>}
+            </h2>
+            <p className="text-xs text-muted-foreground">Who unlocked the pod door, and when, for {date}.</p>
+          </div>
+          <select
+            value={accessFilter}
+            onChange={(e) => setAccessFilter(e.target.value as AccessFilter)}
+            className={inputClass}
+          >
+            <option value="all">All attempts</option>
+            <option value="success">Successful only</option>
+            <option value="blocked">Blocked only</option>
+          </select>
+        </div>
+        {filteredAccessEvents.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No access attempts for this date{accessFilter !== "all" ? " matching this filter" : ""}.</p>
+        ) : (
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-card-border text-xs text-muted-foreground">
+                <th className="py-2 font-medium">Time</th>
+                <th className="py-2 font-medium">Member</th>
+                <th className="py-2 font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredAccessEvents.map((e) => (
+                <tr key={e.id} className="border-b border-card-border last:border-b-0">
+                  <td className="py-2 tabular-nums text-foreground">{formatEventTime(e.attemptedAt)}</td>
+                  <td className="py-2 text-foreground">{e.memberName}</td>
+                  <td className="py-2">
+                    {e.success ? (
+                      <span className="text-success">Entered</span>
+                    ) : (
+                      <span className="text-danger" title={e.kisiResponse ?? undefined}>
+                        Blocked
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
 
       {loading && <p className="text-sm text-muted-foreground">Loading...</p>}
 
