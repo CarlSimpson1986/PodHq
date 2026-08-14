@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { GymSelect } from "@/components/ui/gym-select";
 import type { GymName } from "@/lib/data/types";
 import type { PodBooking, PodMember, PodSettings } from "@/lib/data/pods";
@@ -157,7 +158,12 @@ export function PodsView({
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold text-foreground">Pods</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-semibold text-foreground">Pods</h1>
+          <Link href="/pods/transactions" className="text-xs text-accent hover:underline">
+            Transactions & refunds
+          </Link>
+        </div>
         <div className="flex items-center gap-2">
           {role === "admin" ? (
             <GymSelect value={gym} onChange={handleGymChange} className="w-56" />

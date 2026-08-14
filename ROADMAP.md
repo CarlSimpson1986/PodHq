@@ -174,6 +174,92 @@ before moving to the next. Don't jump ahead to a later stage unprompted.
     afterward via direct SQL (`delete from gym_other_income where gym =
     'Aylesbury Berryfields'`), confirmed back to £0 across the board.
 
+17. **Staff refunds (`/pods/transactions`, admin + owner)** — added to the
+    roadmap 2026-08-14 after the user asked directly whether podHq needed
+    its own Stripe integration; the real trigger was refunds specifically —
+    reading revenue is already solved by both apps sharing one Supabase
+    project, but issuing a refund genuinely needs the Stripe API, which
+    podHq had never touched before. Scope confirmed with the user first:
+    all three purchase types (credit packs, memberships, gift vouchers),
+    and ledger correction driven by Stripe's webhook rather than the
+    refund-issuing request itself — the same pattern every other
+    Stripe-driven balance change in podhq-client already uses, so a refund
+    that succeeds at Stripe but fails to write here still lands correctly
+    once the webhook fires, instead of the two systems silently drifting.
+
+    **Real gap found before any of this could work**: nothing captured the
+    Stripe payment/charge reference at purchase time — only
+    `stripe_event_id` (the webhook event id) existed, which isn't enough to
+    call `stripe.refunds.create()`. `0026_stripe_refunds.sql` (written and
+    **applied 2026-08-14**) adds `stripe_payment_intent_id` to
+    both `credits` and `gift_vouchers`, adds `'refund'` to
+    `credits.reason`'s CHECK constraint, and adds `refunded_at` to
+    `gift_vouchers`. First paste into Supabase's SQL editor hit the same
+    class of error as the cancel-session migration (42601, a statement
+    terminator lost somewhere in the copy) — fixed by clearing the editor
+    and pasting fresh in one go rather than appending. Originally drafted
+    as `0021_stripe_refunds.sql` but
+    renumbered before writing anything to disk — `0021` was already taken
+    by `0021_notification_log.sql` from the concurrent leads/waitlist work
+    landed just before this session (same class of collision the
+    `gym_other_income` migration hit in Stage 16, caught this time by
+    listing the migrations folder first instead of after the fact).
+
+    **podhq-client changes** (see its own ROADMAP for the full detail):
+    the Stripe webhook now captures `stripe_payment_intent_id` on every
+    credit-pack, membership-renewal, and gift-voucher insert — the
+    membership case needed real research, not a guess: `Invoice` has no
+    direct `payment_intent` field in the installed Stripe SDK version
+    (confirmed against its type definitions), replaced by the Invoice
+    Payments API, so that path calls `stripe.invoicePayments.list()` to
+    find the default payment's reference. A new `charge.refunded` handler
+    in the same webhook does the actual ledger write: a negative `credits`
+    row (`reason: 'refund'`, idempotent via `stripe_event_id` same as every
+    other insert there) for credit-pack/membership refunds, or setting
+    `gift_vouchers.refunded_at` for vouchers — matched via
+    `stripe_payment_intent_id`, gated on a fully-refunded charge (partial
+    refunds are logged, not processed — out of scope for v1, staff only
+    ever issues a full refund). Voucher redemption (`/api/vouchers/redeem`)
+    now also rejects an already-refunded code, using the same atomic
+    `.is(..., null)` claim pattern as the existing redeemed-check.
+
+    **podHq side**: `src/lib/stripe.ts` — a deliberately separate
+    `STRIPE_SECRET_KEY` from podhq-client's, not the same value reused
+    across both apps; should hold a **restricted key** (Charges: read,
+    Refunds: write) rather than the full-access key that can also create
+    checkout sessions and subscriptions, same least-privilege reasoning
+    CLAUDE.md already applies to `KISI_API_KEY`. Not yet added to either
+    app's env — a manual step before this can be live-tested.
+    `src/lib/data/refunds.ts` lists recent gym-scoped transactions (only
+    rows with a captured `stripe_payment_intent_id` show up at all — older,
+    pre-migration purchases are excluded rather than shown as permanently
+    un-refundable) and looks up a specific transaction's payment_intent +
+    owning gym before any Stripe call is made. `POST /api/pods/refund`
+    only ever calls `stripe.refunds.create({ payment_intent })` (a full
+    refund by omitting `amount`) — it never touches the ledger directly,
+    same IDOR-proofing pattern as `/api/unlock`: an owner's request is
+    checked against the transaction's real gym (looked up server-side,
+    never client-supplied), a mismatch returns 404 rather than 403 so it
+    doesn't confirm another gym's transaction even exists. New
+    `/pods/transactions` page + `TransactionsView` (inline confirm panel
+    per row, no native `window.confirm`, matching this app's existing
+    pattern), linked from `/pods`.
+
+    **`0026_stripe_refunds.sql` applied 2026-08-14.** Still not
+    live-tested — blocked on two remaining manual steps: adding a
+    restricted `STRIPE_SECRET_KEY` to podHq's env (locally and in Vercel),
+    and adding `charge.refunded` to the production Stripe webhook
+    endpoint's configured event list (same per-event-type opt-in Stage 8
+    already established — this endpoint doesn't forward every event type
+    by default). `npx tsc --noEmit` and
+    `eslint` pass in both repos. The PostgREST embedded-join syntax used in
+    `getRecentTransactions` for `gift_vouchers` (`members!purchaser_member_id!inner(...)`,
+    disambiguating from that table's other member FK,
+    `redeemed_by_member_id`) has no prior example anywhere else in either
+    codebase — reads correctly against Supabase's documented syntax but
+    is unverified against the real API until the migration is applied and
+    this is tested live.
+
 ## Database schema
 
 Two tables pre-date this project and were never created by our migrations — they
@@ -227,6 +313,16 @@ error — against a ledger sum specifically, that means a genuinely wrong
 balance, not just an incomplete list, once a member's history gets long
 enough. Same pattern `create_booking()` already used internally for its
 own balance check.
+
+**`0026_stripe_refunds.sql` written and applied 2026-08-14**: adds
+`stripe_payment_intent_id` to `credits` and `gift_vouchers` (nothing
+previously captured the actual Stripe payment reference — only
+`stripe_event_id`, the webhook event id, which isn't enough to issue a
+refund), widens `credits.reason` to also allow `'refund'`, and adds
+`refunded_at` to `gift_vouchers`. Supports this app's new Stage 17 staff
+refund feature (`/pods/transactions`) — see that stage above for the full
+detail, and podhq-client's ROADMAP.md for the webhook-side changes that
+populate/consume these new columns.
 
 **`0020_cancel_booking_function.sql` written and applied 2026-08-12**
 (per the shared-schema rule — flagged here so a podHq session isn't
