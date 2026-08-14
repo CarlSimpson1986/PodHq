@@ -1,15 +1,15 @@
 import { createSessionClient } from "@/lib/supabase/server";
 import { getGymScope } from "@/lib/auth/gym-scope";
-import { getRecentTransactions } from "@/lib/data/refunds";
-import { TransactionsView } from "@/components/pods/transactions-view";
+import { getPodSettings, getMembersForGym } from "@/lib/data/pods";
+import { CalendarView } from "@/components/pods/calendar-view";
 import { AppShell } from "@/components/layout/app-shell";
 import type { GymName } from "@/lib/data/types";
 
-// Same default as /pods — only Aylesbury Berryfields has a pod configured
-// as of this pilot. An owner is always locked to their own gym regardless.
+// Only Aylesbury Berryfields has a pod configured as of this pilot — same
+// default reasoning as the rest of this app.
 const DEFAULT_GYM: GymName = "Aylesbury Berryfields";
 
-export default async function PodsTransactionsPage() {
+export default async function CalendarPage() {
   const supabase = await createSessionClient();
   const {
     data: { user },
@@ -33,12 +33,13 @@ export default async function PodsTransactionsPage() {
   }
 
   const gym = scope.role === "owner" ? scope.gym : DEFAULT_GYM;
-  const transactions = await getRecentTransactions(gym);
+
+  const [settings, members] = await Promise.all([getPodSettings(gym), getMembersForGym(gym)]);
 
   return (
     <AppShell role={scope.role}>
-      <div className="mx-auto max-w-5xl px-4 py-8">
-        <TransactionsView role={scope.role} initialGym={gym} initialTransactions={transactions} />
+      <div className="mx-auto max-w-6xl px-4 py-8">
+        <CalendarView role={scope.role} initialGym={gym} initialSettings={settings} initialMembers={members} />
       </div>
     </AppShell>
   );

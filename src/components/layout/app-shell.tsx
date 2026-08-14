@@ -73,6 +73,16 @@ const NAV_ITEMS = [
     ),
   },
   {
+    href: "/pods/calendar",
+    label: "Calendar",
+    icon: (
+      <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.5}>
+        <rect x="3" y="4" width="14" height="13" rx="2" />
+        <path d="M3 8h14M7 2.5v3M13 2.5v3" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
     href: "/pods",
     label: "Access",
     icon: (
@@ -98,25 +108,34 @@ export function AppShell({ children, role }: { children: ReactNode; role?: "admi
   const pathname = usePathname();
   const navItems = role === "admin" ? NAV_ITEMS : NAV_ITEMS.filter((item) => item.href !== "/admin");
 
+  // Some hrefs are prefixes of others (e.g. /pods and /pods/calendar), so a
+  // plain startsWith would highlight both at once — only the longest
+  // matching href should ever be active.
+  const activeHref = navItems
+    .filter((item) => pathname === item.href || pathname?.startsWith(`${item.href}/`))
+    .sort((a, b) => b.href.length - a.href.length)[0]?.href;
+
   return (
     <div className="min-h-screen md:flex">
-      {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-screen w-56 shrink-0 flex-col border-r border-card-border bg-card md:flex">
+      {/* Desktop sidebar — deliberately stays on the dark chrome palette
+          (sidebar-*) rather than the light content-area tokens, at the
+          user's request. */}
+      <aside className="sticky top-0 hidden h-screen w-56 shrink-0 flex-col border-r border-sidebar-border bg-sidebar-background md:flex">
         <div className="flex items-center gap-2 px-5 py-6">
           <Logo />
-          <span className="text-xs font-medium tracking-wide text-muted-foreground">PodHQ</span>
+          <span className="text-xs font-medium tracking-wide text-sidebar-muted-foreground">PodHQ</span>
         </div>
         <nav className="flex flex-1 flex-col gap-1 px-3">
           {navItems.map((item) => {
-            const active = pathname?.startsWith(item.href);
+            const active = item.href === activeHref;
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${
+                className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                   active
                     ? "bg-gradient-to-r from-accent to-accent-hover text-accent-foreground shadow-[0_0_24px_-6px_var(--accent)]"
-                    : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+                    : "text-sidebar-muted-foreground hover:bg-white/5 hover:text-sidebar-foreground"
                 }`}
               >
                 {item.icon}
@@ -131,10 +150,10 @@ export function AppShell({ children, role }: { children: ReactNode; role?: "admi
       </aside>
 
       {/* Mobile top bar (wordmark + sign out — nav itself is the bottom bar) */}
-      <div className="flex items-center justify-between border-b border-card-border bg-card px-4 py-3 md:hidden">
+      <div className="flex items-center justify-between border-b border-sidebar-border bg-sidebar-background px-4 py-3 md:hidden">
         <div className="flex items-center gap-2">
           <Logo />
-          <span className="text-xs font-medium tracking-wide text-muted-foreground">PodHQ</span>
+          <span className="text-xs font-medium tracking-wide text-sidebar-muted-foreground">PodHQ</span>
         </div>
         <SignOutButton />
       </div>
@@ -142,15 +161,15 @@ export function AppShell({ children, role }: { children: ReactNode; role?: "admi
       <main className="min-w-0 flex-1 pb-20 md:pb-0">{children}</main>
 
       {/* Mobile bottom nav */}
-      <nav className="fixed inset-x-0 bottom-0 flex border-t border-card-border bg-card md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 flex border-t border-sidebar-border bg-sidebar-background md:hidden">
         {navItems.map((item) => {
-          const active = pathname?.startsWith(item.href);
+          const active = item.href === activeHref;
           return (
             <Link
               key={item.href}
               href={item.href}
               className={`flex flex-1 flex-col items-center gap-1 py-2.5 text-xs font-medium transition-colors ${
-                active ? "text-accent" : "text-muted-foreground"
+                active ? "text-accent" : "text-sidebar-muted-foreground"
               }`}
             >
               {item.icon}

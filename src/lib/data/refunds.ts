@@ -2,8 +2,6 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { GymName } from "./types";
 
-const RECENT_TRANSACTIONS_LIMIT = 50;
-
 export type RefundableTransactionType = "credit_pack" | "membership" | "gift_voucher";
 
 export interface RefundableTransaction {
@@ -40,27 +38,25 @@ interface GiftVoucherRow {
   members: { name: string } | null;
 }
 
-/** Recent Stripe-funded transactions for a gym's members, newest first — the source list podHq's staff refund UI works from. Only rows with a captured stripe_payment_intent_id can ever be refunded, so rows without one (pre-migration purchases, manual_grant/booking_used/booking_refund credits) are excluded entirely rather than shown as permanently un-refundable. */
-export async function getRecentTransactions(gym: GymName): Promise<RefundableTransaction[]> {
+/** Stripe-funded transactions for one member, newest first — the source list for the member profile page's Payments section (moved here from a gym-wide list, since refunds are now issued from an individual member's profile). Only rows with a captured stripe_payment_intent_id can ever be refunded, so rows without one (pre-migration purchases, manual_grant/booking_used/booking_refund credits) are excluded entirely rather than shown as permanently un-refundable. */
+export async function getTransactionsForMember(memberId: number): Promise<RefundableTransaction[]> {
   const admin = createAdminClient();
 
   const [creditsResult, vouchersResult] = await Promise.all([
     admin
       .from("credits")
-      .select("id, member_id, amount, reason, created_at, stripe_payment_intent_id, members!inner(name, gym)")
+      .select("id, member_id, amount, reason, created_at, stripe_payment_intent_id, members(name)")
+      .eq("member_id", memberId)
       .not("stripe_payment_intent_id", "is", null)
       .in("reason", ["purchase", "membership", "refund"])
-      .eq("members.gym", gym)
       .order("created_at", { ascending: false })
-      .limit(RECENT_TRANSACTIONS_LIMIT)
       .returns<CreditRow[]>(),
     admin
       .from("gift_vouchers")
-      .select("id, purchaser_member_id, amount_gbp, credits, created_at, stripe_payment_intent_id, refunded_at, members!purchaser_member_id!inner(name, gym)")
+      .select("id, purchaser_member_id, amount_gbp, credits, created_at, stripe_payment_intent_id, refunded_at, members!purchaser_member_id(name)")
+      .eq("purchaser_member_id", memberId)
       .not("stripe_payment_intent_id", "is", null)
-      .eq("members.gym", gym)
       .order("created_at", { ascending: false })
-      .limit(RECENT_TRANSACTIONS_LIMIT)
       .returns<GiftVoucherRow[]>(),
   ]);
 
@@ -100,9 +96,9 @@ export async function getRecentTransactions(gym: GymName): Promise<RefundableTra
       refunded: row.refunded_at !== null,
     }));
 
-  return [...creditTransactions, ...voucherTransactions]
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, RECENT_TRANSACTIONS_LIMIT);
+  return [...creditTransactions, ...voucherTransactions].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
 }
 
 export type RefundLookupResult =

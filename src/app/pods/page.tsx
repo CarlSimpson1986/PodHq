@@ -1,6 +1,6 @@
 import { createSessionClient } from "@/lib/supabase/server";
 import { getGymScope } from "@/lib/auth/gym-scope";
-import { getPodSettings, getBookingsForGymAndDate, getMembersForGym, getAccessEventsForGym } from "@/lib/data/pods";
+import { getAccessEventsForGym } from "@/lib/data/pods";
 import { PodsView } from "@/components/pods/pods-view";
 import { AppShell } from "@/components/layout/app-shell";
 import type { GymName } from "@/lib/data/types";
@@ -42,12 +42,7 @@ export default async function PodsPage() {
   const gym = scope.role === "owner" ? scope.gym : DEFAULT_GYM;
   const date = todayDateParam();
 
-  const [settings, bookings, members, accessEvents] = await Promise.all([
-    getPodSettings(gym),
-    getBookingsForGymAndDate(gym, new Date(`${date}T00:00:00`)),
-    getMembersForGym(gym),
-    getAccessEventsForGym(gym, new Date(`${date}T00:00:00`)),
-  ]);
+  const accessEvents = await getAccessEventsForGym(gym, new Date(`${date}T00:00:00`));
 
   return (
     <AppShell role={scope.role}>
@@ -56,9 +51,6 @@ export default async function PodsPage() {
           role={scope.role}
           initialGym={gym}
           initialDate={date}
-          initialSettings={settings}
-          initialBookings={bookings}
-          initialMembers={members}
           initialAccessEvents={accessEvents}
         />
       </div>
