@@ -260,6 +260,88 @@ before moving to the next. Don't jump ahead to a later stage unprompted.
     is unverified against the real API until the migration is applied and
     this is tested live.
 
+    **Fully live-verified end-to-end 2026-08-14**, closing out the two
+    remaining manual steps above and surfacing several real, unrelated
+    bugs along the way — none of them in the refund feature's own code:
+
+    - **Both remaining Stripe keys were added**, but initially swapped
+      between the two apps' `.env.local` files — podhq-client ended up
+      with podHq's restricted (Charges: read, Refunds: write) key, which
+      can't create Checkout Sessions, breaking `/buy-credits` with a real
+      `403 more_permissions_required` from Stripe. Fixed by moving the
+      restricted key to podHq's env and restoring podhq-client's own
+      full-access key.
+    - **podhq-client's Stage 17 commit (`0e5fd30`, the `stripe_payment_intent_id`
+      capture + `charge.refunded` handler) was local-only** — same class
+      of gap as podHq's own refund-feature commit being unpushed — so the
+      first real test purchase hit the *old* production webhook and got
+      `stripe_payment_intent_id: null`. Fixed by pushing and deploying
+      podhq-client to production; a second test purchase captured the
+      payment intent correctly.
+    - **Unrelated: the admin account (`carlsimpson83@yahoo.co.uk`) couldn't
+      log in** — password rejected, then a "too many attempts" soft lock.
+      Root cause traced via `auth_events`: the account's `updated_at` had
+      changed outside any audited podHq code path (no matching
+      `admin_password_reset` event), meaning something edited it directly
+      in Supabase rather than through the app. Resolved using podHq's own
+      in-app admin "Reset password" action instead of chasing the direct
+      edit further.
+    - **Local-dev-only quirk, not a real bug**: with both apps running on
+      `localhost` (different ports), browser cookies aren't port-scoped,
+      so a podHq admin session was also being read as a valid session by
+      podhq-client's middleware, redirecting `/signup` back to `/book`
+      and making the sign-up button look broken. Only reproduces when
+      running both apps locally at once; doesn't happen in production
+      (separate domains).
+
+    **Verified live**: a real test member (`podhq-test-refund@example.com`)
+    bought 1 credit via actual Stripe Checkout (test mode) through
+    podhq-client; the `credits` row correctly captured
+    `stripe_payment_intent_id`. From podHq's `/pods/transactions`
+    (Aylesbury Berryfields, admin session), the transaction appeared
+    correctly (confirming `getRecentTransactions`' previously-unverified
+    embedded-join query works against the real API), the inline
+    confirm-panel flow worked, and clicking Confirm produced a genuine
+    ledger correction: a second `credits` row, `amount: -1`,
+    `reason: 'refund'`, same `stripe_payment_intent_id` as the original
+    purchase, arriving via a distinct `charge.refunded` Stripe event —
+    confirming the full chain (refund UI → Stripe refund API →
+    `charge.refunded` webhook → ledger write) end-to-end, not just a 200
+    response.
+
+18. **`/pods` renamed to "Access", with a live door-entry log** — added
+    2026-08-14 at the user's request, modelled on GymFlow's own
+    club-wide Access Logs page (User/Membership/Check-in/Check-out
+    table) but scoped to what podHq actually has data for: Kisi
+    door-unlock *attempts* (`pod_access_events` — member, timestamp,
+    success/fail, blocked-reason), not check-in/out duration,
+    membership type, or guest status, none of which this table tracks.
+    Confirmed with the user before building: rename the existing `/pods`
+    tab (keep its booking/settings/refunds pages) rather than add a
+    separate tab, and build only with the real columns available rather
+    than fabricating the missing ones.
+
+    Sidebar nav label and page H1 changed to "Access" (icon unchanged —
+    the existing padlock already fit). New top section on `/pods`:
+    `getAccessEventsForGym` (`src/lib/data/pods.ts`) joins
+    `pod_access_events` to `members` (`members!inner`, filtered on
+    `members.gym` since the events table itself has no gym column) for
+    the date range, exposed via `GET /api/pods/access-events` (same
+    session/scope/rate-limit pattern as the existing `/api/pods/bookings`
+    route). "Live" is 15s client-side polling rather than a websocket/
+    Supabase Realtime channel — this codebase has no realtime plumbing
+    yet, and polling only runs while viewing today's date, not historical
+    ones. A status filter (All/Successful/Blocked) narrows the same
+    fetched list client-side.
+
+    Verified live against real historical data (12 Aug, Aylesbury
+    Berryfields): the log correctly showed one blocked attempt
+    (Pilot Test Member, location-gate rejection) with the reason in a
+    hover tooltip, the "● Live" indicator correctly appeared only when
+    the date filter was on today, and the status filter correctly
+    narrowed to zero rows when set to "Successful only" against that
+    all-blocked day. `npx tsc --noEmit` passes clean.
+
 ## Database schema
 
 Two tables pre-date this project and were never created by our migrations — they

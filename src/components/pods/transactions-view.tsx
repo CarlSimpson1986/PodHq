@@ -94,7 +94,7 @@ export function TransactionsView({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <Link href="/pods" className="text-xs text-muted-foreground hover:underline">
-            &larr; Pods
+            &larr; Access
           </Link>
           <h1 className="text-xl font-semibold text-foreground">Transactions</h1>
           <p className="text-xs text-muted-foreground">Recent Stripe-funded purchases — refunds are issued through Stripe.</p>

@@ -74,7 +74,7 @@ const NAV_ITEMS = [
   },
   {
     href: "/pods",
-    label: "Pods",
+    label: "Access",
     icon: (
       <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.5}>
         <rect x="3" y="7" width="14" height="9" rx="2" />

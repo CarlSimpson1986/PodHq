@@ -9,6 +9,15 @@
 - Recharts for charts
 - Deployed on Vercel
 
+## Session handoff
+- Before any `git commit`/`git push` that wraps up a working session, add a
+  short summary of that session to `ROADMAP.md` (matching its existing
+  per-stage style: what changed, why, and what's verified vs. still
+  outstanding) — so the next session opens with full context on where things
+  left off, without needing to reconstruct it from the diff or chat history.
+- Keep it proportionate: a small fix can be a sentence or two appended to the
+  relevant stage; a new feature gets its own stage entry as usual.
+
 ## Conventions
 - All components: functional, TypeScript, named exports
 - File naming: kebab-case for files, PascalCase for components
