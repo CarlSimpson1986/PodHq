@@ -342,6 +342,196 @@ before moving to the next. Don't jump ahead to a later stage unprompted.
     narrowed to zero rows when set to "Successful only" against that
     all-blocked day. `npx tsc --noEmit` passes clean.
 
+    **Same-day follow-up: Access stripped down further, its other content
+    split out into two new places.** Scoped against three more GymFlow
+    screenshots the user provided (member profile page, bookings list,
+    payments/refund menu) plus a description of GymFlow's own Calendar.
+    Confirmed with the user before building: Access keeps *only* the entry
+    log now; Pod settings, manual booking, and the bookings-for-date list
+    move to a new Calendar page (below); Transactions/refunds move off
+    Access entirely and onto each member's own new profile page, reached
+    by clicking their name in the Access log.
+
+19. **Member profile pages + a new Calendar page** — same session as the
+    Access rename above, 2026-08-14. Two more real pieces split out of the
+    old all-in-one `/pods` page:
+
+    **Member profile (`/pods/members/[id]`)**: Profile info (mobile,
+    gender, address, waiver, member-since, live credit balance via
+    `get_credit_balance`), Bookings history, and Payments — the
+    Refund action moved here verbatim from the old flat
+    `/pods/transactions` list, which is now deleted along with its
+    component and API route (`getRecentTransactions` also removed,
+    replaced by a per-member `getTransactionsForMember` in
+    `src/lib/data/refunds.ts`; the refund API route itself,
+    `/api/pods/refund`, was already member-agnostic and needed no
+    change). Same IDOR-proofing pattern as the refund lookup: the
+    member's gym is derived server-side and an owner viewing another
+    gym's member gets "Member not found," never a 403 that confirms the
+    member exists. `AccessEvent` gained a `memberId` field so the Access
+    log's member names could link through. Verified live against two
+    real members: one with no Stripe purchases (correct "not provided"/
+    empty-state fallbacks throughout) and one from this session's Stage
+    17 refund testing (correctly showed the purchase, the refund, and a
+    credit balance that matches the real ledger math across a
+    pre-migration purchase, a captured purchase, and its refund).
+
+    **Calendar (`/pods/calendar`, new nav item)**: date navigation
+    (back/Today/forward), a Day/Week/Month view switcher, and — scoped
+    down from GymFlow's own richer occurrence panel to what podHq
+    actually has data and capability for — a click-a-slot panel showing
+    real booked members and real waitlist entries (`waitlist_entries`,
+    already populated by podhq-client's waitlist feature but never
+    surfaced anywhere in podHq before now) side by side, a search-to-add
+    box reusing the existing manual-booking flow, and a Cancel action per
+    booked row. Deliberately did *not* build GymFlow's "Email All" /
+    "Check In All" (no email capability or manual check-in concept exists
+    in this app) or its Class Count / User Type columns (no matching
+    data) — same "don't fabricate missing data" discipline as the Access
+    log rebuild. "Edit Class" became "Edit settings," reusing the exact
+    capacity/open-hour/close-hour form from the old `/pods` page, since
+    podHq's pod config is per-gym, not per-occurrence like GymFlow's
+    classes.
+
+    New data-layer functions in `src/lib/data/pods.ts`:
+    `getBookingsForGymAndRange` (one range query per view load, bucketed
+    into per-slot counts client-side rather than one query per grid
+    cell), `getSlotDetail` (booked + waitlist for one exact slot), and
+    `cancelBookingAsStaff` — which reuses podhq-client's existing
+    `cancel_booking()` RPC and its 2-hour refund/forfeit policy rather
+    than inventing a separate staff-cancellation rule, looking up the
+    booking's real `member_id` server-side (never client-supplied) both
+    for the RPC call and as the ownership check. Three new routes
+    (`/api/pods/calendar`, `/api/pods/slot`, `/api/pods/bookings/cancel`)
+    follow the same session/scope/rate-limit pattern as every other pods
+    route; settings, members, and manual-booking all reuse the
+    already-existing `/api/pods/settings`, `/api/pods/members`, and
+    `/api/pods/bookings` routes as-is.
+
+    **Real bug caught and fixed during this build, not by the user**:
+    `AppShell`'s active-nav-item check was a plain `pathname.startsWith(item.href)`,
+    which broke the moment two hrefs shared a prefix — `/pods/calendar`
+    starts with `/pods` too, so both "Calendar" and "Access" would have
+    highlighted simultaneously the instant Calendar was added. Fixed by
+    picking only the single longest matching href across both the
+    desktop sidebar and the mobile bottom nav (which had the identical
+    bug duplicated).
+
+    Verified live: real bookings rendered in exactly the right grid
+    cells across a full week (cross-checked against known data from
+    earlier in this session); clicking a booked cell showed the correct
+    real member with a working Cancel button and an empty, correctly-
+    labelled waitlist; Month view showed correct real per-day booked
+    counts and clicking a day correctly switched to Day view for that
+    date; nav highlighting confirmed fixed (Calendar and Access no
+    longer both light up). `npx tsc --noEmit` and `eslint` both pass
+    clean across every file touched this session.
+
+20. **Switched from dark-only to a light theme** — same session, 2026-08-14,
+    at the user's request after installing the `ui-ux-pro-max` Claude Code
+    skill (`nextlevelbuilder/ui-ux-pro-max-skill`, a large/well-established
+    community skill — verified before installing rather than trusted
+    blind) and comparing against Resend's actual dashboard (the user's own
+    live session, screenshotted for reference). Decided against the
+    skill's generic suggested palette (a dark-tech dashboard theme with a
+    green accent) since it would have discarded the app's existing,
+    already-documented brand gold (`#c9a24b`) for no real reason — the
+    actual problem, on inspection, wasn't the palette but that 3 of the
+    app's ~65 card-style call sites (all from Stage 19, built earlier the
+    same session: Access, Calendar, member profiles) used a plain flat
+    card style instead of the established `.card-glass` treatment; fixed
+    those 3 files directly rather than touching the other ~62 that were
+    already consistent.
+
+    The light-theme switch itself came from a second, explicit ask,
+    reversing `globals.css`'s original "dark-only by design" decision:
+    `--background`/`--card` went from black to white/off-white,
+    `--foreground`/`--muted-foreground` inverted to dark-on-light, native
+    form control theming (`color-scheme`) switched from `dark` to `light`,
+    and `.card-glass` was redefined from a translucent gradient-hairline-
+    border treatment (relied on light-on-dark contrast) to a flat
+    Resend-style white panel with a thin border and soft shadow — same
+    class name, same ~65 call sites, only the definition changed.
+    `--accent` (the brand gold) was kept rather than replaced, used
+    sparingly (buttons, active nav pill) rather than as a large dark
+    panel, matching Resend's own restrained use of color. Sidebar
+    active/hover states in `AppShell` were rebuilt for the light
+    background (a heavy gold gradient + glow does not read the same on
+    white as it did on black) — a soft `bg-accent/10` tint instead — and
+    the sole remaining hardcoded dark-mode utility (`hover:bg-white/5`)
+    was flipped to `hover:bg-black/5`.
+
+    **Two real, computed accessibility issues caught before shipping,
+    not just eyeballed**: (1) an accidental transcription of
+    `--accent-foreground` to white during the token rewrite — white text
+    on the gold button background computes to 2.40:1, failing WCAG's
+    4.5:1 text threshold outright; reverted to the original near-black
+    value (8.25:1). (2) the `--series-membership` chart-fill color
+    reusing the brand gold as-is: 2.40:1 on the new white `--card`,
+    failing even the more lenient 3:1 non-text/graphical threshold that
+    actually applies to chart marks — fixed with a darker gold
+    (`#b18a35`, 3.20:1) used only for that chart slot, leaving the UI
+    `--accent` itself untouched since its actual use (button/pill fills
+    with near-black text) was never the problem. Both computed via a
+    small Node WCAG-relative-luminance script, not estimated.
+
+    **Known gap, not fixed this session**: `logo-mark.png` has an opaque
+    black background baked into the image itself (not transparent/white
+    strokes as assumed) — it now renders as a solid black square against
+    the light sidebar. Needs a new light-background export of the asset;
+    out of reach without image-editing tooling or the source file.
+
+    Verified live across Calendar, a member profile, Dashboard, Revenue,
+    and Members: cards, charts (donut, stacked area, bar), stat tiles,
+    filter pills, and the at-risk/top-attenders tables all render
+    correctly against the new white background with no leftover
+    dark-mode-only styling found beyond the logo issue above.
+    `npx tsc --noEmit` and `eslint` both pass clean (same 3 pre-existing,
+    unrelated warnings as before: `turnstile-widget.tsx`'s
+    `set-state-in-effect`, `logo.tsx`'s `<img>` warning, an unused var in
+    `admin.ts`).
+
+    **Same-day follow-up: sidebar reverted to solid black, card borders
+    thickened.** Full-light was one step too far for the user's taste —
+    the nav chrome (desktop sidebar, mobile top bar, mobile bottom nav)
+    went back to black, kept genuinely separate from the light content
+    area via new dedicated tokens (`--sidebar-background/-foreground/
+    -muted-foreground/-border`) rather than reusing the light
+    `--foreground`/`--card-border` with per-component dark: overrides —
+    cleaner given the sidebar is a fixed dark island, not something that
+    needs to follow the page theme. `SignOutButton` (only ever rendered
+    inside that chrome) switched to the same tokens directly. The
+    active-nav-item treatment reverted to the original solid gold
+    gradient + glow (`bg-gradient-to-r from-accent to-accent-hover
+    text-accent-foreground shadow-[...]`) rather than the softer
+    Resend-style tint tried earlier that day — it reads fine again now
+    that it's back on black, which is what it was originally tuned for.
+    `--card-border` darkened from light gray to near-black
+    (`#18181b`) and `.card-glass`'s border width doubled to 2px for a
+    more visibly "boxed" card look. Pleasant side effect, not intended:
+    the earlier-flagged logo issue (opaque black background baked into
+    `logo-mark.png`) is now moot — the logo sits on a matching black
+    sidebar again, so the asset never needs replacing after all.
+    Verified live on Dashboard (stat tiles, warning card, bar chart) and
+    Calendar. **The Calendar check at the time was too shallow — a
+    full-page screenshot, not a zoomed-in one — and missed a real bug the
+    user caught immediately after: the Week/Day/Month grids' gridlines
+    didn't actually cross at intersections.** Root cause: those grids
+    used a CSS-grid `gap-px` + `bg-card-border` trick to fake gridlines
+    (a background color showing through 1px gaps between cells), which
+    doesn't guarantee gaps stay pixel-aligned across rows/columns when
+    track widths are fractional (`minmax(90px, 1fr)`) — invisible on the
+    original thin light-gray border, obvious once it went darker/thicker
+    for this same follow-up. Fixed by rebuilding both grids as real
+    `<table>` elements with `border-collapse: collapse` (`table-fixed` +
+    an explicit `<colgroup>` for the hour-label column's width) instead
+    of divs — browsers guarantee collapsed table borders merge into
+    single lines that cross cleanly, which the gap trick never actually
+    promised. Re-verified with an actual zoomed screenshot this time,
+    not just a full-page one: clean crossing intersections confirmed on
+    both Week and Month views, real booked counts/colors unchanged.
+    `npx tsc --noEmit` and `eslint` clean.
+
 ## Database schema
 
 Two tables pre-date this project and were never created by our migrations — they

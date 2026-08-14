@@ -20,6 +20,28 @@ export const createManualBookingSchema = z
   })
   .strict();
 
+export const podCalendarQuerySchema = z
+  .object({
+    gym: z.enum(GYM_NAMES).optional(),
+    start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  })
+  .strict();
+
+export const podSlotQuerySchema = z
+  .object({
+    gym: z.enum(GYM_NAMES).optional(),
+    slotStart: z.string().refine((v) => !Number.isNaN(new Date(v).getTime()), "Invalid slot."),
+  })
+  .strict();
+
+export const cancelBookingSchema = z
+  .object({
+    gym: z.enum(GYM_NAMES).optional(),
+    bookingId: z.number().int().positive(),
+  })
+  .strict();
+
 export const podSettingsQuerySchema = z
   .object({
     gym: z.enum(GYM_NAMES).optional(),
