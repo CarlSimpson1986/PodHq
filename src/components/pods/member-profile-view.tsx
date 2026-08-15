@@ -1,9 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
+import { Suspense, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { MemberProfile, MemberBooking } from "@/lib/data/pods";
 import type { RefundableTransaction, RefundableTransactionType } from "@/lib/data/refunds";
+import type { ActiveMembership, SavedPaymentMethod } from "@/lib/data/sales";
+import type { CatalogItem } from "@/lib/data/catalog";
+import { SellPanel } from "./sell-panel";
 
 const buttonClass =
   "rounded-md bg-gradient-to-r from-accent to-accent-hover px-3 py-1 text-xs font-medium text-accent-foreground disabled:opacity-50";
@@ -37,18 +40,57 @@ export function MemberProfileView({
   profile,
   initialBookings,
   initialTransactions,
+  initialMembership,
+  savedPaymentMethod,
+  creditPacks,
+  membershipTiers,
 }: {
   profile: MemberProfile;
   initialBookings: MemberBooking[];
   initialTransactions: RefundableTransaction[];
+  initialMembership: ActiveMembership | null;
+  savedPaymentMethod: SavedPaymentMethod | null;
+  creditPacks: CatalogItem[];
+  membershipTiers: CatalogItem[];
 }) {
+  const router = useRouter();
   const [transactions, setTransactions] = useState(initialTransactions);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [refundingId, setRefundingId] = useState<string | null>(null);
   const [rowError, setRowError] = useState<Record<string, string>>({});
+  const [balance, setBalance] = useState(profile.creditBalance);
+  const [membership, setMembership] = useState(initialMembership);
+  const [grantAmount, setGrantAmount] = useState(1);
+  const [granting, setGranting] = useState(false);
+  const [grantOpen, setGrantOpen] = useState(false);
+  const [grantError, setGrantError] = useState("");
 
   function rowKey(t: RefundableTransaction) {
     return `${t.type}:${t.id}`;
+  }
+
+  async function handleGrantCredit() {
+    setGranting(true);
+    setGrantError("");
+    try {
+      const res = await fetch("/api/pods/credits/grant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gym: profile.gym, memberId: profile.id, amount: grantAmount }),
+      });
+      const body = await res.json();
+      if (body.status !== "ok") {
+        setGrantError(body.message ?? "Could not grant credit.");
+        return;
+      }
+      setBalance(body.newBalance);
+      setGrantOpen(false);
+      setGrantAmount(1);
+    } catch {
+      setGrantError("Something went wrong. Try again.");
+    } finally {
+      setGranting(false);
+    }
   }
 
   async function handleRefund(t: RefundableTransaction) {
@@ -78,15 +120,76 @@ export function MemberProfileView({
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/pods" className="text-xs text-muted-foreground hover:underline">
-          &larr; Access
-        </Link>
+        <button type="button" onClick={() => router.back()} className="text-xs text-muted-foreground hover:underline">
+          &larr; Back
+        </button>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-xl font-semibold text-foreground">{profile.name}</h1>
-          <span className="text-sm text-muted-foreground">
-            {profile.gym} &middot; {profile.creditBalance} credit{profile.creditBalance === 1 ? "" : "s"}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-muted-foreground">
+              {profile.gym} &middot; {balance} credit{balance === 1 ? "" : "s"}
+            </span>
+            {grantOpen ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={grantAmount}
+                  onChange={(e) => setGrantAmount(Math.max(1, Math.min(20, Number(e.target.value) || 1)))}
+                  className="w-14 rounded-md border border-card-border bg-card px-2 py-1 text-xs text-foreground"
+                  disabled={granting}
+                />
+                <button type="button" onClick={handleGrantCredit} disabled={granting} className={buttonClass}>
+                  {granting ? "Granting..." : "Confirm"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGrantOpen(false);
+                    setGrantError("");
+                  }}
+                  disabled={granting}
+                  className={ghostButtonClass}
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button type="button" onClick={() => setGrantOpen(true)} className={buttonClass}>
+                Grant credit
+              </button>
+            )}
+          </div>
         </div>
+        {grantError && <p className="mt-1 text-right text-xs text-danger">{grantError}</p>}
+        <p className="mt-1 text-right text-xs text-muted-foreground">
+          {membership
+            ? `${membership.tierName} membership${membership.isComp ? " (comp)" : ""}${membership.currentPeriodEnd ? ` · ends ${formatDate(membership.currentPeriodEnd)}` : ""}`
+            : "No active membership"}
+        </p>
+        <p className="mt-1 text-right text-xs text-muted-foreground">
+          {savedPaymentMethod
+            ? `Card on file: ${savedPaymentMethod.brand.toUpperCase()} •••• ${savedPaymentMethod.last4} (exp ${savedPaymentMethod.expMonth}/${savedPaymentMethod.expYear})`
+            : "No card on file"}
+        </p>
+      </div>
+
+      <div className="flex justify-end">
+        <Suspense fallback={null}>
+          <SellPanel
+            memberId={profile.id}
+            gym={profile.gym}
+            hasActiveMembership={!!membership}
+            hasSavedCard={!!savedPaymentMethod}
+            creditPacks={creditPacks}
+            membershipTiers={membershipTiers}
+            onCompSuccess={({ newBalance, membership: newMembership }) => {
+              if (newBalance !== undefined) setBalance(newBalance);
+              if (newMembership) setMembership(newMembership);
+            }}
+          />
+        </Suspense>
       </div>
 
       <section className="card-glass p-4">

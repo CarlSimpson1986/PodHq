@@ -17,15 +17,24 @@ const isDev = process.env.NODE_ENV === "development";
 // plain document.createElement/appendChild in turnstile-widget.tsx, with no
 // nonce attribute of its own — inherit trust from the already-nonced script
 // that creates it, so it doesn't need special-casing here.
+// Stripe additions (2026-08-15, /pods/members/[id]'s embedded Checkout sell
+// panel) follow Stripe's own documented CSP directives exactly
+// (docs.stripe.com/security/guide — "Checkout" + "Stripe.js" sections
+// combined, since Embedded Checkout uses both): script-src/frame-src need
+// js.stripe.com + checkout.stripe.com for the widget and payment iframe,
+// connect-src needs api.stripe.com + checkout.stripe.com for Stripe.js's
+// own API calls, frame-src needs hooks.stripe.com for 3D Secure redirect
+// challenges, and img-src needs the *.stripe.com wildcard for Checkout's
+// own asset loading.
 function buildCsp(nonce: string) {
   return [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://challenges.cloudflare.com${isDev ? " 'unsafe-eval'" : ""}`,
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://challenges.cloudflare.com https://js.stripe.com https://checkout.stripe.com${isDev ? " 'unsafe-eval'" : ""}`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data:",
+    "img-src 'self' data: https://*.stripe.com",
     "font-src 'self' data:",
-    "connect-src 'self' https://challenges.cloudflare.com",
-    "frame-src https://challenges.cloudflare.com",
+    "connect-src 'self' https://challenges.cloudflare.com https://api.stripe.com https://checkout.stripe.com",
+    "frame-src https://challenges.cloudflare.com https://js.stripe.com https://*.js.stripe.com https://checkout.stripe.com https://hooks.stripe.com",
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",
