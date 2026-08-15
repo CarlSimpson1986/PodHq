@@ -326,6 +326,41 @@ export async function getSlotDetail(gym: GymName, slotStartIso: string): Promise
   };
 }
 
+export type GrantCreditResult =
+  | { status: "ok"; newBalance: number }
+  | { status: "not_found" }
+  | { status: "error"; message: string };
+
+/**
+ * Staff comp/correction from the member profile page — e.g. a member paid
+ * outside Stripe, or a booking issue needs manually resolving. Uses the
+ * same 'manual_grant' reason the create_booking()/cancel_booking() RPCs
+ * already write for their own credit/refund rows (0009_pod_booking.sql),
+ * just via a direct insert since there's no RPC-level invariant to
+ * enforce here beyond the ledger being append-only. The member's real gym
+ * is looked up server-side (never trusts a client-supplied gym for the
+ * member itself), matching cancelBookingAsStaff's ownership-check pattern.
+ */
+export async function grantCreditToMember(gym: GymName, memberId: number, amount: number): Promise<GrantCreditResult> {
+  const admin = createAdminClient();
+  const { data: member, error: lookupError } = await admin
+    .from("members")
+    .select("id, gym")
+    .eq("id", memberId)
+    .maybeSingle();
+
+  if (lookupError) throw lookupError;
+  if (!member || member.gym !== gym) return { status: "not_found" };
+
+  const { error: insertError } = await admin.from("credits").insert({ member_id: memberId, amount, reason: "manual_grant" });
+  if (insertError) return { status: "error", message: insertError.message };
+
+  const { data: balance, error: balanceError } = await admin.rpc("get_credit_balance", { p_member_id: memberId });
+  if (balanceError) throw balanceError;
+
+  return { status: "ok", newBalance: (balance as number) ?? 0 };
+}
+
 export type CancelBookingResult =
   | { status: "ok"; refunded: boolean }
   | { status: "not_found" }

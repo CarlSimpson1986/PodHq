@@ -93,6 +93,16 @@ const NAV_ITEMS = [
     ),
   },
   {
+    href: "/setup",
+    label: "Setup",
+    icon: (
+      <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.5}>
+        <circle cx="10" cy="10" r="2.5" />
+        <path d="M10 3v2M10 15v2M17 10h-2M5 10H3M15.1 4.9l-1.4 1.4M6.3 13.7l-1.4 1.4M15.1 15.1l-1.4-1.4M6.3 6.3 4.9 4.9" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
     href: "/admin",
     label: "Admin",
     icon: (
@@ -104,16 +114,30 @@ const NAV_ITEMS = [
   },
 ];
 
+const ADMIN_ONLY_HREFS = ["/admin"];
+// Pricing is a per-gym decision each franchisee makes for their own
+// location, not a franchisor one — "admin" means the franchisor
+// specifically in this app, so Setup is the inverse of every other
+// admin-only page: visible to owners, hidden from admin.
+const OWNER_ONLY_HREFS = ["/setup"];
+
 export function AppShell({ children, role }: { children: ReactNode; role?: "admin" | "owner" }) {
   const pathname = usePathname();
-  const navItems = role === "admin" ? NAV_ITEMS : NAV_ITEMS.filter((item) => item.href !== "/admin");
+  const navItems = NAV_ITEMS.filter((item) => {
+    if (ADMIN_ONLY_HREFS.includes(item.href)) return role === "admin";
+    if (OWNER_ONLY_HREFS.includes(item.href)) return role === "owner";
+    return true;
+  });
 
   // Some hrefs are prefixes of others (e.g. /pods and /pods/calendar), so a
   // plain startsWith would highlight both at once — only the longest
-  // matching href should ever be active.
-  const activeHref = navItems
-    .filter((item) => pathname === item.href || pathname?.startsWith(`${item.href}/`))
-    .sort((a, b) => b.href.length - a.href.length)[0]?.href;
+  // matching href should ever be active. A member's own profile page
+  // (/pods/members/[id]) is reachable from both Access and Calendar, so it
+  // deliberately highlights neither rather than picking one arbitrarily.
+  const activeHref = pathname?.startsWith("/pods/members")
+    ? undefined
+    : navItems.filter((item) => pathname === item.href || pathname?.startsWith(`${item.href}/`)).sort((a, b) => b.href.length - a.href.length)[0]
+        ?.href;
 
   return (
     <div className="min-h-screen md:flex">

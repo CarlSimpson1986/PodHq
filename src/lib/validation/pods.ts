@@ -42,6 +42,14 @@ export const cancelBookingSchema = z
   })
   .strict();
 
+export const grantCreditSchema = z
+  .object({
+    gym: z.enum(GYM_NAMES).optional(),
+    memberId: z.number().int().positive(),
+    amount: z.number().int().min(1).max(20),
+  })
+  .strict();
+
 export const podSettingsQuerySchema = z
   .object({
     gym: z.enum(GYM_NAMES).optional(),

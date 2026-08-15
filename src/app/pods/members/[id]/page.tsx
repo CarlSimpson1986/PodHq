@@ -2,6 +2,8 @@ import { createSessionClient } from "@/lib/supabase/server";
 import { getGymScope } from "@/lib/auth/gym-scope";
 import { getMemberProfile, getBookingsForMember } from "@/lib/data/pods";
 import { getTransactionsForMember } from "@/lib/data/refunds";
+import { getActiveMembershipForMember, getSavedPaymentMethod } from "@/lib/data/sales";
+import { getEnabledCatalogItems } from "@/lib/data/catalog";
 import { MemberProfileView } from "@/components/pods/member-profile-view";
 import { AppShell } from "@/components/layout/app-shell";
 
@@ -53,15 +55,27 @@ export default async function MemberProfilePage({ params }: { params: Promise<{ 
     );
   }
 
-  const [bookings, transactions] = await Promise.all([
+  const [bookings, transactions, membership, savedPaymentMethod, creditPacks, membershipTiers] = await Promise.all([
     getBookingsForMember(memberId),
     getTransactionsForMember(memberId),
+    getActiveMembershipForMember(memberId),
+    getSavedPaymentMethod(memberId),
+    getEnabledCatalogItems(profile.gym, "credit_pack"),
+    getEnabledCatalogItems(profile.gym, "membership"),
   ]);
 
   return (
     <AppShell role={scope.role}>
       <div className="mx-auto max-w-5xl px-4 py-8">
-        <MemberProfileView profile={profile} initialBookings={bookings} initialTransactions={transactions} />
+        <MemberProfileView
+          profile={profile}
+          initialBookings={bookings}
+          initialTransactions={transactions}
+          initialMembership={membership}
+          savedPaymentMethod={savedPaymentMethod}
+          creditPacks={creditPacks}
+          membershipTiers={membershipTiers}
+        />
       </div>
     </AppShell>
   );
