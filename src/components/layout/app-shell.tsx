@@ -115,17 +115,11 @@ const NAV_ITEMS = [
 ];
 
 const ADMIN_ONLY_HREFS = ["/admin"];
-// Pricing is a per-gym decision each franchisee makes for their own
-// location, not a franchisor one — "admin" means the franchisor
-// specifically in this app, so Setup is the inverse of every other
-// admin-only page: visible to owners, hidden from admin.
-const OWNER_ONLY_HREFS = ["/setup"];
 
 export function AppShell({ children, role }: { children: ReactNode; role?: "admin" | "owner" }) {
   const pathname = usePathname();
   const navItems = NAV_ITEMS.filter((item) => {
     if (ADMIN_ONLY_HREFS.includes(item.href)) return role === "admin";
-    if (OWNER_ONLY_HREFS.includes(item.href)) return role === "owner";
     return true;
   });
 
