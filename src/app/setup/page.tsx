@@ -4,13 +4,13 @@ import { listCatalogItems } from "@/lib/data/catalog";
 import { CatalogView } from "@/components/setup/catalog-view";
 import { AppShell } from "@/components/layout/app-shell";
 
-// Owner-only, deliberately: "admin" means the franchisor specifically in
-// this app, and pricing is a per-gym decision each franchisee makes for
-// their own location, not something the franchisor sets or needs fallback
-// access to (unlike gym_outgoings/other_income, which admin *can* edit for
-// oversight — pricing doesn't follow that pattern here, by explicit
-// request). Admin currently has zero visibility into any gym's catalog as
-// a result — flagged, not yet revisited.
+// "Admin" means the franchisor specifically in this app, and pricing is a
+// per-gym decision each franchisee makes for their own location — but the
+// franchisor still needs full oversight, same fallback-access pattern as
+// Outgoings/Other Income/Marketing (owner enters, admin can view/edit any
+// gym they select). Setup shows in the nav for both roles; only the
+// gym-locking differs (owner: always their own gym; admin: picks one via
+// the same GymSelect used everywhere else, "All gyms" until they do).
 export default async function SetupPage() {
   const supabase = await createSessionClient();
   const {
@@ -26,20 +26,21 @@ export default async function SetupPage() {
   }
 
   const scope = await getGymScope(user.id);
-  if (!scope || scope.role !== "owner") {
+  if (!scope) {
     return (
       <main className="flex min-h-screen items-center justify-center px-4 text-center">
-        <p className="text-sm text-danger">Owners only.</p>
+        <p className="text-sm text-danger">No gym or role is assigned to this account. Contact your admin.</p>
       </main>
     );
   }
 
-  const items = await listCatalogItems(scope.gym);
+  const gym = scope.role === "owner" ? scope.gym : null;
+  const items = gym ? await listCatalogItems(gym) : [];
 
   return (
     <AppShell role={scope.role}>
       <div className="mx-auto max-w-5xl px-4 py-8">
-        <CatalogView initialItems={items} />
+        <CatalogView role={scope.role} initialGym={gym} initialItems={items} />
       </div>
     </AppShell>
   );

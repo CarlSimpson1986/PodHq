@@ -3,7 +3,21 @@ import { createSessionClient } from "@/lib/supabase/server";
 import { getGymScope } from "@/lib/auth/gym-scope";
 import { updateCatalogItem, setCatalogItemEnabled } from "@/lib/data/catalog";
 import { updateCatalogItemSchema, setCatalogItemEnabledSchema } from "@/lib/validation/catalog";
+import { GYM_NAMES, type GymName } from "@/lib/data/types";
 import { checkRateLimit } from "@/lib/rate-limit";
+
+function isGymName(value: string): value is GymName {
+  return (GYM_NAMES as readonly string[]).includes(value);
+}
+
+function resolveGym(
+  scope: { role: "admin"; gym: null } | { role: "owner"; gym: GymName },
+  gymParam: string | null | undefined
+): GymName | null {
+  if (scope.role === "owner") return scope.gym;
+  if (!gymParam || !isGymName(gymParam)) return null;
+  return gymParam;
+}
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const supabase = await createSessionClient();
@@ -22,8 +36,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   try {
     const scope = await getGymScope(user.id);
-    if (!scope || scope.role !== "owner") {
-      return NextResponse.json({ status: "error", message: "Owners only." }, { status: 403 });
+    if (!scope) {
+      return NextResponse.json(
+        { status: "error", message: "No gym or role is assigned to this account." },
+        { status: 403 }
+      );
     }
 
     const { id } = await params;
@@ -37,14 +54,21 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     // Two different edits share this route: the full name/label/credits/
     // price form, and the simple enable/disable toggle — distinguished by
     // shape rather than a query param, since both are PATCHes to the same
-    // resource. Both are scoped to the owner's own gym server-side — an
-    // owner can never touch another gym's row by guessing its numeric id.
+    // resource. Owner is locked to their own gym; admin has fallback
+    // access to whichever gym they select (same as everywhere else the
+    // resolveGym pattern is used) — either way, the resolved gym is
+    // checked server-side against the row's own gym, never trusted from
+    // the client alone.
     if (body && typeof body === "object" && "enabled" in body) {
       const parsed = setCatalogItemEnabledSchema.safeParse(body);
       if (!parsed.success) {
         return NextResponse.json({ status: "error", message: "Invalid request." }, { status: 400 });
       }
-      const result = await setCatalogItemEnabled(scope.gym, itemId, parsed.data.enabled);
+      const gym = resolveGym(scope, parsed.data.gym);
+      if (!gym) {
+        return NextResponse.json({ status: "error", message: "A valid gym must be specified." }, { status: 400 });
+      }
+      const result = await setCatalogItemEnabled(gym, itemId, parsed.data.enabled);
       if (result.status === "not_found") {
         return NextResponse.json({ status: "error", message: "Item not found." }, { status: 404 });
       }
@@ -63,7 +87,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       );
     }
 
-    const result = await updateCatalogItem(scope.gym, itemId, parsed.data);
+    const gym = resolveGym(scope, parsed.data.gym);
+    if (!gym) {
+      return NextResponse.json({ status: "error", message: "A valid gym must be specified." }, { status: 400 });
+    }
+
+    const result = await updateCatalogItem(gym, itemId, {
+      name: parsed.data.name,
+      label: parsed.data.label,
+      credits: parsed.data.credits,
+      priceGBP: parsed.data.priceGBP,
+    });
     if (result.status === "not_found") {
       return NextResponse.json({ status: "error", message: "Item not found." }, { status: 404 });
     }
