@@ -292,6 +292,32 @@ export async function getBookingsForGymAndRange(gym: GymName, start: Date, endEx
   }));
 }
 
+export interface WaitlistCount {
+  slotStart: string;
+  count: number;
+}
+
+/** Same one-query-per-range-load shape as getBookingsForGymAndRange, so the Calendar grid can show a waiting count per slot without a click-through. */
+export async function getWaitlistCountsForGymAndRange(gym: GymName, start: Date, endExclusive: Date): Promise<WaitlistCount[]> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("waitlist_entries")
+    .select("slot_start")
+    .eq("gym", gym)
+    .eq("status", "waiting")
+    .gte("slot_start", start.toISOString())
+    .lt("slot_start", endExclusive.toISOString())
+    .returns<{ slot_start: string }[]>();
+
+  if (error) throw error;
+
+  const counts = new Map<string, number>();
+  for (const row of data ?? []) {
+    counts.set(row.slot_start, (counts.get(row.slot_start) ?? 0) + 1);
+  }
+  return Array.from(counts, ([slotStart, count]) => ({ slotStart, count }));
+}
+
 export interface SlotBookingEntry {
   bookingId: number;
   memberId: number;

@@ -5,8 +5,17 @@
    * Light theme (switched 2026-08-14 from the original dark-only design —
    * see the removed "dark-only by design" note below this block — at the
    * user's request, styled after Resend's dashboard: white surfaces, near-
-   * black text, thin light-gray borders, gold used sparingly for actions/
-   * active-state rather than as a large dark panel).
+   * black text, thin light-gray borders).
+   *
+   * Gold restricted to the sidebar only (2026-08-16, user's request —
+   * "I don't like the gold features on the white back spaces, turn them
+   * back to black and white... I am happy with the gold feature selector
+   * on the left main menu"). --accent/--accent-hover/--accent-foreground
+   * now drive every content-area button/action (black, not gold) —
+   * unchanged class names across the ~35 call sites that already use
+   * bg-accent/from-accent/text-accent-foreground, only the token values
+   * changed. The sidebar's active-nav-item keeps gold via its own
+   * dedicated --sidebar-accent-* tokens below, so it didn't need touching.
    */
   --background: #fafafa;
   --foreground: #18181b;
@@ -16,9 +25,9 @@
      cards read as more defined/boxed against the light background rather
      than the initial thin light-gray Resend-style border. */
   --card-border: #18181b;
-  --accent: #c9a24b;
-  --accent-hover: #b58f3f;
-  --accent-foreground: #0a0a0b;
+  --accent: #18181b;
+  --accent-hover: #000000;
+  --accent-foreground: #ffffff;
   --danger: #dc2626;
   --warning: #b45309;
   --success: #16a34a;
@@ -34,6 +43,12 @@
   --sidebar-foreground: #ffffff;
   --sidebar-muted-foreground: #9a9ba3;
   --sidebar-border: rgba(255, 255, 255, 0.09);
+  /* The one place gold still lives — the active-nav-item pill in the
+     sidebar. Same values --accent/--accent-hover/--accent-foreground held
+     before the 2026-08-16 black/white switch above. */
+  --sidebar-accent: #c9a24b;
+  --sidebar-accent-hover: #b58f3f;
+  --sidebar-accent-foreground: #0a0a0b;
   /*
    * Categorical slots for revenue-category charts (Membership vs PAYG/Packs).
    * Re-checked against the new white --card background when this went
@@ -69,6 +84,9 @@
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-muted-foreground: var(--sidebar-muted-foreground);
   --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-hover: var(--sidebar-accent-hover);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --font-sans: var(--font-inter);
   --radius-card: 16px;
 }
@@ -105,5 +123,8 @@ body {
   border-radius: var(--radius-card);
   background: var(--card);
   border: 2px solid var(--card-border);
-  box-shadow: 0 1px 2px 0 rgba(24, 24, 27, 0.04), 0 1px 3px 0 rgba(24, 24, 27, 0.03);
+  /* Deepened 2026-08-16 for more lift/definition against the white
+     background — the previous shadow was near-invisible, part of what
+     read as "basic Tailwind" rather than deliberately crafted. */
+  box-shadow: 0 1px 2px 0 rgba(24, 24, 27, 0.04), 0 8px 20px -6px rgba(24, 24, 27, 0.12);
 }

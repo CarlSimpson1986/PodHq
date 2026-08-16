@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { GymSelect } from "@/components/ui/gym-select";
 import type { GymName } from "@/lib/data/types";
-import type { PodBooking, PodMember, PodSettings, SlotDetail } from "@/lib/data/pods";
+import type { PodBooking, PodMember, PodSettings, SlotDetail, WaitlistCount } from "@/lib/data/pods";
 
 type ViewMode = "day" | "week" | "month";
 
@@ -63,6 +63,7 @@ export function CalendarView({
   const [settings, setSettings] = useState(initialSettings);
   const [members, setMembers] = useState(initialMembers);
   const [bookings, setBookings] = useState<PodBooking[]>([]);
+  const [waitlist, setWaitlist] = useState<WaitlistCount[]>([]);
   const [loading, setLoading] = useState(false);
 
   const [selectedSlot, setSelectedSlot] = useState<Date | null>(null);
@@ -87,6 +88,7 @@ export function CalendarView({
       );
       const body = await res.json();
       setBookings(body.status === "ok" ? body.bookings : []);
+      setWaitlist(body.status === "ok" ? body.waitlist : []);
     } finally {
       setLoading(false);
     }
@@ -162,6 +164,15 @@ export function CalendarView({
 
   function countForDay(date: Date): number {
     return bookings.filter((b) => isSameDay(new Date(b.slotStart), date)).length;
+  }
+
+  function waitlistCountAt(date: Date, hour: number): number {
+    return waitlist
+      .filter((w) => {
+        const wd = new Date(w.slotStart);
+        return isSameDay(wd, date) && wd.getHours() === hour;
+      })
+      .reduce((sum, w) => sum + w.count, 0);
   }
 
   const capacity = settings?.podCapacity ?? 1;
@@ -333,18 +344,28 @@ export function CalendarView({
                   {dayColumns.map((day) => {
                     const count = countAt(day, hour);
                     const full = count >= capacity;
+                    const waiting = waitlistCountAt(day, hour);
                     return (
                       <td key={`${day.toISOString()}-${hour}`} className="border border-card-border p-0">
                         <button
                           type="button"
                           onClick={() => setSelectedSlot(new Date(day.getFullYear(), day.getMonth(), day.getDate(), hour))}
-                          className={`flex h-12 w-full flex-col items-center justify-center transition-colors hover:bg-card-border/10 ${
-                            full ? "text-danger" : count > 0 ? "text-accent" : "text-muted-foreground"
+                          className={`flex h-20 w-full flex-col items-center justify-center gap-0.5 transition-colors ${
+                            full
+                              ? "bg-danger text-white hover:bg-danger/90"
+                              : count > 0
+                                ? "bg-warning/10 text-warning hover:bg-warning/15"
+                                : "text-muted-foreground hover:bg-card-border/10"
                           }`}
                         >
-                          <span className="tabular-nums">
+                          <span className="tabular-nums text-sm font-medium">
                             {count}/{capacity}
                           </span>
+                          {waiting > 0 && (
+                            <span className={`tabular-nums text-[11px] ${full ? "text-white/80" : "text-muted-foreground"}`}>
+                              {waiting} waiting
+                            </span>
+                          )}
                         </button>
                       </td>
                     );

@@ -137,8 +137,11 @@ export function AppShell({ children, role }: { children: ReactNode; role?: "admi
     <div className="min-h-screen md:flex">
       {/* Desktop sidebar — deliberately stays on the dark chrome palette
           (sidebar-*) rather than the light content-area tokens, at the
-          user's request. */}
-      <aside className="sticky top-0 hidden h-screen w-56 shrink-0 flex-col border-r border-sidebar-border bg-sidebar-background md:flex">
+          user's request. Subtle top-to-bottom gloss (2026-08-16, "premier
+          black gloss" pass) rather than a flat fill — a faint highlight
+          near the top edge is what actually reads as gloss/depth rather
+          than plain matte black. */}
+      <aside className="sticky top-0 hidden h-screen w-56 shrink-0 flex-col border-r border-sidebar-border bg-gradient-to-b from-[#141414] via-sidebar-background to-black md:flex">
         <div className="flex items-center gap-2 px-5 py-6">
           <Logo />
           <span className="text-xs font-medium tracking-wide text-sidebar-muted-foreground">PodHQ</span>
@@ -152,7 +155,7 @@ export function AppShell({ children, role }: { children: ReactNode; role?: "admi
                 href={item.href}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                   active
-                    ? "bg-gradient-to-r from-accent to-accent-hover text-accent-foreground shadow-[0_0_24px_-6px_var(--accent)]"
+                    ? "bg-gradient-to-r from-sidebar-accent to-sidebar-accent-hover text-sidebar-accent-foreground shadow-[0_0_24px_-6px_var(--sidebar-accent)]"
                     : "text-sidebar-muted-foreground hover:bg-white/5 hover:text-sidebar-foreground"
                 }`}
               >
@@ -168,7 +171,7 @@ export function AppShell({ children, role }: { children: ReactNode; role?: "admi
       </aside>
 
       {/* Mobile top bar (wordmark + sign out — nav itself is the bottom bar) */}
-      <div className="flex items-center justify-between border-b border-sidebar-border bg-sidebar-background px-4 py-3 md:hidden">
+      <div className="flex items-center justify-between border-b border-sidebar-border bg-gradient-to-b from-[#141414] to-black px-4 py-3 md:hidden">
         <div className="flex items-center gap-2">
           <Logo />
           <span className="text-xs font-medium tracking-wide text-sidebar-muted-foreground">PodHQ</span>
@@ -179,7 +182,7 @@ export function AppShell({ children, role }: { children: ReactNode; role?: "admi
       <main className="min-w-0 flex-1 pb-20 md:pb-0">{children}</main>
 
       {/* Mobile bottom nav */}
-      <nav className="fixed inset-x-0 bottom-0 flex border-t border-sidebar-border bg-sidebar-background md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 flex border-t border-sidebar-border bg-gradient-to-t from-[#141414] to-black md:hidden">
         {navItems.map((item) => {
           const active = item.href === activeHref;
           return (
@@ -187,7 +190,7 @@ export function AppShell({ children, role }: { children: ReactNode; role?: "admi
               key={item.href}
               href={item.href}
               className={`flex flex-1 flex-col items-center gap-1 py-2.5 text-xs font-medium transition-colors ${
-                active ? "text-accent" : "text-sidebar-muted-foreground"
+                active ? "text-sidebar-accent" : "text-sidebar-muted-foreground"
               }`}
             >
               {item.icon}
