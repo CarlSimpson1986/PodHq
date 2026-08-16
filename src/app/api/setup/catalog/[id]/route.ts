@@ -3,21 +3,8 @@ import { createSessionClient } from "@/lib/supabase/server";
 import { getGymScope } from "@/lib/auth/gym-scope";
 import { updateCatalogItem, setCatalogItemEnabled } from "@/lib/data/catalog";
 import { updateCatalogItemSchema, setCatalogItemEnabledSchema } from "@/lib/validation/catalog";
-import { GYM_NAMES, type GymName } from "@/lib/data/types";
 import { checkRateLimit } from "@/lib/rate-limit";
-
-function isGymName(value: string): value is GymName {
-  return (GYM_NAMES as readonly string[]).includes(value);
-}
-
-function resolveGym(
-  scope: { role: "admin"; gym: null } | { role: "owner"; gym: GymName },
-  gymParam: string | null | undefined
-): GymName | null {
-  if (scope.role === "owner") return scope.gym;
-  if (!gymParam || !isGymName(gymParam)) return null;
-  return gymParam;
-}
+import { resolveGym } from "@/lib/auth/resolve-gym";
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const supabase = await createSessionClient();

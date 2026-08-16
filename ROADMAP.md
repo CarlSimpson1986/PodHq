@@ -578,6 +578,321 @@ before moving to the next. Don't jump ahead to a later stage unprompted.
 
     `npx tsc --noEmit`, `eslint`, and `next build` all pass clean in both repos. **Not yet deployed as of this entry** — see podhq-client's ROADMAP for the matching client-side half (service worker fix, email-injection fix, install-prompt banner, one-time-item UI) and the PWA install/offline/logout live-testing notes.
 
+23. **Per-gym Brevo email-marketing config (Setup)** — 2026-08-16, built after
+    the user clarified email marketing can't reuse Stage 13's one-shared-
+    account design: each franchisee runs their **own** Brevo account (own
+    business name, own sender email), not one franchisor account with
+    per-gym lists. `src/lib/marketing/brevo.ts`'s hardcoded `BREVO_API_KEY`
+    env var + `GYM_BREVO_LIST_IDS` map is replaced by a new
+    `gym_brevo_config` table (`0036_gym_brevo_config.sql`, one row per gym:
+    encrypted API key + list ID), managed from a new "Email marketing
+    (Brevo)" section on `/setup` — same owner-enters/admin-fallback-edit
+    pattern as the pricing catalog above it on the same page. A gym with no
+    row yet is silently skipped by `syncLeadsToBrevo`, same as the old
+    unconfigured-gym behaviour.
+
+    **Key handling, per the user's explicit ask ("can they be hashed
+    out?")**: hashing was ruled out — it's one-way, and podHQ needs the
+    real plaintext back to call Brevo's API on every sync, unlike a
+    password that's only ever compared. Used reversible AES-256-GCM
+    instead (`src/lib/crypto/secret-encryption.ts`, keyed by a new
+    server-only `SECRET_ENCRYPTION_KEY` env var — 32 bytes, base64,
+    generated via `openssl rand -base64 32`, not yet added to
+    `.env.local`/Vercel). The Setup UI never receives a saved key back,
+    only a masked "•••• configured · list ID N" summary with a "Replace
+    key" action; `GET /api/setup/brevo` only ever returns that summary,
+    never `api_key_encrypted` or the decrypted value — decryption happens
+    exclusively inside `getDecryptedBrevoConfig`, called only from the
+    server-side sync path. `gym_brevo_config` has RLS enabled with zero
+    policies, same "service-role client only" pattern as `catalog_items`/
+    `gym_kisi_mapping`. Config writes log a new `setup_brevo_key_updated`
+    auth event (actor + gym + list ID) — no DB `CHECK` constraint needed
+    for the new event type since `auth_events.event_type`'s check was
+    already dropped project-wide back at Stage/migration 0006.
+
+    **Not yet applied or live-tested** — `0036_gym_brevo_config.sql` needs
+    running against Supabase, `SECRET_ENCRYPTION_KEY` needs generating and
+    adding to both `.env.local` and Vercel, and Aylesbury Berryfields (the
+    user's own gym, chosen as the real test case since a Brevo account can
+    actually be created for it now) needs a real Brevo account + API key
+    before this can be exercised end-to-end. `npx tsc --noEmit`, `eslint`,
+    and `next build` all pass clean.
+
+    **Applied and verified live, same day.** Migration run via Supabase's
+    SQL Editor, confirmed via a throwaway row-count script
+    (`gym_brevo_config` present, 0 rows). `SECRET_ENCRYPTION_KEY`
+    generated (`openssl rand -base64 32`) and added to podHQ's
+    `.env.local` — initially added to podhq-client's by mistake (same
+    class of key-swap slip as Stage 17's Stripe keys), moved to the
+    correct app, dev server restarted to pick it up. User connected a
+    real Brevo account for Aylesbury Berryfields (sender verified as
+    `admin@myfitpod...` for now — a deliberate placeholder, not a real
+    per-gym identity yet, since every gym will eventually get its own
+    Brevo *and* Resend account) and entered the API key + list ID via
+    `/setup`.
+
+    End-to-end sync verified against Brevo's real API, not just a 200
+    response: decrypted the stored config, POSTed a test contact with the
+    same request shape `syncLeadsToBrevo` uses, confirmed via a separate
+    `GET` that it actually landed in the correct list (10), then deleted
+    the test contact via Brevo's `DELETE` endpoint. Tested through a
+    standalone script reimplementing the decrypt + Brevo-call logic
+    rather than importing the real module directly — Next's `server-only`
+    guard throws outside the Next bundler by design, so the actual
+    module can't be run standalone. The real `/marketing` upload path
+    through the actual UI is still unverified (same MFA-login scripting
+    limitation noted at Stages 14/15/19) — worth a real click-through
+    before fully relying on this for real leads.
+
+    **Also discussed, not built**: a "walk through the door and the app
+    greets you by name" voice feature (AI-coach-adjacent, raised then
+    parked in favour of this) — landed on triggering off the existing
+    unlock action in podhq-client (not a real Kisi door-sensor webhook,
+    which doesn't exist) with a real TTS voice cached per member at
+    signup rather than synthesized live on every visit, to keep cost near
+    zero at franchise scale. No spec, no build — parked for a future
+    session; see `[[project_ai_coach_idea]]` in memory.
+
+    **Brevo config locked to admin-only, same day.** The user pushed back
+    on the original owner-fallback pattern (matching pricing/outgoings)
+    once actually using it: entering a third-party API key is a technical
+    credential-entry task tied to an account the franchisor sets up on
+    the gym's behalf, not a business decision like pricing — no reason
+    for a franchisee to touch the raw key, real risk if they do.
+    `/api/setup/brevo` now rejects `role !== "admin"` outright (403) at
+    both GET and POST; `BrevoConfigView` dropped its `role` prop and
+    always shows the gym selector, since only admin ever renders it now.
+    Confirmed as the general principle going forward: Setup's *business*
+    config (pricing) stays owner-editable with admin fallback; its
+    *technical/credential* config (Brevo, and now Resend below) is
+    admin-only, no owner access at all.
+
+    **Per-gym Resend config, same session** — the user explicitly wants
+    each gym on its own Resend account with its own quota, not one
+    shared account (unlike Brevo, which only needed per-gym *config*,
+    Resend needed a full second table). Real reason: Resend's free tier
+    is a hard 100/day cap, not Brevo's graceful next-day requeue — a
+    booking-confirmation email sent after the cap is hit just fails
+    outright, so a shared account across a growing franchise risks
+    silently dropping member-facing transactional email as volume grows.
+    New `gym_resend_config` table (`0037_gym_resend_config.sql`, applied
+    and verified live same day), a new "Transactional email (Resend)"
+    section on `/setup` (admin-only from the start, no owner-fallback
+    detour this time), `src/lib/data/resend-config.ts` +
+    `src/lib/validation/resend-config.ts` + `/api/setup/resend`, all
+    mirroring the Brevo pattern exactly. One real difference: `from_address`/
+    `from_name` are stored as plain text, not encrypted — unlike an API
+    key, a sender address isn't a secret, it's visible in every email's
+    header.
+
+    Clarified with the user before building: Resend doesn't need a
+    separate *account* per gym the way Brevo does (Brevo owns real
+    per-franchisee marketing lists; Resend is just transactional
+    sending) — one account can hold many verified senders. But the user
+    specifically wants separate *quotas*, which does require separate
+    accounts, so this went with full per-gym accounts rather than the
+    lighter "one shared account, many from-addresses" alternative.
+    Auth's own emails (signup confirm, password reset) are explicitly
+    **out of scope** — those are sent by Supabase itself via one
+    project-wide custom SMTP setting with no per-gym concept at all, and
+    stay on the existing shared setup, unchanged.
+
+    **podhq-client changes** (the actual sending side — podHQ only holds
+    the encrypted config, it never sends email itself): `src/lib/data/
+    resend-config.ts` there is a second, independent copy of the decrypt
+    logic (AES-256-GCM, must stay byte-for-byte identical to podHq's
+    `secret-encryption.ts` — the two apps are separate repos/deploys, no
+    shared package to import from). `sendEmail()` now takes a required
+    `gym`, looks up that gym's config, and **falls back to the existing
+    shared `RESEND_API_KEY`/`RESEND_FROM_ADDRESS` env vars** if the gym
+    has none configured yet — deliberately not a silent no-op like
+    Brevo's lead-sync, since a failed booking-confirmation email is
+    directly member-facing, not a low-stakes marketing miss.
+    `notifyFireAndForget()` now requires `gym` too; every one of its 13
+    call sites across 6 files (signup, bookings, cancellations, waitlist
+    offers, win-back, and 7 separate sites inside the Stripe webhook)
+    updated to pass it through — `gym` was already in scope everywhere
+    via `member.gym`/`contact.gym`/`purchaser.gym` or an existing `gym`
+    function parameter, so this was mechanical, not a redesign. Found via
+    `tsc` itself: making `gym` a required field surfaced every missed
+    call site as a compile error rather than relying on manually
+    re-grepping the codebase.
+
+    Given the user's own observation that Aylesbury alone is unlikely to
+    approach 100 emails/day for a while, there's no urgency to actually
+    connect any gym's own Resend account yet — every gym currently rides
+    the shared fallback with zero config, exactly as designed, and can
+    be switched to its own account whenever it's actually needed (most
+    likely once several gyms are running simultaneously, not necessarily
+    Aylesbury first).
+
+    Verified live: `0037_gym_resend_config.sql` applied via Supabase's
+    SQL Editor, confirmed via a throwaway row-count script (table
+    present, 0 rows — matching "every gym still on the shared fallback"
+    as expected, nothing connected yet). `npx tsc --noEmit`, `eslint`,
+    and `next build` all pass clean in both repos.
+
+24. **Health check endpoint + first regression tests, same day** — the
+    user asked for an honest business-analysis of everything built so
+    far. Of the risks that came back, two had a real code fix rather
+    than a process fix: no automated tests anywhere, and no uptime
+    monitoring for either app.
+
+    `GET /api/health` (`src/app/api/health/route.ts`) — deliberately
+    unauthenticated (listed in a new `PUBLIC_API_EXACT_PATHS` in
+    `src/lib/supabase/middleware.ts`, mirroring podhq-client's already-
+    audited exact-path convention rather than a prefix) and unrate-
+    limited, since an external uptime monitor needs to hit it without a
+    session on a short interval. Checks real Supabase connectivity (a
+    cheap `head: true` count query), not just "the process is up" — a
+    page that loads but can't reach the DB isn't actually healthy, which
+    a plain "hit the homepage" monitor would miss. Returns 503 on DB
+    failure so an uptime monitor can alert on it. Verified live against
+    the local dev server: 200, real DB check, no auth required. Not yet
+    wired to an actual external monitor (UptimeRobot/Better Uptime/etc.)
+    — that's a manual signup step outside this codebase.
+
+    **Vitest added to both repos** (`vitest.config.ts`, `npm test`) —
+    first test framework either repo has had. `"server-only"` throws
+    unconditionally outside Next's own bundler (same issue hit earlier
+    this session trying to run a standalone script against
+    `src/lib/marketing/brevo.ts`), so both configs alias it to a no-op
+    shim (`src/test/server-only-shim.ts`) rather than hitting that wall
+    in every future test file.
+
+    **First regression test**: `src/lib/data/pods.test.ts` encodes the
+    Critical finding from Stage 22's OWASP audit — `createManualBooking`
+    trusting a client-supplied `memberId` with no check it belongs to the
+    gym being booked for. Mocks the Supabase admin client rather than a
+    real DB; asserts the ownership check rejects a cross-gym member
+    *before* `create_booking()` is ever called, not just that the
+    end-to-end result looks right.
+
+    **Deliberately not attempted this pass**: the `resolveGym`
+    owner/admin-scoping pattern is duplicated near-identically across
+    ~12 route files rather than being one shared, tested function — a
+    real risk (a fix in one copy doesn't propagate to the other 11), but
+    consolidating it into a single tested utility is a real refactor
+    that needs its own pass, not something to fold into "add some
+    tests." LTV/P&L calculation logic and the rate-limiter's
+    concurrency behaviour are similarly not covered yet — both need
+    either extraction into pure functions or an integration-style test
+    against a real DB to test meaningfully, neither is unit-testable
+    as-is. This is a first, deliberately narrow slice, not a claim of
+    real coverage.
+
+    `npx tsc --noEmit`, `eslint`, `next build`, and `npx vitest run` all
+    pass clean.
+
+    **`resolveGym` consolidation, same day** — the follow-up flagged
+    above as the highest-value next piece, done immediately rather than
+    left open. Confirmed via grep that all 12 copies were byte-for-byte
+    identical (safe to collapse with zero behaviour risk) before
+    touching anything. New `src/lib/auth/resolve-gym.ts` — one
+    `resolveGym(scope: GymScope, gymParam)` using the `GymScope` type
+    `getGymScope` already exported, rather than each route redefining
+    the same inline union type — with `src/lib/auth/resolve-gym.test.ts`
+    covering the actual security property: an owner's manipulated `gym`
+    param naming a real, different gym must still resolve to their own
+    gym, not the spoofed one. All 12 route files (`setup/catalog` ×2,
+    every `pods/*` route touching a gym-scoped resource) now import the
+    shared function instead of carrying their own copy — a fix here now
+    propagates everywhere at once, and it's the one copy that's tested.
+    `npx tsc --noEmit` passes clean across all 12 call sites, `eslint`
+    clean (only 4 pre-existing, unrelated warnings), `next build` and
+    `npx vitest run` both clean, and a live smoke test against the
+    running dev server confirmed `/api/health` still 200s and
+    `/api/pods/settings` still correctly redirects an unauthenticated
+    request rather than erroring — the logic itself never changed, only
+    where it lives, so this doesn't re-establish live role-based
+    verification (still blocked on MFA-scripting), just confirms nothing
+    broke at the plumbing level.
+
+25. **Calendar tile redesign + gold restricted to sidebar-only + first
+    "premium black gloss" pass** — 2026-08-16, requested while the user
+    was away from the keyboard; verified live against an already-
+    authenticated session rather than waiting for their return.
+
+    **Calendar** (`src/components/pods/calendar-view.tsx`): Week/Day
+    grid cells grew from `h-12` to `h-20`, and now show a "N waiting"
+    line when a slot has a waitlist, not just the booking count. A full
+    slot (`count >= capacity`) now fills the **whole cell** with a solid
+    red background (`bg-danger`, white text) rather than just tinting
+    the count text red — a partially-booked slot (capacity > 1, some but
+    not all taken) gets a softer amber tint instead of nothing, so three
+    states are visually distinct at a glance: empty, partial, full.
+    Required a new range-scoped data path since waitlist counts
+    previously only existed per-slot-on-click: `getWaitlistCountsForGymAndRange`
+    (`src/lib/data/pods.ts`), mirroring `getBookingsForGymAndRange`'s
+    existing one-query-per-view-load shape, wired through
+    `/api/pods/calendar` (now returns `{bookings, waitlist}`) and a new
+    `waitlistCountAt` helper in the component. Month view intentionally
+    left as-is — "session tiles" read as the Week/Day per-slot cells,
+    not the Month view's per-day aggregate cells, which don't map to a
+    single booked/not-booked state the way an individual slot does.
+
+    **Gold restricted to the sidebar only** — the user's read on the
+    Stage 20 light-theme work: gold buttons/links scattered across the
+    white content area read as inconsistent, and they only ever liked it
+    as the sidebar's active-nav treatment. Rather than touching each of
+    the ~35 files that reference `accent`-based Tailwind classes
+    individually, changed the token values themselves: `--accent`/
+    `--accent-hover`/`--accent-foreground` in `globals.css` now resolve
+    to near-black/pure-black/white instead of gold, so every existing
+    `bg-accent`/`from-accent`/`text-accent-foreground` class across the
+    app picks up the new colour automatically via Tailwind v4's
+    `@theme inline` (a live CSS-variable reference, not a compile-time
+    substitution) — zero touches needed outside `globals.css` for the
+    ~35 files. The sidebar alone needed an edit: added dedicated
+    `--sidebar-accent`/`--sidebar-accent-hover`/`--sidebar-accent-foreground`
+    tokens (the exact gold values `--accent` held before), and
+    `app-shell.tsx`'s active-nav-item classes (desktop pill, mobile
+    bottom-nav text colour, and the pill's `shadow-[...var(--accent)]`
+    glow) were repointed at the new sidebar-specific tokens — the one
+    place in the whole edit that had to change per-file.
+
+    **First "premium black gloss" pass** — the user couldn't fully
+    articulate the ask beyond "doesn't feel basic Tailwind," so this is
+    a deliberately bounded first attempt, not a full redesign, flagged
+    to the user as such: `.card-glass`'s shadow deepened (`0 8px 20px
+    -6px` instead of a near-invisible `0 1px 3px`) for more lift/
+    definition against the white background, and the sidebar/mobile nav
+    chrome moved from a flat `bg-sidebar-background` fill to a subtle
+    top-to-bottom gradient (`from-[#141414] via-sidebar-background to-black`)
+    for a faint gloss highlight rather than plain matte black. Every
+    existing black button/pill across the app already gets a matching
+    subtle gradient for free, since `bg-gradient-to-r from-accent
+    to-accent-hover` was already a gradient class — only the token
+    values needed to change, from gold-to-darker-gold to near-black-to-
+    pure-black.
+
+    **Verified live** against an already-authenticated browser session
+    (MFA blocks scripting a fresh login, same limitation noted
+    throughout this project) rather than the usual local-dev-only check:
+    confirmed on Dashboard/Setup/Admin/Calendar that the sidebar still
+    shows gold on the active nav item, confirmed on Admin's "Create
+    account" button that content-area primary buttons are now solid
+    black with white text (not gold), and confirmed the Calendar's
+    Week-view tiles render visibly larger.
+
+    **Same-session follow-up: red-square/waitlist behaviour confirmed
+    live too**, at the user's request while still away from the
+    keyboard. Created a throwaway booking + waitlist entry directly
+    against production (two real `auth.users` + `members` rows, a
+    `create_booking()` RPC call, a `waitlist_entries` insert — same
+    "throwaway test member" pattern Stage 15's concurrency test used) for
+    Aylesbury Berryfields, screenshotted the result (full slot rendering
+    solid red with "1 waiting" beneath it, sent to the user), then fully
+    deleted every row created (waitlist entry, booking, credit grant,
+    both members, both auth users) and verified nothing remained. Also
+    incidentally confirmed the feature against **real, pre-existing**
+    bookings already in the data — several other genuinely-booked slots
+    in the same week rendered red without any test data involved,
+    confirming the logic isn't just correct for the synthetic case.
+    `npx tsc
+    --noEmit`, `eslint`, `next build`, and `npx vitest run` all pass
+    clean.
+
 ## Database schema
 
 Two tables pre-date this project and were never created by our migrations — they

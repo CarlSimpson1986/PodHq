@@ -10,9 +10,16 @@ const PUBLIC_PATHS = [
 ];
 
 const PUBLIC_API_PREFIXES = ["/api/auth/"];
+// Exact path, not a prefix — same reasoning podhq-client's proxy.ts
+// documents from the 2026-08-16 OWASP audit: a prefix here would make any
+// future route added under it a silent public opt-in by default. /api/health
+// has no session to check (an external uptime monitor hits it), so it needs
+// its own explicit allowlist entry rather than sharing one.
+const PUBLIC_API_EXACT_PATHS = ["/api/health"];
 
 function isPublicPath(pathname: string) {
   if (PUBLIC_PATHS.includes(pathname)) return true;
+  if (PUBLIC_API_EXACT_PATHS.includes(pathname)) return true;
   return PUBLIC_API_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 

@@ -1,23 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createSessionClient } from "@/lib/supabase/server";
 import { getGymScope } from "@/lib/auth/gym-scope";
-import { getBookingsForGymAndRange } from "@/lib/data/pods";
-import { GYM_NAMES, type GymName } from "@/lib/data/types";
+import { getBookingsForGymAndRange, getWaitlistCountsForGymAndRange } from "@/lib/data/pods";
 import { podCalendarQuerySchema } from "@/lib/validation/pods";
 import { checkRateLimit } from "@/lib/rate-limit";
-
-function isGymName(value: string): value is GymName {
-  return (GYM_NAMES as readonly string[]).includes(value);
-}
-
-function resolveGym(
-  scope: { role: "admin"; gym: null } | { role: "owner"; gym: GymName },
-  gymParam: string | null | undefined
-): GymName | null {
-  if (scope.role === "owner") return scope.gym;
-  if (!gymParam || !isGymName(gymParam)) return null;
-  return gymParam;
-}
+import { resolveGym } from "@/lib/auth/resolve-gym";
 
 export async function GET(request: NextRequest) {
   const supabase = await createSessionClient();
@@ -57,12 +44,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ status: "error", message: "A valid gym must be specified." }, { status: 400 });
     }
 
-    const bookings = await getBookingsForGymAndRange(
-      gym,
-      new Date(`${parsed.data.start}T00:00:00`),
-      new Date(`${parsed.data.end}T00:00:00`)
-    );
-    return NextResponse.json({ status: "ok", bookings });
+    const rangeStart = new Date(`${parsed.data.start}T00:00:00`);
+    const rangeEnd = new Date(`${parsed.data.end}T00:00:00`);
+    const [bookings, waitlist] = await Promise.all([
+      getBookingsForGymAndRange(gym, rangeStart, rangeEnd),
+      getWaitlistCountsForGymAndRange(gym, rangeStart, rangeEnd),
+    ]);
+    return NextResponse.json({ status: "ok", bookings, waitlist });
   } catch (err) {
     console.error("[api/pods/calendar GET]", { userId: user.id, error: err instanceof Error ? err.message : err });
     return NextResponse.json({ status: "error", message: "Something went wrong. Try again." }, { status: 500 });

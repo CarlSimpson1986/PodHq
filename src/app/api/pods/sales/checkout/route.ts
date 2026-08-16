@@ -3,22 +3,9 @@ import { createSessionClient } from "@/lib/supabase/server";
 import { getGymScope } from "@/lib/auth/gym-scope";
 import { createPackCheckoutSession, createMembershipCheckoutSession } from "@/lib/data/sales";
 import { getCatalogItemBySlug } from "@/lib/data/catalog";
-import { GYM_NAMES, type GymName } from "@/lib/data/types";
 import { createSalesCheckoutSchema } from "@/lib/validation/sales";
 import { checkRateLimit } from "@/lib/rate-limit";
-
-function isGymName(value: string): value is GymName {
-  return (GYM_NAMES as readonly string[]).includes(value);
-}
-
-function resolveGym(
-  scope: { role: "admin"; gym: null } | { role: "owner"; gym: GymName },
-  gymParam: string | null | undefined
-): GymName | null {
-  if (scope.role === "owner") return scope.gym;
-  if (!gymParam || !isGymName(gymParam)) return null;
-  return gymParam;
-}
+import { resolveGym } from "@/lib/auth/resolve-gym";
 
 export async function POST(request: NextRequest) {
   const supabase = await createSessionClient();

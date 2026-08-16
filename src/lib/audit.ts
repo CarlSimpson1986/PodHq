@@ -17,7 +17,9 @@ export type AuthEventType =
   | "staff_membership_comp"
   | "staff_checkout_session_created"
   | "staff_saved_card_charge"
-  | "staff_refund_issued";
+  | "staff_refund_issued"
+  | "setup_brevo_key_updated"
+  | "setup_resend_key_updated";
 
 interface LogAuthEventInput {
   email: string;
