@@ -113,6 +113,9 @@ export async function POST(request: NextRequest) {
     if (result.status === "slot_full") {
       return NextResponse.json({ status: "error", message: "That slot is already at capacity." }, { status: 409 });
     }
+    if (result.status === "not_found") {
+      return NextResponse.json({ status: "error", message: "Member not found." }, { status: 404 });
+    }
     if (result.status === "error") {
       console.error("[api/pods/bookings POST]", { userId: user.id, error: result.message });
       return NextResponse.json({ status: "error", message: "Could not create booking." }, { status: 500 });

@@ -57,7 +57,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: "error", message: "A valid gym must be specified." }, { status: 400 });
     }
 
-    const result = await grantCreditToMember(gym, parsed.data.memberId, parsed.data.amount);
+    if (!user.email) {
+      return NextResponse.json({ status: "error", message: "Account has no email on record." }, { status: 400 });
+    }
+
+    const result = await grantCreditToMember(gym, parsed.data.memberId, parsed.data.amount, {
+      userId: user.id,
+      email: user.email,
+    });
 
     if (result.status === "not_found") {
       return NextResponse.json({ status: "error", message: "Member not found." }, { status: 404 });

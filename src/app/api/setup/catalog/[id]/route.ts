@@ -97,6 +97,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       label: parsed.data.label,
       credits: parsed.data.credits,
       priceGBP: parsed.data.priceGBP,
+      oneTimePerMember: parsed.data.oneTimePerMember,
     });
     if (result.status === "not_found") {
       return NextResponse.json({ status: "error", message: "Item not found." }, { status: 404 });

@@ -9,6 +9,7 @@ export const createCatalogItemSchema = z
     label: z.string().min(1).max(100),
     credits: z.number().int().positive().max(1000),
     priceGBP: z.number().positive().max(10000),
+    oneTimePerMember: z.boolean().optional(),
   })
   .strict();
 
@@ -19,6 +20,7 @@ export const updateCatalogItemSchema = z
     label: z.string().min(1).max(100),
     credits: z.number().int().positive().max(1000),
     priceGBP: z.number().positive().max(10000),
+    oneTimePerMember: z.boolean(),
   })
   .strict();
 

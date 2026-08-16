@@ -1,6 +1,12 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logAuthEvent } from "@/lib/audit";
 import type { GymName } from "./types";
+
+export interface StaffActor {
+  userId: string;
+  email: string;
+}
 
 export interface PodMember {
   id: number;
@@ -225,6 +231,7 @@ export type CreateManualBookingResult =
   | { status: "ok"; bookingId: number }
   | { status: "insufficient_credits" }
   | { status: "slot_full" }
+  | { status: "not_found" }
   | { status: "error"; message: string };
 
 export async function createManualBooking(
@@ -233,6 +240,19 @@ export async function createManualBooking(
   slotStartIso: string
 ): Promise<CreateManualBookingResult> {
   const admin = createAdminClient();
+
+  // Same ownership check as grantCreditToMember/cancelBookingAsStaff — the
+  // member's real gym is looked up server-side rather than trusting the
+  // caller's memberId to already belong to the gym they're booking for.
+  const { data: member, error: lookupError } = await admin
+    .from("members")
+    .select("id, gym")
+    .eq("id", memberId)
+    .maybeSingle();
+
+  if (lookupError) throw lookupError;
+  if (!member || member.gym !== gym) return { status: "not_found" };
+
   const { data, error } = await admin.rpc("create_booking", {
     p_member_id: memberId,
     p_gym: gym,
@@ -341,7 +361,13 @@ export type GrantCreditResult =
  * is looked up server-side (never trusts a client-supplied gym for the
  * member itself), matching cancelBookingAsStaff's ownership-check pattern.
  */
-export async function grantCreditToMember(gym: GymName, memberId: number, amount: number): Promise<GrantCreditResult> {
+export async function grantCreditToMember(
+  gym: GymName,
+  memberId: number,
+  amount: number,
+  actor: StaffActor,
+  catalogItemId?: string
+): Promise<GrantCreditResult> {
   const admin = createAdminClient();
   const { data: member, error: lookupError } = await admin
     .from("members")
@@ -352,11 +378,24 @@ export async function grantCreditToMember(gym: GymName, memberId: number, amount
   if (lookupError) throw lookupError;
   if (!member || member.gym !== gym) return { status: "not_found" };
 
-  const { error: insertError } = await admin.from("credits").insert({ member_id: memberId, amount, reason: "manual_grant" });
+  const { error: insertError } = await admin
+    .from("credits")
+    .insert({ member_id: memberId, amount, reason: "manual_grant", catalog_item_id: catalogItemId ?? null });
   if (insertError) return { status: "error", message: insertError.message };
 
   const { data: balance, error: balanceError } = await admin.rpc("get_credit_balance", { p_member_id: memberId });
   if (balanceError) throw balanceError;
+
+  // Found in the 2026-08-16 OWASP audit: this is a real money-adjacent
+  // action (free credits bypassing Stripe entirely) with no prior record of
+  // which staff account performed it. auth_events.detail carries the target
+  // since members aren't Supabase Auth accounts themselves.
+  await logAuthEvent({
+    email: actor.email,
+    userId: actor.userId,
+    eventType: "staff_credit_grant",
+    detail: JSON.stringify({ gym, memberId, amount }),
+  });
 
   return { status: "ok", newBalance: (balance as number) ?? 0 };
 }

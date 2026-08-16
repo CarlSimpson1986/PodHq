@@ -20,9 +20,10 @@ interface FormState {
   label: string;
   credits: string;
   priceGBP: string;
+  oneTimePerMember: boolean;
 }
 
-const emptyForm: FormState = { name: "", label: "", credits: "", priceGBP: "" };
+const emptyForm: FormState = { name: "", label: "", credits: "", priceGBP: "", oneTimePerMember: false };
 
 function CatalogSection({
   gym,
@@ -48,15 +49,23 @@ function CatalogSection({
 
   function startEdit(item: CatalogItem) {
     setEditingId(item.id);
-    setEditForm({ name: item.name, label: item.label, credits: String(item.credits), priceGBP: String(item.priceGBP) });
+    setEditForm({
+      name: item.name,
+      label: item.label,
+      credits: String(item.credits),
+      priceGBP: String(item.priceGBP),
+      oneTimePerMember: item.oneTimePerMember,
+    });
     setError("");
   }
 
-  function parseForm(form: FormState): { name: string; label: string; credits: number; priceGBP: number } | null {
+  function parseForm(
+    form: FormState
+  ): { name: string; label: string; credits: number; priceGBP: number; oneTimePerMember: boolean } | null {
     const credits = Number(form.credits);
     const priceGBP = Number(form.priceGBP);
     if (!form.name.trim() || !form.label.trim() || !Number.isInteger(credits) || credits <= 0 || !(priceGBP > 0)) return null;
-    return { name: form.name.trim(), label: form.label.trim(), credits, priceGBP };
+    return { name: form.name.trim(), label: form.label.trim(), credits, priceGBP, oneTimePerMember: form.oneTimePerMember };
   }
 
   async function handleCreate() {
@@ -180,6 +189,14 @@ function CatalogSection({
               className={inputClass}
             />
           </div>
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={addForm.oneTimePerMember}
+              onChange={(e) => setAddForm((f) => ({ ...f, oneTimePerMember: e.target.checked }))}
+            />
+            One-time per member (e.g. an intro offer — a member can only ever buy this once; staff can still sell/grant it again)
+          </label>
           <div className="flex gap-2">
             <button type="button" onClick={handleCreate} disabled={busyId === -1} className={buttonClass}>
               {busyId === -1 ? "Saving..." : "Save"}
@@ -211,6 +228,7 @@ function CatalogSection({
               <th className="py-2 font-medium">Label</th>
               <th className="py-2 font-medium">{creditsLabel}</th>
               <th className="py-2 font-medium">Price</th>
+              <th className="py-2 font-medium">One-time</th>
               <th className="py-2 font-medium">Status</th>
               <th className="py-2 font-medium" />
             </tr>
@@ -253,6 +271,13 @@ function CatalogSection({
                           className={`${inputClass} w-24`}
                         />
                       </td>
+                      <td className="py-2">
+                        <input
+                          type="checkbox"
+                          checked={editForm.oneTimePerMember}
+                          onChange={(e) => setEditForm((f) => ({ ...f, oneTimePerMember: e.target.checked }))}
+                        />
+                      </td>
                       <td className="py-2 text-muted-foreground">{item.enabled ? "Enabled" : "Disabled"}</td>
                       <td className="py-2 text-right">
                         <div className="flex justify-end gap-2">
@@ -271,6 +296,7 @@ function CatalogSection({
                       <td className="py-2 text-muted-foreground">{item.label}</td>
                       <td className="py-2 tabular-nums text-foreground">{item.credits}</td>
                       <td className="py-2 tabular-nums text-foreground">{formatGBP(item.priceGBP)}</td>
+                      <td className="py-2 text-muted-foreground">{item.oneTimePerMember ? "Yes" : "—"}</td>
                       <td className="py-2">
                         <span className={item.enabled ? "text-foreground" : "text-muted-foreground"}>
                           {item.enabled ? "Enabled" : "Disabled"}
