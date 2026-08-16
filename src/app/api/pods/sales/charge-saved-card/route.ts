@@ -72,15 +72,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!user.email) {
+      return NextResponse.json({ status: "error", message: "Account has no email on record." }, { status: 400 });
+    }
+    const actor = { userId: user.id, email: user.email };
+
     const result =
       parsed.data.type === "credit_pack"
-        ? await chargeSavedCardForPack(gym, parsed.data.memberId, parsed.data.itemId, parsed.data.priceGBP)
+        ? await chargeSavedCardForPack(gym, parsed.data.memberId, parsed.data.itemId, parsed.data.priceGBP, actor)
         : await createMembershipWithSavedCard(
             gym,
             parsed.data.memberId,
             parsed.data.itemId,
             parsed.data.priceGBP,
-            parsed.data.discountMode ?? "ongoing"
+            parsed.data.discountMode ?? "ongoing",
+            actor
           );
 
     if (result.status === "not_found") {

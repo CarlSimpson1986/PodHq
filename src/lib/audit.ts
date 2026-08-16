@@ -12,7 +12,12 @@ export type AuthEventType =
   | "account_locked"
   | "admin_lockout_reset"
   | "admin_password_reset"
-  | "admin_account_deleted";
+  | "admin_account_deleted"
+  | "staff_credit_grant"
+  | "staff_membership_comp"
+  | "staff_checkout_session_created"
+  | "staff_saved_card_charge"
+  | "staff_refund_issued";
 
 interface LogAuthEventInput {
   email: string;

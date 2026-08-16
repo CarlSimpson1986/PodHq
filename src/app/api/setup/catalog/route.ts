@@ -105,6 +105,7 @@ export async function POST(request: NextRequest) {
       label: parsed.data.label,
       credits: parsed.data.credits,
       priceGBP: parsed.data.priceGBP,
+      oneTimePerMember: parsed.data.oneTimePerMember,
     });
     if (result.status === "error") {
       console.error("[api/setup/catalog POST]", { userId: user.id, error: result.message });

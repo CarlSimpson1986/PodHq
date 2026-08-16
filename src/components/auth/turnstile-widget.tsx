@@ -31,15 +31,16 @@ const SCRIPT_SRC = "https://challenges.cloudflare.com/turnstile/v0/api.js";
 export function TurnstileWidget({ onToken }: { onToken: (token: string) => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
-  const [scriptReady, setScriptReady] = useState(false);
+  // Lazy initializer rather than setting this from inside the effect below
+  // when the script turns out to already be loaded — a newer
+  // eslint-plugin-react-hooks (pulled in by the 2026-08-16 dependency
+  // upgrade) promotes synchronous setState-in-effect from warning to error.
+  const [scriptReady, setScriptReady] = useState(() => typeof window !== "undefined" && !!window.turnstile);
 
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
   useEffect(() => {
-    if (window.turnstile) {
-      setScriptReady(true);
-      return;
-    }
+    if (window.turnstile) return;
 
     const existing = document.querySelector<HTMLScriptElement>(`script[src="${SCRIPT_SRC}"]`);
     if (existing) {

@@ -57,10 +57,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: "error", message: "A valid gym must be specified." }, { status: 400 });
     }
 
+    if (!user.email) {
+      return NextResponse.json({ status: "error", message: "Account has no email on record." }, { status: 400 });
+    }
+    const actor = { userId: user.id, email: user.email };
+
     const result =
       parsed.data.type === "credit_pack"
-        ? await compCreditPack(gym, parsed.data.memberId, parsed.data.itemId)
-        : await compMembership(gym, parsed.data.memberId, parsed.data.itemId, parsed.data.endDate ?? null);
+        ? await compCreditPack(gym, parsed.data.memberId, parsed.data.itemId, actor)
+        : await compMembership(gym, parsed.data.memberId, parsed.data.itemId, parsed.data.endDate ?? null, actor);
 
     if (result.status === "not_found") {
       return NextResponse.json({ status: "error", message: "Member not found." }, { status: 404 });

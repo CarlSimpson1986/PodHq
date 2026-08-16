@@ -5,6 +5,7 @@ import { lookupRefundableTransaction } from "@/lib/data/refunds";
 import { getStripeClient } from "@/lib/stripe";
 import { createRefundSchema } from "@/lib/validation/refunds";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { logAuthEvent } from "@/lib/audit";
 
 // Only calls Stripe — never writes the credits/gift_vouchers ledger itself.
 // podhq-client's existing webhook (already the sole writer for every other
@@ -64,6 +65,21 @@ export async function POST(request: NextRequest) {
 
     const stripe = getStripeClient();
     const refund = await stripe.refunds.create({ payment_intent: lookup.paymentIntentId });
+
+    if (user.email) {
+      await logAuthEvent({
+        email: user.email,
+        userId: user.id,
+        eventType: "staff_refund_issued",
+        detail: JSON.stringify({
+          gym: lookup.memberGym,
+          type: parsed.data.type,
+          id: parsed.data.id,
+          refundId: refund.id,
+          amountRefunded: refund.amount,
+        }),
+      });
+    }
 
     return NextResponse.json({ status: "ok", refundId: refund.id, amountRefunded: refund.amount });
   } catch (err) {

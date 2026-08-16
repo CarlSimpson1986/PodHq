@@ -25,7 +25,16 @@ export default function LoginPage() {
   const [captchaKey, setCaptchaKey] = useState(0);
   const [captchaStuck, setCaptchaStuck] = useState(false);
 
-  const handleCaptchaToken = useCallback((token: string) => setCaptchaToken(token), []);
+  const handleCaptchaToken = useCallback((token: string) => {
+    setCaptchaToken(token);
+    // A real (non-expiry) token means the widget isn't stuck — reset here,
+    // in the callback that actually observed the change, rather than
+    // unconditionally at the top of the effect below (a newer
+    // eslint-plugin-react-hooks, pulled in by the 2026-08-16 dependency
+    // upgrade, promotes synchronous setState-in-effect from warning to
+    // error).
+    if (token) setCaptchaStuck(false);
+  }, []);
 
   // The widget failing to load is otherwise silent — the submit button just
   // stays disabled forever with no explanation, which is exactly what made
@@ -34,7 +43,6 @@ export default function LoginPage() {
   // suggest the one workaround that's actually been confirmed to help
   // (browser extensions interfering with the widget's own script load).
   useEffect(() => {
-    setCaptchaStuck(false);
     if (captchaToken) return;
     const timer = setTimeout(() => setCaptchaStuck(true), CAPTCHA_TIMEOUT_MS);
     return () => clearTimeout(timer);
@@ -44,6 +52,7 @@ export default function LoginPage() {
   // (success or failure) so the next submit has a fresh one.
   function resetCaptcha() {
     setCaptchaToken("");
+    setCaptchaStuck(false);
     setCaptchaKey((k) => k + 1);
   }
 

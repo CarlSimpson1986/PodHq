@@ -5,8 +5,12 @@ const LIMIT_PER_MINUTE = 100;
 
 /**
  * Sliding-window-by-minute rate limiter backed by the rate_limits table.
- * Buckets by (user_id, route, minute) so it's a plain upsert + compare —
- * no external cache needed at this app's scale (~10 users).
+ * Buckets by (user_id, route, minute). Goes through the increment_rate_limit
+ * RPC (0034_increment_rate_limit.sql) rather than a separate select+update —
+ * that read-then-write pair let two concurrent requests both pass the limit
+ * check and both increment, letting a burst exceed LIMIT_PER_MINUTE (found
+ * in the 2026-08-16 OWASP audit). The RPC's INSERT ... ON CONFLICT ... DO
+ * UPDATE does the check-and-increment as one atomic statement instead.
  */
 export async function checkRateLimit(
   userId: string,
@@ -16,39 +20,16 @@ export async function checkRateLimit(
   const windowStart = new Date();
   windowStart.setSeconds(0, 0);
 
-  const { data, error } = await admin
-    .from("rate_limits")
-    .select("request_count")
-    .eq("user_id", userId)
-    .eq("route", route)
-    .eq("window_start", windowStart.toISOString())
-    .maybeSingle();
+  const { data, error } = await admin.rpc("increment_rate_limit", {
+    p_user_id: userId,
+    p_route: route,
+    p_window_start: windowStart.toISOString(),
+  });
 
   if (error) {
-    console.error("[rate-limit] read failed, failing open", { route, error: error.message });
+    console.error("[rate-limit] increment failed, failing open", { route, error: error.message });
     return { allowed: true };
   }
 
-  if (!data) {
-    await admin.from("rate_limits").insert({
-      user_id: userId,
-      route,
-      window_start: windowStart.toISOString(),
-      request_count: 1,
-    });
-    return { allowed: true };
-  }
-
-  if (data.request_count >= LIMIT_PER_MINUTE) {
-    return { allowed: false };
-  }
-
-  await admin
-    .from("rate_limits")
-    .update({ request_count: data.request_count + 1 })
-    .eq("user_id", userId)
-    .eq("route", route)
-    .eq("window_start", windowStart.toISOString());
-
-  return { allowed: true };
+  return { allowed: (data as number) <= LIMIT_PER_MINUTE };
 }

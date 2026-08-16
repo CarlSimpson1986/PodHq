@@ -14,6 +14,7 @@ export interface CatalogItem {
   credits: number;
   priceGBP: number;
   enabled: boolean;
+  oneTimePerMember: boolean;
 }
 
 function mapRow(row: {
@@ -26,6 +27,7 @@ function mapRow(row: {
   credits: number;
   price_gbp: number;
   enabled: boolean;
+  one_time_per_member: boolean;
 }): CatalogItem {
   return {
     id: row.id,
@@ -37,6 +39,7 @@ function mapRow(row: {
     credits: row.credits,
     priceGBP: row.price_gbp,
     enabled: row.enabled,
+    oneTimePerMember: row.one_time_per_member,
   };
 }
 
@@ -86,6 +89,7 @@ export async function createCatalogItem(input: {
   label: string;
   credits: number;
   priceGBP: number;
+  oneTimePerMember?: boolean;
 }): Promise<CreateCatalogItemResult> {
   const admin = createAdminClient();
   const baseSlug = slugify(input.name);
@@ -112,6 +116,7 @@ export async function createCatalogItem(input: {
       label: input.label,
       credits: input.credits,
       price_gbp: input.priceGBP,
+      one_time_per_member: input.oneTimePerMember ?? false,
     })
     .select("*")
     .single();
@@ -126,12 +131,19 @@ export type UpdateCatalogItemResult = { status: "ok" } | { status: "not_found" }
 export async function updateCatalogItem(
   gym: GymName,
   id: number,
-  input: { name: string; label: string; credits: number; priceGBP: number }
+  input: { name: string; label: string; credits: number; priceGBP: number; oneTimePerMember: boolean }
 ): Promise<UpdateCatalogItemResult> {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("catalog_items")
-    .update({ name: input.name, label: input.label, credits: input.credits, price_gbp: input.priceGBP, updated_at: new Date().toISOString() })
+    .update({
+      name: input.name,
+      label: input.label,
+      credits: input.credits,
+      price_gbp: input.priceGBP,
+      one_time_per_member: input.oneTimePerMember,
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", id)
     .eq("gym", gym)
     .select("id")
