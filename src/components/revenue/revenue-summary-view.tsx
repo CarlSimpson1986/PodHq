@@ -10,6 +10,7 @@ import { TrendYoyChart } from "./trend-yoy-chart";
 import { TopProductsChart } from "./top-products-chart";
 import { TopCustomersTable } from "./top-customers-table";
 import { GymSelect } from "@/components/ui/gym-select";
+import { DateRangeDropdown } from "./date-range-dropdown";
 
 function formatRange(range: MonthRange): string {
   return range.start === range.end
@@ -17,21 +18,18 @@ function formatRange(range: MonthRange): string {
     : `${formatMonthLabel(range.start)} – ${formatMonthLabel(range.end)}`;
 }
 
-const PRESETS: { value: DateRangePreset; label: string }[] = [
-  { value: "last_month", label: "Last month" },
-  { value: "qtd", label: "Quarter to date" },
-  { value: "last_quarter", label: "Last quarter" },
-  { value: "ytd", label: "Year to date" },
-  { value: "full_year", label: "Full year" },
-];
-
 const currentYear = new Date().getUTCFullYear();
-const YEAR_OPTIONS = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
-const buttonBase =
-  "rounded-md px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-50";
-const buttonActive = "bg-accent text-accent-foreground";
-const buttonInactive = "bg-card border border-card-border text-muted-foreground hover:text-foreground";
+// Mirrors getDefaultReportMonth() server-side (src/lib/data/dashboard.ts) —
+// the pipeline never has current-month data, so the month picker's upper
+// bound is last calendar month, not this one. The server clamps
+// independently too (resolveDateRange's "month" case) — this is only a UX
+// nicety so the picker doesn't even offer an out-of-range month.
+const now = new Date();
+const lastCompletedMonthDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+const LAST_COMPLETED_MONTH = `${lastCompletedMonthDate.getUTCFullYear()}-${String(
+  lastCompletedMonthDate.getUTCMonth() + 1
+).padStart(2, "0")}`;
 
 interface RevenueSummaryViewProps {
   role: "admin" | "owner";
@@ -43,17 +41,24 @@ interface RevenueSummaryViewProps {
 export function RevenueSummaryView({ role, initialPreset, initialGym, initialSummary }: RevenueSummaryViewProps) {
   const [preset, setPreset] = useState(initialPreset);
   const [year, setYear] = useState(currentYear);
+  const [month, setMonth] = useState(LAST_COMPLETED_MONTH);
   const [gym, setGym] = useState<GymName | null>(initialGym);
   const [summary, setSummary] = useState<RevenueRangeSummary | null>(initialSummary);
+  // Tracked separately from `summary` — the dropdown trigger needs a range
+  // to display even when a fetch errors and summary is cleared to null
+  // (see below), otherwise the one control that lets a user recover from
+  // an error would itself disappear along with the failed data.
+  const [range, setRange] = useState<MonthRange>(initialSummary.range);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  function refetch(nextPreset: DateRangePreset, nextYear: number, nextGym: GymName | null) {
+  function refetch(nextPreset: DateRangePreset, nextYear: number, nextMonth: string, nextGym: GymName | null) {
     setError(null);
     startTransition(async () => {
       try {
         const params = new URLSearchParams({ preset: nextPreset });
         if (nextPreset === "full_year") params.set("year", String(nextYear));
+        if (nextPreset === "month") params.set("month", nextMonth);
         if (role === "admin" && nextGym) params.set("gym", nextGym);
 
         const res = await fetch(`/api/revenue/summary?${params.toString()}`);
@@ -67,6 +72,7 @@ export function RevenueSummaryView({ role, initialPreset, initialGym, initialSum
           return;
         }
         setSummary(body.summary);
+        setRange(body.summary.range);
       } catch {
         setSummary(null);
         setError("Something went wrong. Try again.");
@@ -76,17 +82,28 @@ export function RevenueSummaryView({ role, initialPreset, initialGym, initialSum
 
   function handlePresetChange(next: DateRangePreset) {
     setPreset(next);
-    refetch(next, year, gym);
+    refetch(next, year, month, gym);
   }
 
-  function handleYearChange(next: number) {
+  // Combined, not composed from handlePresetChange + a separate year
+  // setter — see date-range-dropdown.tsx's onSelectYear for why calling
+  // two state-setting handlers back to back here would refetch twice off
+  // stale closures.
+  function handleSelectYear(next: number) {
     setYear(next);
-    refetch(preset, next, gym);
+    setPreset("full_year");
+    refetch("full_year", next, month, gym);
+  }
+
+  function handleMonthChange(next: string) {
+    setMonth(next);
+    setPreset("month");
+    refetch("month", year, next, gym);
   }
 
   function handleGymChange(next: GymName | null) {
     setGym(next);
-    refetch(preset, year, next);
+    refetch(preset, year, month, next);
   }
 
   return (
@@ -94,32 +111,16 @@ export function RevenueSummaryView({ role, initialPreset, initialGym, initialSum
       <h1 className="text-xl font-semibold text-foreground">Revenue — {gym ?? "All gyms"}</h1>
 
       <div className="mt-6 flex flex-wrap items-center gap-2">
-        {PRESETS.map((p) => (
-          <button
-            key={p.value}
-            type="button"
-            disabled={isPending}
-            onClick={() => handlePresetChange(p.value)}
-            className={`${buttonBase} ${preset === p.value ? buttonActive : buttonInactive}`}
-          >
-            {p.label}
-          </button>
-        ))}
-
-        {preset === "full_year" && (
-          <select
-            value={year}
-            disabled={isPending}
-            onChange={(e) => handleYearChange(Number(e.target.value))}
-            className="rounded-md border border-card-border bg-card px-2 py-1.5 text-sm text-foreground"
-          >
-            {YEAR_OPTIONS.map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
-        )}
+        <DateRangeDropdown
+          preset={preset}
+          month={month}
+          range={range}
+          lastCompletedMonth={LAST_COMPLETED_MONTH}
+          disabled={isPending}
+          onPreset={handlePresetChange}
+          onSelectYear={handleSelectYear}
+          onMonth={handleMonthChange}
+        />
 
         {role === "admin" && (
           <GymSelect value={gym} onChange={handleGymChange} disabled={isPending} className="ml-auto" />
