@@ -8,6 +8,9 @@ export const createCatalogItemSchema = z
     name: z.string().min(1).max(100),
     label: z.string().min(1).max(100),
     credits: z.number().int().positive().max(1000),
+    // Not a closed enum yet — see CatalogItem's own comment
+    // (src/lib/data/catalog.ts). Defaults to 'pod' server-side if omitted.
+    creditType: z.string().min(1).max(40).optional(),
     priceGBP: z.number().positive().max(10000),
     oneTimePerMember: z.boolean().optional(),
   })

@@ -4,6 +4,11 @@ import type { GymName } from "./types";
 
 export type CatalogItemType = "credit_pack" | "membership";
 
+// Not a closed TS union yet, deliberately — same reasoning as
+// pod_resources.credit_type (src/lib/data/pods.ts): only 'pod' and
+// 'recovery' exist today (Hove, confirmed live 2026-08-17), but this is
+// plain text end to end (no DB CHECK either), so a future gym adding a
+// third resource type needs no schema/type-union change here.
 export interface CatalogItem {
   id: number;
   gym: GymName;
@@ -12,6 +17,7 @@ export interface CatalogItem {
   name: string;
   label: string;
   credits: number;
+  creditType: string;
   priceGBP: number;
   enabled: boolean;
   oneTimePerMember: boolean;
@@ -25,6 +31,7 @@ function mapRow(row: {
   name: string;
   label: string;
   credits: number;
+  credit_type: string;
   price_gbp: number;
   enabled: boolean;
   one_time_per_member: boolean;
@@ -37,6 +44,7 @@ function mapRow(row: {
     name: row.name,
     label: row.label,
     credits: row.credits,
+    creditType: row.credit_type,
     priceGBP: row.price_gbp,
     enabled: row.enabled,
     oneTimePerMember: row.one_time_per_member,
@@ -88,6 +96,7 @@ export async function createCatalogItem(input: {
   name: string;
   label: string;
   credits: number;
+  creditType?: string;
   priceGBP: number;
   oneTimePerMember?: boolean;
 }): Promise<CreateCatalogItemResult> {
@@ -115,6 +124,7 @@ export async function createCatalogItem(input: {
       name: input.name,
       label: input.label,
       credits: input.credits,
+      credit_type: input.creditType ?? "pod",
       price_gbp: input.priceGBP,
       one_time_per_member: input.oneTimePerMember ?? false,
     })

@@ -114,7 +114,7 @@ export async function compCreditPack(gym: GymName, memberId: number, packId: str
   const pack = await getCatalogItemBySlug(gym, packId);
   if (!pack || pack.type !== "credit_pack") return { status: "unknown_item" };
 
-  const result = await grantCreditToMember(gym, memberId, pack.credits, actor, pack.itemId);
+  const result = await grantCreditToMember(gym, memberId, pack.credits, actor, pack.itemId, pack.creditType);
   if (result.status === "not_found") return { status: "not_found" };
   if (result.status === "error") return { status: "error", message: result.message };
   return { status: "ok", newBalance: result.newBalance };
@@ -160,12 +160,20 @@ export async function compMembership(
   if (claimError) return { status: "error", message: claimError.message };
   if (!claimed || claimed.length === 0) return { status: "already_active" };
 
+  // catalog_item_id/credit_type both threaded through here — a pre-existing
+  // gap found 2026-08-17: every other purchase site already set
+  // catalog_item_id, this one never did, and credit_type is new as of the
+  // same session (multiple bookable resources per gym / Hove's Recovery
+  // pricing).
   const { error: creditError } = await admin
     .from("credits")
-    .insert({ member_id: memberId, amount: tier.credits, reason: "membership" });
+    .insert({ member_id: memberId, amount: tier.credits, reason: "membership", catalog_item_id: tier.itemId, credit_type: tier.creditType });
   if (creditError) return { status: "error", message: creditError.message };
 
-  const { data: balance, error: balanceError } = await admin.rpc("get_credit_balance", { p_member_id: memberId });
+  const { data: balance, error: balanceError } = await admin.rpc("get_credit_balance", {
+    p_member_id: memberId,
+    p_credit_type: tier.creditType,
+  });
   if (balanceError) throw balanceError;
 
   await logAuthEvent({
@@ -235,7 +243,7 @@ export async function createPackCheckoutSession(
             },
           },
         ],
-        metadata: { member_id: String(memberId), credits: String(pack.credits), packageId: pack.itemId },
+        metadata: { member_id: String(memberId), credits: String(pack.credits), packageId: pack.itemId, creditType: pack.creditType },
         return_url: `${origin}/pods/members/${memberId}?checkout_session_id={CHECKOUT_SESSION_ID}`,
       },
       { idempotencyKey: crypto.randomUUID() }
@@ -324,6 +332,7 @@ export async function createMembershipCheckoutSession(
             tier_id: tier.itemId,
             tier_name: tier.name,
             credits_per_period: String(tier.credits),
+            credit_type: tier.creditType,
           },
         },
         return_url: `${origin}/pods/members/${memberId}?checkout_session_id={CHECKOUT_SESSION_ID}`,
@@ -393,7 +402,13 @@ export async function chargeSavedCardForPack(
         payment_method: paymentMethodId,
         off_session: true,
         confirm: true,
-        metadata: { member_id: String(memberId), credits: String(pack.credits), source: "staff_saved_card", packageId: pack.itemId },
+        metadata: {
+          member_id: String(memberId),
+          credits: String(pack.credits),
+          source: "staff_saved_card",
+          packageId: pack.itemId,
+          creditType: pack.creditType,
+        },
       },
       { idempotencyKey: crypto.randomUUID() }
     );
@@ -507,6 +522,7 @@ export async function createMembershipWithSavedCard(
           tier_id: tier.itemId,
           tier_name: tier.name,
           credits_per_period: String(tier.credits),
+          credit_type: tier.creditType,
         },
       },
       { idempotencyKey: crypto.randomUUID() }

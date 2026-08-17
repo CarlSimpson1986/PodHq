@@ -3,15 +3,15 @@
 -- as the new source of truth, superseding gym_kisi_mapping (one row per
 -- gym) — the old table is renamed, not dropped, at the end of this file
 -- (belt-and-braces safety net, see that statement's own comment).
--- Berkhamsted gets two
--- identical Kisi-based resources seeded here (its pod-booking feature
--- has never actually been turned on — zero live bookings/members there
--- today, confirmed live 2026-08-17, so this is a genuinely safe first
--- multi-resource gym). Brighton's resources (PDK-based, split credit
--- types, 30-min slots) are deliberately NOT seeded here — that's
--- Milestone 2, and Brighton isn't in either app's GYM_NAMES list yet
--- either. Aylesbury Berryfields (the only gym with real live data) gets
--- its single existing resource carried over unchanged.
+-- Hove (a new gym opening soon, real priority confirmed live 2026-08-17)
+-- gets its two resources seeded here — a genuine gym+wellness double
+-- site, not two identical rooms (see the seed statement's own comment
+-- for the credit_type/slot_duration/access_provider detail). Berkhamsted
+-- (which also has two identical gym rooms) is deliberately NOT seeded in
+-- this pass — it has zero live bookings/members today either way, so
+-- adding it later carries no risk; Hove is the actual near-term need.
+-- Aylesbury Berryfields (the only gym with real live data right now)
+-- gets its single existing resource carried over unchanged.
 --
 -- Function changes (create_booking/cancel_booking/get_credit_balance)
 -- are a separate migration (0039) — same reasoning this project already
@@ -76,13 +76,23 @@ select
   pod_capacity, open_hour, close_hour, latitude, longitude, unlock_radius_meters
 from public.gym_kisi_mapping;
 
--- Seed Berkhamsted's two identical rooms — same credit_type/slot_duration
--- as the default 'pod' shape above, deliberately NULL Kisi IDs until real
--- hardware IDs are obtained (same reasoning as the header comment).
-insert into public.pod_resources (gym, resource_key, label, pod_capacity, open_hour, close_hour)
+-- Seed Hove's two resources — confirmed live 2026-08-17: a new gym, real
+-- priority over Berkhamsted (which this migration no longer seeds —
+-- zero risk either way since it has no live data, can be added back
+-- whenever actually needed). A genuine gym+wellness double site, not two
+-- identical rooms: different credit_type, different slot_duration_minutes,
+-- and access_provider='pdk' (ProdataKey, not Kisi) since that's Hove's
+-- real door system, confirmed live the same day — Fairford Leys already
+-- has a PDK account, and Hove will be added there as a new group. Real
+-- door integration is a separate, deferred piece of work (unlock/route.ts
+-- already fails closed with a clear message for 'pdk' resources) — this
+-- only seeds the resource rows themselves so booking/pricing/credits can
+-- be built and tested now regardless of when the physical door is wired
+-- up.
+insert into public.pod_resources (gym, resource_key, label, credit_type, slot_duration_minutes, access_provider, pod_capacity, open_hour, close_hour)
 values
-  ('Berkhamsted', 'pod_a', 'Gym Pod A', 1, 0, 24),
-  ('Berkhamsted', 'pod_b', 'Gym Pod B', 1, 0, 24);
+  ('Hove', 'gym', 'Gym', 'pod', 60, 'pdk', 1, 0, 24),
+  ('Hove', 'wellness', 'Wellness Room', 'recovery', 30, 'pdk', 1, 0, 24);
 
 -- Renamed, not dropped — belt-and-braces per the user's explicit request
 -- 2026-08-17, on top of an external JSON export of its pre-migration

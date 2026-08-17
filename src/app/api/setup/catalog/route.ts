@@ -91,6 +91,7 @@ export async function POST(request: NextRequest) {
       name: parsed.data.name,
       label: parsed.data.label,
       credits: parsed.data.credits,
+      creditType: parsed.data.creditType,
       priceGBP: parsed.data.priceGBP,
       oneTimePerMember: parsed.data.oneTimePerMember,
     });

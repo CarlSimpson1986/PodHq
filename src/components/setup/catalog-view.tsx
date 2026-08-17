@@ -25,6 +25,12 @@ interface FormState {
 
 const emptyForm: FormState = { name: "", label: "", credits: "", priceGBP: "", oneTimePerMember: false };
 
+// Not a closed set in the schema (see CatalogItem's own comment) — plain
+// text so a gym adding a third resource type someday needs no code
+// change here, just typing a new value in. Defaults to "pod" when left
+// blank, matching every existing item.
+const DEFAULT_CREDIT_TYPE = "pod";
+
 function CatalogSection({
   gym,
   type,
@@ -42,6 +48,9 @@ function CatalogSection({
 }) {
   const [adding, setAdding] = useState(false);
   const [addForm, setAddForm] = useState<FormState>(emptyForm);
+  // Create-only — not part of FormState/parseForm since it's never
+  // editable after creation (see createCatalogItem's own comment).
+  const [addCreditType, setAddCreditType] = useState(DEFAULT_CREDIT_TYPE);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<FormState>(emptyForm);
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -80,7 +89,7 @@ function CatalogSection({
       const res = await fetch("/api/setup/catalog", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gym, type, ...parsed }),
+        body: JSON.stringify({ gym, type, creditType: addCreditType.trim() || DEFAULT_CREDIT_TYPE, ...parsed }),
       });
       const body = await res.json();
       if (body.status !== "ok") {
@@ -88,6 +97,7 @@ function CatalogSection({
         return;
       }
       setAddForm(emptyForm);
+      setAddCreditType(DEFAULT_CREDIT_TYPE);
       setAdding(false);
       onChanged();
     } catch {
@@ -188,7 +198,18 @@ function CatalogSection({
               onChange={(e) => setAddForm((f) => ({ ...f, priceGBP: e.target.value }))}
               className={inputClass}
             />
+            <input
+              placeholder={`Credit type (default "${DEFAULT_CREDIT_TYPE}")`}
+              value={addCreditType}
+              onChange={(e) => setAddCreditType(e.target.value)}
+              className={inputClass}
+            />
           </div>
+          <p className="text-xs text-muted-foreground">
+            Which credit balance this item grants — most gyms only ever use &quot;pod&quot;. A gym with more than one
+            bookable resource type (e.g. a wellness room billed separately) uses a matching second credit type there.
+            Can&apos;t be changed once created.
+          </p>
           <label className="flex items-center gap-2 text-xs text-muted-foreground">
             <input
               type="checkbox"
@@ -227,6 +248,7 @@ function CatalogSection({
               <th className="py-2 font-medium">Name</th>
               <th className="py-2 font-medium">Label</th>
               <th className="py-2 font-medium">{creditsLabel}</th>
+              <th className="py-2 font-medium">Credit type</th>
               <th className="py-2 font-medium">Price</th>
               <th className="py-2 font-medium">One-time</th>
               <th className="py-2 font-medium">Status</th>
@@ -262,6 +284,8 @@ function CatalogSection({
                           className={`${inputClass} w-20`}
                         />
                       </td>
+                      {/* Not editable — set once at creation, see the form's own note above. */}
+                      <td className="py-2 text-muted-foreground">{item.creditType}</td>
                       <td className="py-2">
                         <input
                           type="number"
@@ -295,6 +319,7 @@ function CatalogSection({
                       <td className="py-2 text-foreground">{item.name}</td>
                       <td className="py-2 text-muted-foreground">{item.label}</td>
                       <td className="py-2 tabular-nums text-foreground">{item.credits}</td>
+                      <td className="py-2 text-muted-foreground">{item.creditType}</td>
                       <td className="py-2 tabular-nums text-foreground">{formatGBP(item.priceGBP)}</td>
                       <td className="py-2 text-muted-foreground">{item.oneTimePerMember ? "Yes" : "—"}</td>
                       <td className="py-2">
