@@ -5,6 +5,7 @@ export const GYM_NAMES = [
   "Crewe",
   "Fairford Leys",
   "Hackney",
+  "Hove",
   "Kingston upon Thames",
   "Milton Keynes",
   "Oxford East",
