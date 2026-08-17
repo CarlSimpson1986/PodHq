@@ -1,6 +1,6 @@
 import { createSessionClient } from "@/lib/supabase/server";
 import { getGymScope } from "@/lib/auth/gym-scope";
-import { getPodSettings, getMembersForGym } from "@/lib/data/pods";
+import { getPodResourcesForGym, getMembersForGym } from "@/lib/data/pods";
 import { CalendarView } from "@/components/pods/calendar-view";
 import { AppShell } from "@/components/layout/app-shell";
 import type { GymName } from "@/lib/data/types";
@@ -34,12 +34,12 @@ export default async function CalendarPage() {
 
   const gym = scope.role === "owner" ? scope.gym : DEFAULT_GYM;
 
-  const [settings, members] = await Promise.all([getPodSettings(gym), getMembersForGym(gym)]);
+  const [resources, members] = await Promise.all([getPodResourcesForGym(gym), getMembersForGym(gym)]);
 
   return (
     <AppShell role={scope.role}>
       <div className="mx-auto max-w-6xl px-4 py-8">
-        <CalendarView role={scope.role} initialGym={gym} initialSettings={settings} initialMembers={members} />
+        <CalendarView role={scope.role} initialGym={gym} initialResources={resources} initialMembers={members} />
       </div>
     </AppShell>
   );

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { GymSelect } from "@/components/ui/gym-select";
 import type { GymName } from "@/lib/data/types";
-import type { PodBooking, PodMember, PodSettings, SlotDetail, WaitlistCount } from "@/lib/data/pods";
+import type { PodBooking, PodMember, PodResource, SlotDetail, WaitlistCount } from "@/lib/data/pods";
 
 type ViewMode = "day" | "week" | "month";
 
@@ -13,6 +13,8 @@ const buttonClass =
 const dangerButtonClass =
   "rounded-md border border-danger/50 px-2 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/10 disabled:opacity-50";
 const ghostButtonClass = "rounded-md border border-card-border px-2 py-1 text-xs text-muted-foreground";
+const tabActiveClass = "rounded-md bg-gradient-to-r from-accent to-accent-hover px-3 py-1.5 text-xs font-medium text-accent-foreground";
+const tabInactiveClass = "rounded-md border border-card-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground";
 
 function toDateParam(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -49,18 +51,19 @@ function formatHour(h: number) {
 export function CalendarView({
   role,
   initialGym,
-  initialSettings,
+  initialResources,
   initialMembers,
 }: {
   role: "admin" | "owner";
   initialGym: GymName;
-  initialSettings: PodSettings | null;
+  initialResources: PodResource[];
   initialMembers: PodMember[];
 }) {
   const [gym, setGym] = useState<GymName>(initialGym);
   const [view, setView] = useState<ViewMode>("week");
   const [anchor, setAnchor] = useState<Date>(() => new Date());
-  const [settings, setSettings] = useState(initialSettings);
+  const [resources, setResources] = useState<PodResource[]>(initialResources);
+  const [resourceId, setResourceId] = useState<number | null>(initialResources[0]?.id ?? null);
   const [members, setMembers] = useState(initialMembers);
   const [bookings, setBookings] = useState<PodBooking[]>([]);
   const [waitlist, setWaitlist] = useState<WaitlistCount[]>([]);
@@ -69,11 +72,28 @@ export function CalendarView({
   const [selectedSlot, setSelectedSlot] = useState<Date | null>(null);
 
   const [editingSettings, setEditingSettings] = useState(false);
-  const [capacityDraft, setCapacityDraft] = useState(initialSettings?.podCapacity ?? 1);
-  const [openHourDraft, setOpenHourDraft] = useState(initialSettings?.openHour ?? 0);
-  const [closeHourDraft, setCloseHourDraft] = useState(initialSettings?.closeHour ?? 24);
+  const resource = resources.find((r) => r.id === resourceId) ?? null;
+  const [capacityDraft, setCapacityDraft] = useState(resource?.podCapacity ?? 1);
+  const [openHourDraft, setOpenHourDraft] = useState(resource?.openHour ?? 0);
+  const [closeHourDraft, setCloseHourDraft] = useState(resource?.closeHour ?? 24);
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
+
+  // Reset the settings-edit drafts whenever the selected resource changes
+  // (switching tabs, or a fresh fetch after a gym change) — React's own
+  // "adjusting state when a prop changes" pattern (setState during render,
+  // guarded by comparing against the previous value), not a useEffect:
+  // this only needs to run before the next paint, and a plain effect here
+  // would be flagged as an unnecessary cascading-render risk by this
+  // project's lint config (see podhq-client's identical fix earlier the
+  // same session).
+  const [lastResourceId, setLastResourceId] = useState(resourceId);
+  if (resourceId !== lastResourceId) {
+    setLastResourceId(resourceId);
+    setCapacityDraft(resource?.podCapacity ?? 1);
+    setOpenHourDraft(resource?.openHour ?? 0);
+    setCloseHourDraft(resource?.closeHour ?? 24);
+  }
 
   // Range covered by the current view.
   const rangeStart = view === "day" ? anchor : view === "week" ? startOfWeek(anchor) : startOfWeek(startOfMonth(anchor));
@@ -94,18 +114,16 @@ export function CalendarView({
     }
   }
 
-  async function fetchSettingsAndMembers(nextGym: GymName) {
-    const [settingsRes, membersRes] = await Promise.all([
-      fetch(`/api/pods/settings?gym=${encodeURIComponent(nextGym)}`),
+  async function fetchResourcesAndMembers(nextGym: GymName) {
+    const [resourcesRes, membersRes] = await Promise.all([
+      fetch(`/api/pods/resources?gym=${encodeURIComponent(nextGym)}`),
       fetch(`/api/pods/members?gym=${encodeURIComponent(nextGym)}`),
     ]);
-    const settingsBody = await settingsRes.json();
+    const resourcesBody = await resourcesRes.json();
     const membersBody = await membersRes.json();
-    const nextSettings: PodSettings | null = settingsBody.status === "ok" ? settingsBody.settings : null;
-    setSettings(nextSettings);
-    setCapacityDraft(nextSettings?.podCapacity ?? 1);
-    setOpenHourDraft(nextSettings?.openHour ?? 0);
-    setCloseHourDraft(nextSettings?.closeHour ?? 24);
+    const nextResources: PodResource[] = resourcesBody.status === "ok" ? resourcesBody.resources : [];
+    setResources(nextResources);
+    setResourceId(nextResources[0]?.id ?? null);
     setMembers(membersBody.status === "ok" ? membersBody.members : []);
   }
 
@@ -119,7 +137,7 @@ export function CalendarView({
   function handleGymChange(next: GymName | null) {
     if (!next || role !== "admin") return;
     setGym(next);
-    fetchSettingsAndMembers(next);
+    fetchResourcesAndMembers(next);
   }
 
   function step(direction: -1 | 1) {
@@ -133,20 +151,23 @@ export function CalendarView({
   }
 
   async function handleSaveSettings() {
+    if (!resourceId) return;
     setSettingsError(null);
     setSavingSettings(true);
     try {
       const res = await fetch("/api/pods/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gym, podCapacity: capacityDraft, openHour: openHourDraft, closeHour: closeHourDraft }),
+        body: JSON.stringify({ gym, resourceId, podCapacity: capacityDraft, openHour: openHourDraft, closeHour: closeHourDraft }),
       });
       const body = await res.json();
       if (body.status !== "ok") {
         setSettingsError(body.message ?? "Could not save settings.");
         return;
       }
-      setSettings({ gym, podCapacity: capacityDraft, openHour: openHourDraft, closeHour: closeHourDraft });
+      setResources((prev) =>
+        prev.map((r) => (r.id === resourceId ? { ...r, podCapacity: capacityDraft, openHour: openHourDraft, closeHour: closeHourDraft } : r))
+      );
       setEditingSettings(false);
     } catch {
       setSettingsError("Something went wrong. Try again.");
@@ -157,25 +178,27 @@ export function CalendarView({
 
   function countAt(date: Date, hour: number): number {
     return bookings.filter((b) => {
+      if (b.resourceId !== resourceId) return false;
       const bd = new Date(b.slotStart);
       return isSameDay(bd, date) && bd.getHours() === hour;
     }).length;
   }
 
   function countForDay(date: Date): number {
-    return bookings.filter((b) => isSameDay(new Date(b.slotStart), date)).length;
+    return bookings.filter((b) => b.resourceId === resourceId && isSameDay(new Date(b.slotStart), date)).length;
   }
 
   function waitlistCountAt(date: Date, hour: number): number {
     return waitlist
       .filter((w) => {
+        if (w.resourceId !== resourceId) return false;
         const wd = new Date(w.slotStart);
         return isSameDay(wd, date) && wd.getHours() === hour;
       })
       .reduce((sum, w) => sum + w.count, 0);
   }
 
-  const capacity = settings?.podCapacity ?? 1;
+  const capacity = resource?.podCapacity ?? 1;
 
   function headerLabel() {
     if (view === "day") return anchor.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
@@ -225,9 +248,28 @@ export function CalendarView({
         </div>
       </div>
 
+      {/* Resource tabs — a gym with exactly one resource shows nothing
+          here at all, no behavior change from before this feature. */}
+      {resources.length > 1 && (
+        <div className="flex flex-wrap gap-2">
+          {resources.map((r) => (
+            <button
+              key={r.id}
+              type="button"
+              onClick={() => setResourceId(r.id)}
+              className={r.id === resourceId ? tabActiveClass : tabInactiveClass}
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {editingSettings && (
         <section className="card-glass p-4">
-          <h2 className="mb-3 text-sm font-semibold text-foreground">Pod settings</h2>
+          <h2 className="mb-3 text-sm font-semibold text-foreground">
+            {resource ? `${resource.label} settings` : "Pod settings"}
+          </h2>
           <div className="flex flex-wrap items-end gap-4">
             <label className="flex flex-col gap-1 text-xs text-muted-foreground">
               Capacity per slot
@@ -260,12 +302,12 @@ export function CalendarView({
                 ))}
               </select>
             </label>
-            <button type="button" onClick={handleSaveSettings} disabled={savingSettings} className={buttonClass}>
+            <button type="button" onClick={handleSaveSettings} disabled={savingSettings || !resourceId} className={buttonClass}>
               {savingSettings ? "Saving..." : "Save"}
             </button>
           </div>
           {settingsError && <p className="mt-2 text-xs text-danger">{settingsError}</p>}
-          {!settings && <p className="mt-2 text-xs text-warning">This gym has no pod configured yet.</p>}
+          {!resource && <p className="mt-2 text-xs text-warning">This gym has no pod configured yet.</p>}
         </section>
       )}
 
@@ -349,8 +391,9 @@ export function CalendarView({
                       <td key={`${day.toISOString()}-${hour}`} className="border border-card-border p-0">
                         <button
                           type="button"
+                          disabled={!resourceId}
                           onClick={() => setSelectedSlot(new Date(day.getFullYear(), day.getMonth(), day.getDate(), hour))}
-                          className={`flex h-20 w-full flex-col items-center justify-center gap-0.5 transition-colors ${
+                          className={`flex h-20 w-full flex-col items-center justify-center gap-0.5 transition-colors disabled:opacity-50 ${
                             full
                               ? "bg-danger text-white hover:bg-danger/90"
                               : count > 0
@@ -377,9 +420,11 @@ export function CalendarView({
         </section>
       )}
 
-      {selectedSlot && (
+      {selectedSlot && resourceId && (
         <SlotPanel
           gym={gym}
+          resourceId={resourceId}
+          resourceLabel={resource?.label ?? ""}
           slot={selectedSlot}
           members={members}
           onClose={() => setSelectedSlot(null)}
@@ -392,12 +437,16 @@ export function CalendarView({
 
 function SlotPanel({
   gym,
+  resourceId,
+  resourceLabel,
   slot,
   members,
   onClose,
   onChanged,
 }: {
   gym: GymName;
+  resourceId: number;
+  resourceLabel: string;
   slot: Date;
   members: PodMember[];
   onClose: () => void;
@@ -414,7 +463,9 @@ function SlotPanel({
   async function load() {
     setLoading(true);
     try {
-      const res = await fetch(`/api/pods/slot?gym=${encodeURIComponent(gym)}&slotStart=${encodeURIComponent(slot.toISOString())}`);
+      const res = await fetch(
+        `/api/pods/slot?gym=${encodeURIComponent(gym)}&resourceId=${resourceId}&slotStart=${encodeURIComponent(slot.toISOString())}`
+      );
       const body = await res.json();
       setDetail(body.status === "ok" ? body.detail : { bookings: [], waitlist: [] });
     } finally {
@@ -425,7 +476,7 @@ function SlotPanel({
   useEffect(() => {
     queueMicrotask(() => load());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slot.getTime()]);
+  }, [slot.getTime(), resourceId]);
 
   async function handleBook() {
     if (!selectedMemberId) {
@@ -438,7 +489,7 @@ function SlotPanel({
       const res = await fetch("/api/pods/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gym, memberId: selectedMemberId, slotStart: slot.toISOString() }),
+        body: JSON.stringify({ gym, resourceId, memberId: selectedMemberId, slotStart: slot.toISOString() }),
       });
       const body = await res.json();
       if (body.status !== "ok") {
@@ -486,7 +537,7 @@ function SlotPanel({
               {slot.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}
             </h2>
             <p className="text-sm text-muted-foreground">
-              {formatHour(slot.getHours())} &middot; {gym}
+              {formatHour(slot.getHours())} &middot; {resourceLabel || gym}
             </p>
           </div>
           <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground">

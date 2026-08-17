@@ -9,18 +9,25 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // (grantCreditToMember, cancelBookingAsStaff) already did this ownership
 // check; this one didn't, until it was fixed the same session.
 //
+// Extended 2026-08-17 (multiple bookable resources per gym): the same
+// ownership check now also applies to resourceId — a resource from a
+// different gym than the caller's selected gym must be rejected too,
+// since create_booking() itself derives gym from the resource and has no
+// way to know the caller's intended gym was different.
+//
 // Mocks the Supabase admin client rather than hitting a real DB — this is
 // a unit test of the ownership-check branch specifically, not an
 // integration test of create_booking() itself.
-const maybeSingleMock = vi.fn();
+const memberMaybeSingleMock = vi.fn();
+const resourceMaybeSingleMock = vi.fn();
 const rpcMock = vi.fn();
 
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
-    from: () => ({
+    from: (table: string) => ({
       select: () => ({
         eq: () => ({
-          maybeSingle: maybeSingleMock,
+          maybeSingle: table === "members" ? memberMaybeSingleMock : resourceMaybeSingleMock,
         }),
       }),
     }),
@@ -34,16 +41,21 @@ import { createManualBooking } from "./pods";
 
 describe("createManualBooking", () => {
   beforeEach(() => {
-    maybeSingleMock.mockReset();
+    memberMaybeSingleMock.mockReset();
+    resourceMaybeSingleMock.mockReset();
     rpcMock.mockReset();
+    // Default: a resource that genuinely belongs to the gym under test —
+    // individual tests override this when the resource itself is the
+    // thing under test.
+    resourceMaybeSingleMock.mockResolvedValue({ data: { id: 7, gym: "Aylesbury Berryfields" }, error: null });
   });
 
   it("refuses to book a member into a gym they don't belong to", async () => {
     // The looked-up member genuinely belongs to a different gym than the
     // one the caller is trying to book them into.
-    maybeSingleMock.mockResolvedValue({ data: { id: 42, gym: "Basingstoke" }, error: null });
+    memberMaybeSingleMock.mockResolvedValue({ data: { id: 42, gym: "Basingstoke" }, error: null });
 
-    const result = await createManualBooking("Aylesbury Berryfields", 42, "2026-08-20T09:00:00.000Z");
+    const result = await createManualBooking("Aylesbury Berryfields", 7, 42, "2026-08-20T09:00:00.000Z");
 
     expect(result).toEqual({ status: "not_found" });
     // The whole point of the fix: create_booking() must never even be
@@ -52,24 +64,45 @@ describe("createManualBooking", () => {
   });
 
   it("refuses to book a member id that doesn't exist at all", async () => {
-    maybeSingleMock.mockResolvedValue({ data: null, error: null });
+    memberMaybeSingleMock.mockResolvedValue({ data: null, error: null });
 
-    const result = await createManualBooking("Aylesbury Berryfields", 999, "2026-08-20T09:00:00.000Z");
+    const result = await createManualBooking("Aylesbury Berryfields", 7, 999, "2026-08-20T09:00:00.000Z");
 
     expect(result).toEqual({ status: "not_found" });
     expect(rpcMock).not.toHaveBeenCalled();
   });
 
-  it("proceeds to book when the member genuinely belongs to that gym", async () => {
-    maybeSingleMock.mockResolvedValue({ data: { id: 42, gym: "Aylesbury Berryfields" }, error: null });
+  it("refuses to book against a resource that belongs to a different gym", async () => {
+    memberMaybeSingleMock.mockResolvedValue({ data: { id: 42, gym: "Aylesbury Berryfields" }, error: null });
+    resourceMaybeSingleMock.mockResolvedValue({ data: { id: 7, gym: "Basingstoke" }, error: null });
+
+    const result = await createManualBooking("Aylesbury Berryfields", 7, 42, "2026-08-20T09:00:00.000Z");
+
+    expect(result).toEqual({ status: "not_found" });
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("refuses to book against a resource id that doesn't exist at all", async () => {
+    memberMaybeSingleMock.mockResolvedValue({ data: { id: 42, gym: "Aylesbury Berryfields" }, error: null });
+    resourceMaybeSingleMock.mockResolvedValue({ data: null, error: null });
+
+    const result = await createManualBooking("Aylesbury Berryfields", 999, 42, "2026-08-20T09:00:00.000Z");
+
+    expect(result).toEqual({ status: "not_found" });
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("proceeds to book when both the member and resource genuinely belong to that gym", async () => {
+    memberMaybeSingleMock.mockResolvedValue({ data: { id: 42, gym: "Aylesbury Berryfields" }, error: null });
+    resourceMaybeSingleMock.mockResolvedValue({ data: { id: 7, gym: "Aylesbury Berryfields" }, error: null });
     rpcMock.mockResolvedValue({ data: 123, error: null });
 
-    const result = await createManualBooking("Aylesbury Berryfields", 42, "2026-08-20T09:00:00.000Z");
+    const result = await createManualBooking("Aylesbury Berryfields", 7, 42, "2026-08-20T09:00:00.000Z");
 
     expect(result).toEqual({ status: "ok", bookingId: 123 });
     expect(rpcMock).toHaveBeenCalledWith("create_booking", {
       p_member_id: 42,
-      p_gym: "Aylesbury Berryfields",
+      p_resource_id: 7,
       p_slot_start: "2026-08-20T09:00:00.000Z",
     });
   });

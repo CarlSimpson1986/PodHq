@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createSessionClient } from "@/lib/supabase/server";
 import { getGymScope } from "@/lib/auth/gym-scope";
-import { getPodSettings, updatePodSettings } from "@/lib/data/pods";
+import { getPodResourcesForGym, updatePodResourceSettings } from "@/lib/data/pods";
 import { podSettingsQuerySchema, updatePodSettingsSchema } from "@/lib/validation/pods";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { resolveGym } from "@/lib/auth/resolve-gym";
@@ -40,8 +40,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ status: "error", message: "A valid gym must be specified." }, { status: 400 });
     }
 
-    const settings = await getPodSettings(gym);
-    return NextResponse.json({ status: "ok", settings });
+    // Returns every resource for the gym now, not a single settings
+    // object — a gym can have more than one bookable resource (see
+    // pod_resources). The client picks which one it's editing.
+    const resources = await getPodResourcesForGym(gym);
+    return NextResponse.json({ status: "ok", resources });
   } catch (err) {
     console.error("[api/pods/settings GET]", { userId: user.id, error: err instanceof Error ? err.message : err });
     return NextResponse.json({ status: "error", message: "Something went wrong. Try again." }, { status: 500 });
@@ -86,14 +89,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: "error", message: "A valid gym must be specified." }, { status: 400 });
     }
 
-    const updated = await updatePodSettings(gym, {
+    const updated = await updatePodResourceSettings(parsed.data.resourceId, gym, {
       podCapacity: parsed.data.podCapacity,
       openHour: parsed.data.openHour,
       closeHour: parsed.data.closeHour,
     });
 
     if (!updated) {
-      return NextResponse.json({ status: "error", message: "This gym has no pod configured yet." }, { status: 404 });
+      return NextResponse.json({ status: "error", message: "Resource not found." }, { status: 404 });
     }
 
     return NextResponse.json({ status: "ok" });

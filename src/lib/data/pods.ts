@@ -17,12 +17,25 @@ export interface PodBooking {
   id: number;
   memberId: number;
   memberName: string;
+  resourceId: number;
   slotStart: string;
   status: "booked" | "cancelled" | "completed" | "no_show";
 }
 
-export interface PodSettings {
+// One row per bookable resource (a gym can have more than one — see
+// pod_resources, 0038_pod_resources.sql). accessProvider/creditType are
+// plain strings here, not a closed TS union yet — Milestone 1
+// (Berkhamsted) never produces anything but 'kisi'/'pod', and widening
+// this to a real union is Milestone 2's job once Brighton's 'pdk'/
+// 'recovery' values actually exist.
+export interface PodResource {
+  id: number;
   gym: GymName;
+  resourceKey: string;
+  label: string;
+  creditType: string;
+  slotDurationMinutes: number;
+  accessProvider: string;
   podCapacity: number;
   openHour: number;
   closeHour: number;
@@ -32,6 +45,8 @@ export interface AccessEvent {
   id: number;
   memberId: number;
   memberName: string;
+  resourceId: number | null;
+  resourceLabel: string | null;
   attemptedAt: string;
   success: boolean;
   kisiResponse: string | null;
@@ -59,31 +74,71 @@ export interface MemberBooking {
   status: "booked" | "cancelled" | "completed" | "no_show";
 }
 
-/** Null when this gym has no gym_kisi_mapping row — no pod configured yet. */
-export async function getPodSettings(gym: GymName): Promise<PodSettings | null> {
+/** Every bookable resource at a gym — empty array if none configured yet. Ordered by resource_key for a stable tab order. */
+export async function getPodResourcesForGym(gym: GymName): Promise<PodResource[]> {
   const admin = createAdminClient();
   const { data, error } = await admin
-    .from("gym_kisi_mapping")
-    .select("gym, pod_capacity, open_hour, close_hour")
+    .from("pod_resources")
+    .select("id, gym, resource_key, label, credit_type, slot_duration_minutes, access_provider, pod_capacity, open_hour, close_hour")
     .eq("gym", gym)
+    .order("resource_key");
+
+  if (error) throw error;
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    gym: row.gym as GymName,
+    resourceKey: row.resource_key,
+    label: row.label,
+    creditType: row.credit_type,
+    slotDurationMinutes: row.slot_duration_minutes,
+    accessProvider: row.access_provider,
+    podCapacity: row.pod_capacity,
+    openHour: row.open_hour,
+    closeHour: row.close_hour,
+  }));
+}
+
+export async function getPodResourceById(resourceId: number): Promise<PodResource | null> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("pod_resources")
+    .select("id, gym, resource_key, label, credit_type, slot_duration_minutes, access_provider, pod_capacity, open_hour, close_hour")
+    .eq("id", resourceId)
     .maybeSingle();
 
   if (error) throw error;
   if (!data) return null;
 
-  return { gym: data.gym as GymName, podCapacity: data.pod_capacity, openHour: data.open_hour, closeHour: data.close_hour };
+  return {
+    id: data.id,
+    gym: data.gym as GymName,
+    resourceKey: data.resource_key,
+    label: data.label,
+    creditType: data.credit_type,
+    slotDurationMinutes: data.slot_duration_minutes,
+    accessProvider: data.access_provider,
+    podCapacity: data.pod_capacity,
+    openHour: data.open_hour,
+    closeHour: data.close_hour,
+  };
 }
 
-export async function updatePodSettings(
+export async function updatePodResourceSettings(
+  resourceId: number,
   gym: GymName,
   settings: { podCapacity: number; openHour: number; closeHour: number }
 ): Promise<boolean> {
   const admin = createAdminClient();
+  // gym re-checked here, not just trusted from the caller's own scope
+  // resolution — same defensive shape as every other resource-scoped
+  // write in this file (createManualBooking, cancelBookingAsStaff).
   const { data, error } = await admin
-    .from("gym_kisi_mapping")
+    .from("pod_resources")
     .update({ pod_capacity: settings.podCapacity, open_hour: settings.openHour, close_hour: settings.closeHour })
+    .eq("id", resourceId)
     .eq("gym", gym)
-    .select("gym")
+    .select("id")
     .maybeSingle();
 
   if (error) throw error;
@@ -108,12 +163,14 @@ export async function getBookingsForGymAndDate(gym: GymName, date: Date): Promis
 
   const { data, error } = await admin
     .from("bookings")
-    .select("id, member_id, slot_start, status, members(name)")
+    .select("id, member_id, resource_id, slot_start, status, members(name)")
     .eq("gym", gym)
     .gte("slot_start", startOfDay.toISOString())
     .lt("slot_start", endOfDay.toISOString())
     .order("slot_start")
-    .returns<{ id: number; member_id: number; slot_start: string; status: PodBooking["status"]; members: { name: string } | null }[]>();
+    .returns<
+      { id: number; member_id: number; resource_id: number; slot_start: string; status: PodBooking["status"]; members: { name: string } | null }[]
+    >();
 
   if (error) throw error;
 
@@ -121,6 +178,7 @@ export async function getBookingsForGymAndDate(gym: GymName, date: Date): Promis
     id: row.id,
     memberId: row.member_id,
     memberName: row.members?.name ?? "Unknown member",
+    resourceId: row.resource_id,
     slotStart: row.slot_start,
     status: row.status,
   }));
@@ -130,7 +188,10 @@ export async function getBookingsForGymAndDate(gym: GymName, date: Date): Promis
  * Door-unlock attempts (success and blocked) for the "Access" log —
  * distinct from bookings: this is what actually happened at the door,
  * timestamped by attempted_at, not the booked slot_start. Filtered via
- * members.gym since pod_access_events itself has no gym column.
+ * members.gym since pod_access_events itself has no gym column. Resource
+ * is joined transitively via booking_id -> bookings.resource_id (kept
+ * off pod_access_events itself deliberately — low event volume, a join
+ * is cheap and avoids a second column to keep in sync).
  */
 export async function getAccessEventsForGym(gym: GymName, date: Date): Promise<AccessEvent[]> {
   const admin = createAdminClient();
@@ -141,7 +202,7 @@ export async function getAccessEventsForGym(gym: GymName, date: Date): Promise<A
 
   const { data, error } = await admin
     .from("pod_access_events")
-    .select("id, member_id, attempted_at, success, kisi_response, members!inner(name, gym)")
+    .select("id, member_id, attempted_at, success, kisi_response, members!inner(name, gym), bookings(resource_id, pod_resources(label))")
     .eq("members.gym", gym)
     .gte("attempted_at", startOfDay.toISOString())
     .lt("attempted_at", endOfDay.toISOString())
@@ -154,6 +215,7 @@ export async function getAccessEventsForGym(gym: GymName, date: Date): Promise<A
         success: boolean;
         kisi_response: string | null;
         members: { name: string } | null;
+        bookings: { resource_id: number; pod_resources: { label: string } | null } | null;
       }[]
     >();
 
@@ -163,6 +225,8 @@ export async function getAccessEventsForGym(gym: GymName, date: Date): Promise<A
     id: row.id,
     memberId: row.member_id,
     memberName: row.members?.name ?? "Unknown member",
+    resourceId: row.bookings?.resource_id ?? null,
+    resourceLabel: row.bookings?.pod_resources?.label ?? null,
     attemptedAt: row.attempted_at,
     success: row.success,
     kisiResponse: row.kisi_response,
@@ -236,6 +300,7 @@ export type CreateManualBookingResult =
 
 export async function createManualBooking(
   gym: GymName,
+  resourceId: number,
   memberId: number,
   slotStartIso: string
 ): Promise<CreateManualBookingResult> {
@@ -244,18 +309,23 @@ export async function createManualBooking(
   // Same ownership check as grantCreditToMember/cancelBookingAsStaff — the
   // member's real gym is looked up server-side rather than trusting the
   // caller's memberId to already belong to the gym they're booking for.
-  const { data: member, error: lookupError } = await admin
-    .from("members")
-    .select("id, gym")
-    .eq("id", memberId)
-    .maybeSingle();
+  // resourceId's own gym is checked too — a resourceId from a different
+  // gym than the caller's selected gym must be rejected here, since
+  // create_booking() itself derives gym from the resource and has no way
+  // to know the caller's intended gym was different.
+  const [memberResult, resourceResult] = await Promise.all([
+    admin.from("members").select("id, gym").eq("id", memberId).maybeSingle(),
+    admin.from("pod_resources").select("id, gym").eq("id", resourceId).maybeSingle(),
+  ]);
 
-  if (lookupError) throw lookupError;
-  if (!member || member.gym !== gym) return { status: "not_found" };
+  if (memberResult.error) throw memberResult.error;
+  if (resourceResult.error) throw resourceResult.error;
+  if (!memberResult.data || memberResult.data.gym !== gym) return { status: "not_found" };
+  if (!resourceResult.data || resourceResult.data.gym !== gym) return { status: "not_found" };
 
   const { data, error } = await admin.rpc("create_booking", {
     p_member_id: memberId,
-    p_gym: gym,
+    p_resource_id: resourceId,
     p_slot_start: slotStartIso,
   });
 
@@ -273,13 +343,15 @@ export async function getBookingsForGymAndRange(gym: GymName, start: Date, endEx
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("bookings")
-    .select("id, member_id, slot_start, status, members(name)")
+    .select("id, member_id, resource_id, slot_start, status, members(name)")
     .eq("gym", gym)
     .eq("status", "booked")
     .gte("slot_start", start.toISOString())
     .lt("slot_start", endExclusive.toISOString())
     .order("slot_start")
-    .returns<{ id: number; member_id: number; slot_start: string; status: PodBooking["status"]; members: { name: string } | null }[]>();
+    .returns<
+      { id: number; member_id: number; resource_id: number; slot_start: string; status: PodBooking["status"]; members: { name: string } | null }[]
+    >();
 
   if (error) throw error;
 
@@ -287,35 +359,43 @@ export async function getBookingsForGymAndRange(gym: GymName, start: Date, endEx
     id: row.id,
     memberId: row.member_id,
     memberName: row.members?.name ?? "Unknown member",
+    resourceId: row.resource_id,
     slotStart: row.slot_start,
     status: row.status,
   }));
 }
 
 export interface WaitlistCount {
+  resourceId: number;
   slotStart: string;
   count: number;
 }
 
-/** Same one-query-per-range-load shape as getBookingsForGymAndRange, so the Calendar grid can show a waiting count per slot without a click-through. */
+/** Same one-query-per-range-load shape as getBookingsForGymAndRange, so the Calendar grid can show a waiting count per slot without a click-through. Keyed by resourceId+slotStart — two resources sharing a slot_start must not merge counts. */
 export async function getWaitlistCountsForGymAndRange(gym: GymName, start: Date, endExclusive: Date): Promise<WaitlistCount[]> {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("waitlist_entries")
-    .select("slot_start")
+    .select("resource_id, slot_start")
     .eq("gym", gym)
     .eq("status", "waiting")
     .gte("slot_start", start.toISOString())
     .lt("slot_start", endExclusive.toISOString())
-    .returns<{ slot_start: string }[]>();
+    .returns<{ resource_id: number; slot_start: string }[]>();
 
   if (error) throw error;
 
-  const counts = new Map<string, number>();
+  const counts = new Map<string, { resourceId: number; slotStart: string; count: number }>();
   for (const row of data ?? []) {
-    counts.set(row.slot_start, (counts.get(row.slot_start) ?? 0) + 1);
+    const key = `${row.resource_id}|${row.slot_start}`;
+    const existing = counts.get(key);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      counts.set(key, { resourceId: row.resource_id, slotStart: row.slot_start, count: 1 });
+    }
   }
-  return Array.from(counts, ([slotStart, count]) => ({ slotStart, count }));
+  return Array.from(counts.values());
 }
 
 export interface SlotBookingEntry {
@@ -335,8 +415,17 @@ export interface SlotDetail {
   waitlist: SlotWaitlistEntry[];
 }
 
-/** Powers the Calendar's click-a-slot panel: who's booked (any status, so a cancelled row is still visible for context) and who's waiting, for one exact slot. */
-export async function getSlotDetail(gym: GymName, slotStartIso: string): Promise<SlotDetail> {
+/**
+ * Powers the Calendar's click-a-slot panel: who's booked (any status, so
+ * a cancelled row is still visible for context) and who's waiting, for
+ * one exact resource+slot. gym is required and filtered on directly
+ * (bookings/waitlist_entries both still carry their own gym column) —
+ * without it, a resourceId belonging to a *different* gym than the
+ * caller's resolved scope would leak that gym's slot detail, since
+ * resourceId alone carries no ownership check back to the caller's own
+ * gym scope.
+ */
+export async function getSlotDetail(gym: GymName, resourceId: number, slotStartIso: string): Promise<SlotDetail> {
   const admin = createAdminClient();
 
   const [bookingsResult, waitlistResult] = await Promise.all([
@@ -344,12 +433,14 @@ export async function getSlotDetail(gym: GymName, slotStartIso: string): Promise
       .from("bookings")
       .select("id, member_id, status, members(name)")
       .eq("gym", gym)
+      .eq("resource_id", resourceId)
       .eq("slot_start", slotStartIso)
       .returns<{ id: number; member_id: number; status: PodBooking["status"]; members: { name: string } | null }[]>(),
     admin
       .from("waitlist_entries")
       .select("member_id, members(name)")
       .eq("gym", gym)
+      .eq("resource_id", resourceId)
       .eq("slot_start", slotStartIso)
       .eq("status", "waiting")
       .returns<{ member_id: number; members: { name: string } | null }[]>(),
@@ -386,13 +477,16 @@ export type GrantCreditResult =
  * enforce here beyond the ledger being append-only. The member's real gym
  * is looked up server-side (never trusts a client-supplied gym for the
  * member itself), matching cancelBookingAsStaff's ownership-check pattern.
+ * creditType defaults to 'pod' — Milestone 1 never grants anything else;
+ * Brighton's Recovery-credit grants pass it explicitly once that exists.
  */
 export async function grantCreditToMember(
   gym: GymName,
   memberId: number,
   amount: number,
   actor: StaffActor,
-  catalogItemId?: string
+  catalogItemId?: string,
+  creditType = "pod"
 ): Promise<GrantCreditResult> {
   const admin = createAdminClient();
   const { data: member, error: lookupError } = await admin
@@ -406,10 +500,13 @@ export async function grantCreditToMember(
 
   const { error: insertError } = await admin
     .from("credits")
-    .insert({ member_id: memberId, amount, reason: "manual_grant", catalog_item_id: catalogItemId ?? null });
+    .insert({ member_id: memberId, amount, reason: "manual_grant", catalog_item_id: catalogItemId ?? null, credit_type: creditType });
   if (insertError) return { status: "error", message: insertError.message };
 
-  const { data: balance, error: balanceError } = await admin.rpc("get_credit_balance", { p_member_id: memberId });
+  const { data: balance, error: balanceError } = await admin.rpc("get_credit_balance", {
+    p_member_id: memberId,
+    p_credit_type: creditType,
+  });
   if (balanceError) throw balanceError;
 
   // Found in the 2026-08-16 OWASP audit: this is a real money-adjacent
@@ -420,7 +517,7 @@ export async function grantCreditToMember(
     email: actor.email,
     userId: actor.userId,
     eventType: "staff_credit_grant",
-    detail: JSON.stringify({ gym, memberId, amount }),
+    detail: JSON.stringify({ gym, memberId, amount, creditType }),
   });
 
   return { status: "ok", newBalance: (balance as number) ?? 0 };
