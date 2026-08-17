@@ -4,7 +4,7 @@ import { GYM_NAMES, type GymName } from "./types";
 import { getDefaultReportMonth, getRevenueTrend, shiftMonth } from "./dashboard";
 import { sumOtherIncomeForRange } from "./other-income";
 
-export type DateRangePreset = "last_month" | "qtd" | "last_quarter" | "ytd" | "full_year";
+export type DateRangePreset = "last_month" | "qtd" | "last_quarter" | "ytd" | "full_year" | "month";
 
 export interface MonthRange {
   start: string;
@@ -56,7 +56,11 @@ function monthCount(range: MonthRange): number {
  * "QTD" means "quarter containing the last completed month, through that
  * month", not "calendar quarter to date" in the usual sense.
  */
-export function resolveDateRange(preset: DateRangePreset, year?: number): { range: MonthRange; label: string } {
+export function resolveDateRange(
+  preset: DateRangePreset,
+  year?: number,
+  month?: string
+): { range: MonthRange; label: string } {
   const refMonth = getDefaultReportMonth();
   const refYear = Number(refMonth.slice(0, 4));
 
@@ -77,6 +81,15 @@ export function resolveDateRange(preset: DateRangePreset, year?: number): { rang
       const targetYear = year ?? refYear;
       const end = targetYear === refYear ? refMonth : `${targetYear}-12`;
       return { range: { start: `${targetYear}-01`, end }, label: `${targetYear}` };
+    }
+    case "month": {
+      // Clamped to refMonth, not just validated — the pipeline never has
+      // current-month data (see the note above this function), so a
+      // client-supplied month past the last completed one would otherwise
+      // silently return an all-zero summary that looks like a real gap
+      // rather than an out-of-range request.
+      const target = month && /^\d{4}-\d{2}$/.test(month) && month <= refMonth ? month : refMonth;
+      return { range: { start: target, end: target }, label: "Selected month" };
     }
   }
 }
@@ -274,9 +287,10 @@ async function sumOtherIncomeForRangeAnyGym(gym: GymName | null, range: MonthRan
 export async function getRevenueSummaryForRange(
   gym: GymName | null,
   preset: DateRangePreset,
-  year?: number
+  year?: number,
+  month?: string
 ): Promise<RevenueRangeSummary> {
-  const { range, label } = resolveDateRange(preset, year);
+  const { range, label } = resolveDateRange(preset, year, month);
 
   const sameRangeLastYear: MonthRange = {
     start: shiftMonth(range.start, -12),
@@ -285,9 +299,11 @@ export async function getRevenueSummaryForRange(
 
   // A same-length immediately-prior period is only meaningful for
   // fixed-length recent presets — YTD/full-year don't have an obvious
-  // "previous period" of the same shape, so we skip it for those.
+  // "previous period" of the same shape, so we skip it for those. "month"
+  // behaves like "last_month" here — both are a single-month range, just
+  // anchored to a client-chosen month instead of always the last one.
   const previousPeriod: MonthRange | null =
-    preset === "last_month" || preset === "qtd" || preset === "last_quarter"
+    preset === "last_month" || preset === "qtd" || preset === "last_quarter" || preset === "month"
       ? { start: shiftMonth(range.start, -monthCount(range)), end: shiftMonth(range.end, -monthCount(range)) }
       : null;
 

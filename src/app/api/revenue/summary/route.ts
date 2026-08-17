@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
     const parsed = revenueSummaryQuerySchema.safeParse({
       preset: searchParams.get("preset") ?? undefined,
       year: searchParams.get("year") ?? undefined,
+      month: searchParams.get("month") ?? undefined,
       gym: searchParams.get("gym") ?? undefined,
     });
 
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
     // client sends — only an admin's gym selection is actually honoured.
     const gym = scope.role === "owner" ? scope.gym : (parsed.data.gym ?? null);
 
-    const summary = await getRevenueSummaryForRange(gym, parsed.data.preset, parsed.data.year);
+    const summary = await getRevenueSummaryForRange(gym, parsed.data.preset, parsed.data.year, parsed.data.month);
     return NextResponse.json({ status: "ok", role: scope.role, gym, summary });
   } catch (err) {
     // A transient failure (token-refresh race, DB blip) — distinct from

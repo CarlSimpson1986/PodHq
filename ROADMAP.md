@@ -926,6 +926,67 @@ before moving to the next. Don't jump ahead to a later stage unprompted.
     the only app-side path that can ever fix this specific account's
     password, not a bug to keep re-diagnosing.
 
+27. **Revenue month drill-down, 2026-08-17** — picked up from the prior
+    session's explicit "next session" note: `/revenue` only ever offered
+    the 5 fixed presets, no way to view one arbitrary specific month.
+    Scoped to Revenue only for this pass (confirmed with the user rather
+    than assumed) — Member Insights' existing prev/next month stepper is
+    a separate, deliberately-untouched control.
+
+    Data layer: `DateRangePreset` gained a `"month"` value;
+    `resolveDateRange` clamps any requested month to the last completed
+    month server-side (the pipeline never has current-month data — a
+    later month would otherwise silently return an all-zero summary that
+    reads as a real gap rather than an out-of-range request), and treats
+    `"month"` like `"last_month"` for the previous-period comparison
+    (both are single-month ranges, just anchored differently). No new
+    query path needed for the actual figures — `RevenueRangeSummary`
+    already rendered a single month cleanly whenever `range.start ===
+    range.end`.
+
+    **UI went through a real revision, not built once and shipped**:
+    first pass was 5 pill buttons plus a bare native `<input type="month">`
+    inline — functionally fine, but the user disliked it on sight and
+    pointed at GymFlow's own Access Logs date-range control (a single
+    "Show: [range]" trigger opening a panel with preset shortcuts on the
+    left and a calendar on the right) as the actual reference. Rebuilt as
+    `date-range-dropdown.tsx`: a single trigger button (calendar icon +
+    live range label, same custom-listbox pattern as the existing
+    `GymSelect`, click-outside-to-close) opening a panel with the 5
+    presets as a vertical list on the left and a month-grid (not a full
+    day calendar — Revenue data is month-granularity only, a day picker
+    would offer nothing a day-level date can't back) on the right,
+    year-navigable via arrows. The year heading text is itself clickable
+    to jump straight to "Full year" for that year, rather than a second,
+    redundant year `<select>` sitting alongside the month grid.
+
+    **Real bug caught before it shipped, not live**: the year-heading
+    click was originally wired as two separate callbacks fired back to
+    back (`onPreset("full_year")` then `onYear(year)`) — each one trigger-
+    ing the parent's own `refetch` off its *own* render's closure values,
+    so the first call would refetch using the still-stale `year` state
+    and the second would refetch using the still-stale `preset` state
+    (React state updates don't apply mid-function-body — a classic stale-
+    closure trap, not something a type-check or lint pass catches).
+    Fixed by collapsing it into one combined `onSelectYear` callback that
+    sets both pieces of state and calls `refetch` exactly once with the
+    correct combined values.
+
+    Also fixed along the way: the dropdown trigger itself was originally
+    gated on `summary` being non-null, meaning a failed fetch (bad
+    network, transient error) would hide the *only* control that could
+    let the user pick a different filter to recover — moved the
+    displayed range into its own `range` state, updated only on a
+    successful fetch, so the trigger survives an error independently of
+    the rest of the page clearing.
+
+    `npx tsc --noEmit`, `eslint`, `next build`, and `npx vitest run` all
+    pass clean. **Not click-tested live** — podHq's login requires MFA,
+    which can't be scripted (same limitation noted throughout this file);
+    verified via local dev server startup + full build only, pushed to
+    production on the user's own explicit go-ahead after describing the
+    change rather than a live click-through.
+
 ## Database schema
 
 Two tables pre-date this project and were never created by our migrations — they
