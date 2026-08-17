@@ -893,6 +893,39 @@ before moving to the next. Don't jump ahead to a later stage unprompted.
     --noEmit`, `eslint`, `next build`, and `npx vitest run` all pass
     clean.
 
+26. **Shared Supabase Auth config gotcha found and fixed, 2026-08-17** —
+    no podHq code changed, but flagged here since it's this app's own
+    login flow that was broken. podHq and podhq-client share one Supabase
+    project's Auth settings, including a single project-wide **Site URL**
+    (used only as a fallback when a requested `emailRedirectTo` isn't in
+    the **Redirect URLs** allowlist — not a router). podhq-client's own
+    Site-URL fix (getting its confirmation emails off `localhost`, see its
+    ROADMAP) set that shared fallback to `https://podhq-client.vercel.app`,
+    and only *that* app's callback URL was ever added to the allowlist —
+    podHq's own `https://podhq.vercel.app/auth/callback` never was, even
+    though `src/app/api/auth/magic-link/route.ts` had always correctly
+    requested it (`${origin}/auth/callback`). Result: podHq's "send me a
+    link instead" silently redirected to podhq-client's sign-in page
+    instead, for as long as this repo has had a magic-link option. Fixed
+    by adding podHq's callback URL to the same shared allowlist (Supabase
+    dashboard — both apps' URLs coexist there fine, no per-app config
+    conflict). Verified live via an admin-generated link
+    (`admin.auth.admin.generateLink()`, bypassing the app's own rate
+    limiter which had been legitimately tripped by repeated testing) that
+    correctly landed on podHq afterward.
+
+    **Real account lockout hit and resolved along the way, structural not
+    a one-off**: the admin account (MFA-enrolled) got stuck because
+    podhq-client has no MFA support at all (deliberate pilot-scope
+    simplification) and Supabase requires an AAL2 (MFA-verified) session
+    to change a password on any MFA-enrolled account — so
+    podhq-client's own password-reset screen can never complete a change
+    for an account that's also a podHq admin/owner, no matter what's
+    entered. Resolved by changing the password through podHq instead
+    (full MFA support, reaches AAL2 normally) — worth remembering this is
+    the only app-side path that can ever fix this specific account's
+    password, not a bug to keep re-diagnosing.
+
 ## Database schema
 
 Two tables pre-date this project and were never created by our migrations — they
