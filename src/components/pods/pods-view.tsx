@@ -123,6 +123,7 @@ export function PodsView({
               <tr className="border-b border-card-border text-xs text-muted-foreground">
                 <th className="py-2 font-medium">Time</th>
                 <th className="py-2 font-medium">Member</th>
+                <th className="py-2 font-medium">Room</th>
                 <th className="py-2 font-medium">Status</th>
               </tr>
             </thead>
@@ -135,6 +136,7 @@ export function PodsView({
                       {e.memberName}
                     </Link>
                   </td>
+                  <td className="py-2 text-muted-foreground">{e.resourceLabel ?? "—"}</td>
                   <td className="py-2">
                     {e.success ? (
                       <span className="text-success">Entered</span>

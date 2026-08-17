@@ -11,12 +11,16 @@ export const podBookingsQuerySchema = z
 export const createManualBookingSchema = z
   .object({
     gym: z.enum(GYM_NAMES).optional(),
+    resourceId: z.number().int().positive(),
     memberId: z.number().int().positive(),
-    // On-the-hour, matching the DB check on bookings.slot_start.
+    // Minute-level here — the actual on-the-hour-or-half-hour alignment is
+    // resource-duration-specific (30 vs 60 min) and validated server-side
+    // by create_booking() itself, which is the only place that knows a
+    // given resource's slot_duration_minutes.
     slotStart: z.string().refine((v) => {
       const d = new Date(v);
-      return !Number.isNaN(d.getTime()) && d.getMinutes() === 0 && d.getSeconds() === 0 && d.getMilliseconds() === 0;
-    }, "Slot must be on the hour."),
+      return !Number.isNaN(d.getTime()) && d.getSeconds() === 0 && d.getMilliseconds() === 0;
+    }, "Invalid slot."),
   })
   .strict();
 
@@ -31,6 +35,7 @@ export const podCalendarQuerySchema = z
 export const podSlotQuerySchema = z
   .object({
     gym: z.enum(GYM_NAMES).optional(),
+    resourceId: z.coerce.number().int().positive(),
     slotStart: z.string().refine((v) => !Number.isNaN(new Date(v).getTime()), "Invalid slot."),
   })
   .strict();
@@ -59,6 +64,7 @@ export const podSettingsQuerySchema = z
 export const updatePodSettingsSchema = z
   .object({
     gym: z.enum(GYM_NAMES).optional(),
+    resourceId: z.number().int().positive(),
     podCapacity: z.number().int().min(1).max(50),
     openHour: z.number().int().min(0).max(23),
     closeHour: z.number().int().min(1).max(24),

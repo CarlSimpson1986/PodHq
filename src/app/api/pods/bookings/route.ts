@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: "error", message: "A valid gym must be specified." }, { status: 400 });
     }
 
-    const result = await createManualBooking(gym, parsed.data.memberId, parsed.data.slotStart);
+    const result = await createManualBooking(gym, parsed.data.resourceId, parsed.data.memberId, parsed.data.slotStart);
 
     if (result.status === "insufficient_credits") {
       return NextResponse.json(
