@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import type { CatalogItem, CatalogItemType } from "@/lib/data/catalog";
 import type { GymName } from "@/lib/data/types";
-import { GymSelect } from "@/components/ui/gym-select";
 
 const buttonClass =
   "rounded-md bg-gradient-to-r from-accent to-accent-hover px-3 py-1.5 text-xs font-medium text-accent-foreground disabled:opacity-50";
@@ -355,20 +354,22 @@ function CatalogSection({
 }
 
 export function CatalogView({
-  role,
-  initialGym,
+  gym,
   initialItems,
 }: {
-  role: "admin" | "owner";
-  initialGym: GymName | null;
+  gym: GymName | null;
   initialItems: CatalogItem[];
 }) {
-  const [gym, setGym] = useState<GymName | null>(initialGym);
   const [items, setItems] = useState(initialItems);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  // initialItems already covers the first render (owner's fixed gym, or
+  // admin landing with nothing selected) — only refetch on gym changes
+  // that happen after mount, so switching the shared selector doesn't
+  // cause a spurious extra fetch/loading-flash on load.
+  const isFirstRender = useRef(true);
 
-  function refetch(nextGym: GymName | null) {
+  const refetch = useCallback((nextGym: GymName | null) => {
     setError(null);
     if (!nextGym) {
       setItems([]);
@@ -387,12 +388,15 @@ export function CatalogView({
         setError("Something went wrong. Try again.");
       }
     });
-  }
+  }, []);
 
-  function handleGymChange(next: GymName | null) {
-    setGym(next);
-    refetch(next);
-  }
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    refetch(gym);
+  }, [gym, refetch]);
 
   return (
     <div className="space-y-6">
@@ -402,11 +406,6 @@ export function CatalogView({
           Credit packs and membership tiers staff can sell and members can buy. Disabling an item stops new sales but keeps
           its history intact — price changes never affect purchases or memberships already sold.
         </p>
-        {role === "admin" && (
-          <div className="mt-3">
-            <GymSelect value={gym} onChange={handleGymChange} disabled={isPending} />
-          </div>
-        )}
       </div>
 
       {error && <p className="text-sm text-danger">{error}</p>}
