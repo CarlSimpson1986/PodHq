@@ -1,9 +1,7 @@
 import { createSessionClient } from "@/lib/supabase/server";
 import { getGymScope } from "@/lib/auth/gym-scope";
 import { listCatalogItems } from "@/lib/data/catalog";
-import { CatalogView } from "@/components/setup/catalog-view";
-import { BrevoConfigView } from "@/components/setup/brevo-config-view";
-import { ResendConfigView } from "@/components/setup/resend-config-view";
+import { SetupShell } from "@/components/setup/setup-shell";
 import { AppShell } from "@/components/layout/app-shell";
 
 // "Admin" means the franchisor specifically in this app, and pricing is a
@@ -48,14 +46,8 @@ export default async function SetupPage() {
 
   return (
     <AppShell role={scope.role}>
-      <div className="mx-auto max-w-5xl px-4 py-8 space-y-6">
-        <CatalogView role={scope.role} initialGym={gym} initialItems={items} />
-        {scope.role === "admin" && (
-          <>
-            <BrevoConfigView initialGym={null} initialConfig={null} />
-            <ResendConfigView initialGym={null} initialConfig={null} />
-          </>
-        )}
+      <div className="mx-auto max-w-5xl px-4 py-8">
+        <SetupShell role={scope.role} initialGym={gym} initialItems={items} />
       </div>
     </AppShell>
   );

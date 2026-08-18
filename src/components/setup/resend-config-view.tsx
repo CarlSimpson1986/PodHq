@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { GymName } from "@/lib/data/types";
-import { GymSelect } from "@/components/ui/gym-select";
 
 const buttonClass =
   "rounded-md bg-gradient-to-r from-accent to-accent-hover px-3 py-1.5 text-xs font-medium text-accent-foreground disabled:opacity-50";
@@ -18,16 +17,10 @@ interface ResendConfigSummary {
 }
 
 // Admin-only, same reasoning as BrevoConfigView — never rendered for an
-// owner.
-export function ResendConfigView({
-  initialGym,
-  initialConfig,
-}: {
-  initialGym: GymName | null;
-  initialConfig: ResendConfigSummary | null;
-}) {
-  const [gym, setGym] = useState<GymName | null>(initialGym);
-  const [config, setConfig] = useState<ResendConfigSummary | null>(initialConfig);
+// owner. gym is controlled by the shared selector in setup-shell.tsx, not
+// managed locally, so switching gyms there scopes this card too.
+export function ResendConfigView({ gym }: { gym: GymName | null }) {
+  const [config, setConfig] = useState<ResendConfigSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -36,15 +29,15 @@ export function ResendConfigView({
   const [fromName, setFromName] = useState("");
   const [saving, setSaving] = useState(false);
 
-  function load(nextGym: GymName | null) {
+  const load = useCallback(() => {
     setError(null);
     setEditing(false);
-    if (!nextGym) {
+    if (!gym) {
       setConfig(null);
       return;
     }
     setLoading(true);
-    fetch(`/api/setup/resend?gym=${encodeURIComponent(nextGym)}`)
+    fetch(`/api/setup/resend?gym=${encodeURIComponent(gym)}`)
       .then((res) => res.json())
       .then((body) => {
         if (body.status !== "ok") {
@@ -55,12 +48,14 @@ export function ResendConfigView({
       })
       .catch(() => setError("Something went wrong. Try again."))
       .finally(() => setLoading(false));
-  }
+  }, [gym]);
 
-  function handleGymChange(next: GymName | null) {
-    setGym(next);
-    load(next);
-  }
+  useEffect(() => {
+    // Deferred a tick so load()'s own setState calls aren't reachable
+    // synchronously from the effect body itself — same fix as
+    // calendar-view.tsx's fetchRange, this project's established pattern.
+    queueMicrotask(load);
+  }, [load]);
 
   async function handleSave() {
     if (!gym) return;
@@ -85,7 +80,7 @@ export function ResendConfigView({
       setFromAddress("");
       setFromName("");
       setEditing(false);
-      load(gym);
+      load();
     } catch {
       setError("Something went wrong. Try again.");
     } finally {
@@ -95,15 +90,12 @@ export function ResendConfigView({
 
   return (
     <section className="card-glass p-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-sm font-semibold text-foreground">Transactional email (Resend)</h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Each gym has its own Resend account and quota. Key is stored encrypted and never shown again once saved.
-            A gym with nothing connected falls back to the shared default account rather than failing to send.
-          </p>
-        </div>
-        <GymSelect value={gym} onChange={handleGymChange} disabled={loading} />
+      <div>
+        <h2 className="text-sm font-semibold text-foreground">Transactional email (Resend)</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Each gym has its own Resend account and quota. Key is stored encrypted and never shown again once saved.
+          A gym with nothing connected falls back to the shared default account rather than failing to send.
+        </p>
       </div>
 
       {!gym ? (

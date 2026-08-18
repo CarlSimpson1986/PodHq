@@ -987,6 +987,52 @@ before moving to the next. Don't jump ahead to a later stage unprompted.
     production on the user's own explicit go-ahead after describing the
     change rather than a live click-through.
 
+28. **`/setup`'s three gym pickers merged into one, 2026-08-18** — surfaced
+    while scoping Hove's onboarding (new per-gym Resend + Brevo accounts,
+    each gym registered as its own business, subdomain DNS per gym). User
+    spotted it live via screenshot: `/setup`'s Catalog, Brevo, and Resend
+    cards each held their own independent gym-selector state, so picking
+    Hove in one did nothing for the other two — real busywork exactly when
+    onboarding touches all three in one sitting.
+
+    New `src/components/setup/setup-shell.tsx` owns a single `gym` state
+    and the page's only `GymSelect`; `CatalogView`, `BrevoConfigView`, and
+    `ResendConfigView` all changed from managing their own `gym`
+    state (with their own internal selector) to a plain controlled `gym`
+    prop from the shell. `CatalogView` keeps its existing "Setup — {gym}"
+    heading (shared by both roles); the shell adds nothing extra for an
+    owner, whose gym is fixed with no selector at all, unchanged from
+    before.
+
+    **Real lint fix needed, not just a mechanical prop change**: switching
+    Brevo/Resend from "fetch on selector onChange" to "fetch via
+    `useEffect` on a `gym` prop change" tripped `react-hooks/set-state-in-
+    effect` (the same stricter `eslint-plugin-react-hooks` from the
+    2026-08-16 dependency upgrade) — calling `load()`'s synchronous
+    `setLoading`/`setConfig` directly from the effect body. Fixed with this
+    project's own already-established pattern for exactly this
+    (`calendar-view.tsx`'s `fetchRange`): `queueMicrotask(load)` inside the
+    effect. `CatalogView`'s equivalent effect needed no such fix — its
+    existing first-render guard (skip refetch on mount, only refetch on a
+    later change) was already enough to keep the linter satisfied.
+
+    **Live-verified** against local dev (after two unrelated environment
+    snags fixed along the way, not app bugs: a stale MFA-incomplete
+    session left over in the browser profile from earlier testing —
+    logged out via a real `POST /api/auth/logout` call, since the route
+    only accepts POST and a plain GET navigation silently no-ops; then a
+    stale unversioned JS chunk cached by Chrome from a previous day's dev
+    server, mismatched against the freshly-restarted server after clearing
+    `.next` — a hard reload fixed it, no code change involved). With a
+    real admin session, selecting **Hove** in the one shared selector
+    correctly scoped all four sections at once: "Setup — Hove", empty
+    Credit packs/Membership tiers, and both Brevo/Resend showing "not
+    connected for this gym yet" with live Connect buttons. `npx tsc
+    --noEmit` and `eslint` pass clean on all changed files.
+
+    Hove's actual Resend/Brevo account creation itself is still pending —
+    this only fixed the setup page's own UX gap ahead of doing that.
+
 ## Database schema
 
 Two tables pre-date this project and were never created by our migrations — they
