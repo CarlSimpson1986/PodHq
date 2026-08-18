@@ -1033,6 +1033,47 @@ before moving to the next. Don't jump ahead to a later stage unprompted.
     Hove's actual Resend/Brevo account creation itself is still pending —
     this only fixed the setup page's own UX gap ahead of doing that.
 
+    **Same-day follow-up: real infrastructure bug found and fixed while
+    actually using the fixed page.** The very first live Save attempt (Hove's
+    Brevo card) returned "Something went wrong" with no useful detail —
+    traced via `vercel logs` (Vercel CLI, already authenticated from prior
+    `vercel --prod` deploys) to a genuine 500: `SECRET_ENCRYPTION_KEY is not
+    configured`. That variable had **never been added to podHq's Production
+    environment at all** — confirmed via `vercel env ls production`, not
+    assumed — meaning every per-gym Brevo/Resend save had been silently
+    broken in production since the feature shipped 2026-08-16; nothing had
+    ever hit this failure before because nothing had ever been saved
+    successfully, hence `gym_resend_config`/`gym_brevo_config` still showing
+    0 rows in every prior verification note. Checking further found
+    **podhq-client's Production environment was missing the same variable
+    too** — it never had one, since it only started needing it once this
+    feature existed. Both matter: podHq encrypts (and, for Brevo only, also
+    decrypts, since podHq itself syncs to Brevo directly) while podhq-client
+    decrypts Resend configs specifically to send real member-facing email —
+    Brevo is never touched by podhq-client at all.
+
+    Fixed by generating a fresh key and adding it to both projects' Vercel
+    Production env plus both local `.env.local` files, then redeploying
+    both (`vercel --prod` doesn't retroactively apply new env vars to an
+    already-running deployment — a fresh one is required). The key ended up
+    rotated twice more after that, unrelated to the underlying bug: the
+    VS Code Claude Code extension surfaces whatever text is selected/
+    cursor-adjacent in an open editor tab as conversation context
+    automatically, and `.env.local` being open in VS Code during this
+    session leaked the value into chat twice by accident (once via a
+    highlighted line, once via just cursor movement) — worth remembering
+    for any future secret-rotation work done with that extension active:
+    close the file, don't just avoid deliberately pasting it.
+
+    **Fully live-verified after the real fix**: both Brevo (list ID 2) and
+    Resend (`hello@hove.myfitpod.co.uk`) saved for Hove — confirmed via
+    `vercel logs` showing real `POST /api/setup/brevo` and
+    `POST /api/setup/resend` requests returning 200 in production, not just
+    trusting the UI's own success state. Hove's actual DNS verification
+    (SPF/DKIM for `hove.myfitpod.co.uk`) is still outstanding, so real sends
+    through Hove's own Resend account won't work until that's done — but
+    the stored config itself is confirmed correct and encrypted.
+
 ## Database schema
 
 Two tables pre-date this project and were never created by our migrations — they
