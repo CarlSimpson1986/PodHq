@@ -28,7 +28,14 @@ export async function createSessionClient() {
               ...options,
               httpOnly: true,
               secure: true,
-              sameSite: "strict",
+              // Lax, not strict — a top-level cross-site redirect back into
+              // this app (Stripe Connect's Account Link return_url) has
+              // Strict cookies silently withheld by the browser, which
+              // logs the admin out mid-flow. Lax still blocks cross-site
+              // POST/CSRF, just not this GET redirect. Same fix podhq-
+              // client already applied for its own Stripe Checkout
+              // success_url redirect (Stage 4).
+              sameSite: "lax",
             });
           });
         } catch {
