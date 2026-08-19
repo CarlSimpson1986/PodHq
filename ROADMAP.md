@@ -1074,6 +1074,78 @@ before moving to the next. Don't jump ahead to a later stage unprompted.
     through Hove's own Resend account won't work until that's done — but
     the stored config itself is confirmed correct and encrypted.
 
+29. **Stripe Connect — Hove pilot (per-gym payment separation), 2026-08-19** —
+    built at the user's request: today every gym shares one Stripe account,
+    which has no concept of "which gym" a payment belongs to at all, only
+    reconstructed after the fact from `member.gym`. The user wants real
+    per-gym separation (own balance, own payouts, franchisees able to
+    refund their own clients directly), via Stripe Connect, piloted on
+    **Hove** first since it isn't open yet. Full detail (including
+    podhq-client's half — checkout/webhook routing) lives in its own
+    ROADMAP.md; this entry covers podHq's half.
+
+    Confirmed with the user before building: Hove has no existing Stripe
+    account, so this uses **Connect Onboarding** (a brand-new Standard
+    account) rather than OAuth-linking an existing one; connecting a gym
+    is **admin-only** in `/setup`, same pattern as the existing Resend/
+    Brevo cards; **direct charges**; and **franchisees must be able to
+    refund their own clients from podHq** — the one hard requirement.
+    `src/app/api/pods/refund/route.ts` already scoped an `owner` correctly
+    to their own gym (`lookup.memberGym !== scope.gym` → 404); the only
+    real gap was `stripe.refunds.create()` always hitting the platform
+    account regardless of which Stripe account actually processed the
+    payment.
+
+    `supabase/migrations/0040_gym_stripe_config.sql` (written and
+    **applied 2026-08-19**) — `gym_stripe_config`: `gym` (unique), `stripe_account_id`
+    (not a secret, unlike the Resend/Brevo keys — no encryption needed,
+    unlike `secret-encryption.ts`), `onboarding_complete`. A gym with no
+    row (every gym today) falls back to the shared platform account
+    exactly as before — not a breaking change for anyone but Hove.
+
+    `src/lib/data/stripe-connect-config.ts` — `startStripeConnectOnboarding`
+    creates the Standard account + a fresh Account Link,
+    `completeStripeConnectReturn` re-checks `details_submitted` against
+    the real Stripe object rather than trusting the redirect alone (same
+    "don't trust the redirect, check real state" reasoning podhq-client's
+    own Stripe Checkout `success_url` already established),
+    `getStripeAccountId` is the read used by the refund route below. New
+    `GET/POST /api/setup/stripe-connect` (admin-only, same
+    `getGymScope`/rate-limit pattern as `/api/setup/resend`) and its
+    `/return` callback route, which Stripe's Account Link redirects back
+    to. New `StripeConnectView` card in `/setup`'s `SetupShell`, next to
+    Resend/Brevo. New `setup_stripe_connect_started` added to
+    `AuthEventType` in `src/lib/audit.ts` — no migration needed, same as
+    every prior addition to that union, since `auth_events.event_type`'s
+    CHECK constraint was dropped back in `0006_auth_events_lockout_reset.sql`.
+
+    `src/app/api/pods/refund/route.ts` now looks up the paying gym's
+    `stripe_account_id` via the same `stripe-connect-config.ts` and passes
+    `{ stripeAccount }` into `stripe.refunds.create()` when present — no
+    role/scoping change needed, the existing owner-locked-to-own-gym check
+    already did the right thing, this only fixes *which* Stripe account
+    the refund call actually hits.
+
+    **Flagged, not built this pass**: the staff "charge card on file" sell
+    panel (`/pods/members/[id]`, Stage 21) stays platform-account only — a
+    saved card lives on the platform account's Customer object today, and
+    charging it against a connected account instead is a separate, larger
+    change (Customer/payment methods don't automatically carry over
+    between Stripe accounts).
+
+    **Not yet live-tested — two of the three manual steps outstanding**:
+    (1) migration applied ✓, (2) Connect enabled on the Stripe platform
+    account (Standard accounts, direct funds flow, Stripe-hosted onboarding
+    + Stripe Dashboard for account management) ✓; (3) **this app's own
+    `STRIPE_SECRET_KEY` is a deliberately restricted key (`Charges: read,
+    Refunds: write` only, per its own `src/lib/stripe.ts`) — creating
+    connected accounts needs the `Connect` write permission added to that
+    same restricted key**, still outstanding, or the onboarding calls will
+    fail with a permissions error. Once that's done: apply the fourth step
+    (webhook "listen to connected accounts" toggle) after deploying, then
+    connect Hove for real via `/setup`. `npx tsc --noEmit`, `eslint`, and
+    `next build` all pass clean.
+
 ## Database schema
 
 Two tables pre-date this project and were never created by our migrations — they
@@ -1148,6 +1220,14 @@ since 0009 but unused until now) if cancelled more than 2 hours before
 `slot_start`, forfeits it otherwise — atomically via `for update` on the
 booking row, same race-safety concern `create_booking()` already handles
 with its advisory lock. No table/column changes, function-only.
+
+**`0040_gym_stripe_config.sql` written and applied 2026-08-19**
+(per the shared-schema rule — flagged on both sides): new table,
+`gym` (unique) / `stripe_account_id` / `onboarding_complete`, for the new
+Stripe Connect per-gym payment separation feature (Stage 29 above). Not a
+secret column — `stripe_account_id` is visible in Stripe's own Dashboard
+UI — so no encryption, unlike `gym_resend_config`/`gym_brevo_config`'s
+`api_key_encrypted`.
 
 **`Revenue`** (capital R — quote in SQL: `public."Revenue"`)
 

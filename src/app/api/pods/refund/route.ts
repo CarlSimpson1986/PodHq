@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createSessionClient } from "@/lib/supabase/server";
 import { getGymScope } from "@/lib/auth/gym-scope";
 import { lookupRefundableTransaction } from "@/lib/data/refunds";
+import { getStripeAccountId } from "@/lib/data/stripe-connect-config";
 import { getStripeClient } from "@/lib/stripe";
 import { createRefundSchema } from "@/lib/validation/refunds";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -64,7 +65,17 @@ export async function POST(request: NextRequest) {
     }
 
     const stripe = getStripeClient();
-    const refund = await stripe.refunds.create({ payment_intent: lookup.paymentIntentId });
+    // A payment processed on a gym's own connected account (Stripe Connect)
+    // only exists there, not on the platform account — refunds.create()
+    // needs to be told which account to look in, or it 404s ("no such
+    // payment_intent") even though the payment is perfectly real. null
+    // (the platform account) is passed through as undefined, matching
+    // every gym's behaviour before Connect existed.
+    const stripeAccountId = await getStripeAccountId(lookup.memberGym);
+    const refund = await stripe.refunds.create(
+      { payment_intent: lookup.paymentIntentId },
+      stripeAccountId ? { stripeAccount: stripeAccountId } : undefined
+    );
 
     if (user.email) {
       await logAuthEvent({
