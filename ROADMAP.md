@@ -1133,18 +1133,61 @@ before moving to the next. Don't jump ahead to a later stage unprompted.
     change (Customer/payment methods don't automatically carry over
     between Stripe accounts).
 
-    **Not yet live-tested — two of the three manual steps outstanding**:
-    (1) migration applied ✓, (2) Connect enabled on the Stripe platform
-    account (Standard accounts, direct funds flow, Stripe-hosted onboarding
-    + Stripe Dashboard for account management) ✓; (3) **this app's own
-    `STRIPE_SECRET_KEY` is a deliberately restricted key (`Charges: read,
-    Refunds: write` only, per its own `src/lib/stripe.ts`) — creating
-    connected accounts needs the `Connect` write permission added to that
-    same restricted key**, still outstanding, or the onboarding calls will
-    fail with a permissions error. Once that's done: apply the fourth step
-    (webhook "listen to connected accounts" toggle) after deploying, then
-    connect Hove for real via `/setup`. `npx tsc --noEmit`, `eslint`, and
-    `next build` all pass clean.
+    **All four manual steps done, and Hove is genuinely connected —
+    live-verified 2026-08-19.** Migration applied; Connect enabled on the
+    platform account (Standard, direct funds flow, Stripe-hosted
+    onboarding); a fresh restricted key created under the **new**
+    `admin@myfitpod...` platform account specifically (not the old
+    Aylesbury-tied test key this app had been using since the pilot) with
+    `Charges: read`, `Refunds: write`, `Accounts: write`, `Account Links:
+    write`; webhook "listen to connected accounts" not yet toggled (no
+    live payment tested yet, only account creation/onboarding — flagged
+    below). Connected Hove through the real `/setup` UI, completed
+    Stripe's hosted onboarding with test data (UK test sort code `10-88-00`
+    / account `00012345`, from Stripe's own documented test-bank-account
+    list — a plausible-but-fake sort code fails Stripe's own format
+    validation even in test mode).
+
+    **Real bug found and fixed during this test**: `src/lib/supabase/
+    server.ts` and `src/lib/supabase/middleware.ts` both set session
+    cookies with `sameSite: "strict"` — this app had never hit the failure
+    mode before (no prior feature sent the browser on a top-level
+    cross-site redirect and back), but Stripe Connect's Account Link
+    return_url is exactly that, and Strict cookies are silently withheld
+    by the browser on the way back, logging the admin out mid-flow.
+    **Same bug class podhq-client already found and fixed in its own Stage
+    4** (Stripe Checkout's success_url redirect) — should have been
+    applied here proactively when this feature was built, not found
+    reactively. Fixed by switching both to `sameSite: "lax"`.
+
+    That cookie bug meant the onboarding-complete signal never reached
+    `completeStripeConnectReturn` on the first real attempt, even though
+    Stripe's own account was genuinely fully onboarded — confirmed by
+    querying Stripe directly (bypassing the browser entirely, via a
+    throwaway script using the same `node --env-file=.env.local` pattern
+    as `reset-pilot-password.mjs`): `details_submitted: true,
+    charges_enabled: true, payouts_enabled: true`, zero outstanding
+    requirements, for `acct_1U6B6KPLmj2HICwn`. `gym_stripe_config`'s
+    `onboarding_complete` was out of sync with that real state (still
+    `false`) — synced directly to `true` by the same script rather than
+    re-doing the onboarding form a second time. Script deleted after use.
+
+    **A separate, real hydration bug in `/setup` was also found this
+    session, not yet root-caused or fixed** — `SetupShell` mismatches on a
+    cold/fresh load specifically when `initialGym` is `null` (an admin's
+    first load before picking a gym), reproducible independent of any dev-
+    server restart. Non-fatal (React recovers and the page still works,
+    confirmed live), but flagged as real outstanding work, not swept under
+    the stale-bundle explanation that covered the *other* symptoms this
+    session.
+
+    **Also still outstanding, not built this pass**: linking an
+    **existing** Stripe account (OAuth), for a franchisee who already has
+    one rather than needing a brand-new Connect Onboarding account created
+    for them — Hove specifically had no existing account so this wasn't
+    needed for it, but it's a real gap for future gyms and was raised
+    directly by the user during this session. `npx tsc --noEmit` and
+    `eslint` pass clean on the cookie fix.
 
 ## Database schema
 

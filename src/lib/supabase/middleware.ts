@@ -51,7 +51,8 @@ export async function updateSession(request: NextRequest) {
             ...options,
             httpOnly: true,
             secure: true,
-            sameSite: "strict",
+            // Lax, not strict — see src/lib/supabase/server.ts for why.
+            sameSite: "lax",
           })
         );
       },
