@@ -1189,6 +1189,22 @@ before moving to the next. Don't jump ahead to a later stage unprompted.
     directly by the user during this session. `npx tsc --noEmit` and
     `eslint` pass clean on the cookie fix.
 
+    **Clarified 2026-08-20 while setting up webhooks: podhq-client has no
+    live payment traffic yet at all** — GymFlow is still the real,
+    live payment system for every gym; podhq-client hasn't launched for
+    any of them, and Hove is the only gym in this Connect pilot. An
+    earlier note in this same session wrongly assumed other gyms had
+    real checkout traffic depending on the shared platform-account
+    webhook right now — corrected directly by the user. The stated
+    go-forward plan is every future gym onboards via its own Connect
+    account from day one, so the platform-account fallback path in the
+    code (`getGymStripeAccountId` returning `null`) may end up rarely or
+    never exercised for real traffic. Decision: **only the Connect
+    ("Connected accounts") webhook endpoint is being set up for this
+    pilot** — the "Your account" platform endpoint is deferred, not
+    urgent, since nothing live depends on it today. Add it later only if
+    a real gym actually ends up needing the platform fallback path.
+
     **Restricted-key permissions scoped 2026-08-20, neither key created
     yet.** A prior session (lost mid-discussion to a power cut before it
     reached ROADMAP.md or a commit) worked out the permission split for
