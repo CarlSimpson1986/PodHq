@@ -73,6 +73,10 @@ export function CalendarView({
 
   const [editingSettings, setEditingSettings] = useState(false);
   const resource = resources.find((r) => r.id === resourceId) ?? null;
+  // Week/Day grid rows — only the resource's actual open hours, not the
+  // full 0-23 constant (that one stays as-is for the settings dropdowns,
+  // which need every hour selectable regardless of the current setting).
+  const visibleHours = resource ? HOURS.filter((h) => h >= resource.openHour && h < resource.closeHour) : HOURS;
   const [capacityDraft, setCapacityDraft] = useState(resource?.podCapacity ?? 1);
   const [openHourDraft, setOpenHourDraft] = useState(resource?.openHour ?? 0);
   const [closeHourDraft, setCloseHourDraft] = useState(resource?.closeHour ?? 24);
@@ -380,7 +384,7 @@ export function CalendarView({
               </tr>
             </thead>
             <tbody>
-              {HOURS.map((hour) => (
+              {visibleHours.map((hour) => (
                 <tr key={hour}>
                   <td className="border border-card-border bg-card p-1.5 text-right text-muted-foreground">{formatHour(hour)}</td>
                   {dayColumns.map((day) => {
