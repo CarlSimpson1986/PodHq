@@ -220,7 +220,7 @@ export async function compMembership(
 }
 
 export type CreateCheckoutResult =
-  | { status: "ok"; clientSecret: string }
+  | { status: "ok"; clientSecret: string; stripeAccountId: string | null }
   | { status: "not_found" }
   | { status: "already_active" }
   | { status: "unknown_item" }
@@ -286,7 +286,7 @@ export async function createPackCheckoutSession(
       detail: JSON.stringify({ gym, memberId, itemId: packId, type: "credit_pack", priceGBP }),
     });
 
-    return { status: "ok", clientSecret: session.client_secret };
+    return { status: "ok", clientSecret: session.client_secret, stripeAccountId };
   } catch (err) {
     return { status: "error", message: err instanceof Error ? err.message : "Stripe error." };
   }
@@ -382,7 +382,7 @@ export async function createMembershipCheckoutSession(
       detail: JSON.stringify({ gym, memberId, itemId: tierId, type: "membership", priceGBP, discountMode }),
     });
 
-    return { status: "ok", clientSecret: session.client_secret };
+    return { status: "ok", clientSecret: session.client_secret, stripeAccountId };
   } catch (err) {
     return { status: "error", message: err instanceof Error ? err.message : "Stripe error." };
   }

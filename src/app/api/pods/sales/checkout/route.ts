@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: "error", message: "Could not start checkout." }, { status: 500 });
     }
 
-    return NextResponse.json({ status: "ok", clientSecret: result.clientSecret });
+    return NextResponse.json({ status: "ok", clientSecret: result.clientSecret, stripeAccountId: result.stripeAccountId });
   } catch (err) {
     console.error("[api/pods/sales/checkout POST]", { userId: user.id, error: err instanceof Error ? err.message : err });
     return NextResponse.json({ status: "error", message: "Something went wrong. Try again." }, { status: 500 });

@@ -1,16 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { loadStripe } from "@stripe/stripe-js";
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe-js";
 import type { GymName } from "@/lib/data/types";
 import type { ActiveMembership } from "@/lib/data/sales";
 import type { CatalogItem } from "@/lib/data/catalog";
-
-const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
-  ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
-  : null;
 
 const buttonClass =
   "rounded-md bg-gradient-to-r from-accent to-accent-hover px-3 py-1.5 text-xs font-medium text-accent-foreground disabled:opacity-50";
@@ -55,7 +51,24 @@ export function SellPanel({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [stripeAccountId, setStripeAccountId] = useState<string | null>(null);
   const [savedCardCharged, setSavedCardCharged] = useState(false);
+
+  // Stripe.js itself needs to know which connected account a Checkout
+  // Session belongs to, separately from the server-side session creation —
+  // a session created against Hove's account via `stripeAccount` 404s here
+  // otherwise ("provided key does not have access to account..."), even
+  // though the server-side call succeeded. Memoized on stripeAccountId
+  // (only changes once, when a checkout starts) rather than recreated
+  // every render, per Stripe's own guidance not to call loadStripe() on
+  // every render.
+  const stripePromise = useMemo(() => {
+    if (!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) return null;
+    return loadStripe(
+      process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
+      stripeAccountId ? { stripeAccount: stripeAccountId } : undefined
+    );
+  }, [stripeAccountId]);
 
   const catalog = itemType === "credit_pack" ? creditPacks : membershipTiers;
   const selected = catalog.find((i) => i.itemId === itemId) ?? catalog[0];
@@ -133,6 +146,7 @@ export function SellPanel({
         setError(body.message ?? "Could not start checkout.");
         return;
       }
+      setStripeAccountId(body.stripeAccountId ?? null);
       setClientSecret(body.clientSecret);
     } catch {
       setError("Something went wrong. Try again.");
@@ -177,6 +191,7 @@ export function SellPanel({
   function cancel() {
     setOpen(false);
     setClientSecret(null);
+    setStripeAccountId(null);
     setError("");
   }
 
