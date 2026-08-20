@@ -1204,41 +1204,43 @@ before moving to the next. Don't jump ahead to a later stage unprompted.
     this note is just the key permissions that design needs to actually
     run.
 
-    **Correction, same day**: Stripe's restricted-key permission grid
-    actually has *two* independent columns per resource — one for direct
-    (platform-account) requests, and a separate one that applies only
-    when the key is used with the `Stripe-Account` header (i.e. against
-    a connected account). Confirmed against Stripe's own docs, not
-    assumed. Both columns need enabling for every resource a key
-    actually calls against a connected account — a plain "Write"
-    checkbox alone isn't enough.
+    **Live-dashboard permission model, confirmed by the user while
+    actually creating the keys (this took two corrections to land on —
+    documented in full for whoever hits this next):** each resource in
+    the restricted-key creation screen needs **both** its direct
+    None/Read/Write permission **and** a separate Connect permission
+    granted — not just the one setting. An initial pass wrongly
+    simplified this down to "one setting governs both" after a
+    momentary misreading of the user's own live observation; that was
+    wrong, corrected immediately by the user watching the real screen.
+    Trust the live-observed dashboard behaviour recorded here over
+    anything found via docs search if the two ever disagree again.
 
     **podHq's key** (`src/lib/stripe.ts` — staff sell/comp panel +
     refunds + Connect account management): Checkout Sessions, Coupons,
-    Customers, Payment Intents, Products, Subscriptions, Refunds — all
-    **Write** (Customers can be Read-only), **with the Connect-column
-    permission also enabled** for all of those, since every one of them
-    now runs against a connected account whenever the target gym has
-    one (see the `sales.ts` fix directly below). Plus **Accounts
-    (Write)** and **Account Links (Write)** for Connect account
-    creation/onboarding itself — these two are direct-only, there's no
-    "connected account" version of "create an account." No `Charges`
-    permission is actually required by any code path (`refunds.create`
-    takes a `payment_intent`, not a charge) despite this app's doc-
-    comment previously saying "Charges: read, Refunds: write" — that
-    comment predated Stage 21's sell/comp panel and has now been
-    corrected in `stripe.ts` directly.
+    Payment Intents, Products, Subscriptions, Refunds — **Write**, plus
+    their **Connect permission enabled**, since every one of these now
+    runs against a connected account whenever the target gym has one
+    (see the `sales.ts` fix directly below). Customers — **Read**, plus
+    Connect enabled. Accounts and Account Links — **Write**, direct only
+    (Connect account creation/onboarding is inherently a platform-only
+    operation, nothing to enable there). No `Charges` permission is
+    actually required by any code path (`refunds.create` takes a
+    `payment_intent`, not a charge) despite this app's doc-comment
+    previously saying "Charges: read, Refunds: write" — that comment
+    predated Stage 21's sell/comp panel and has now been corrected in
+    `stripe.ts` directly.
 
     **podhq-client's key** (`src/lib/stripe.ts` — member-facing checkout
-    + webhook): Checkout Sessions, Customers, Subscriptions — Write,
-    with the Connect-column permission enabled on all three (self-
-    service checkout already routes through `stripeAccount` for a
-    connected gym); Invoice Payments, Payment Intents — Read, same
-    Connect-column requirement (both are read back inside the webhook
-    via `connectRequestOptions` when `event.account` is set). No
-    Refunds permission needed at all — refunds are only ever issued
-    from podHq's `/api/pods/refund`, this app only reacts to the
-    resulting `charge.refunded` webhook event to correct the ledger.
+    + webhook): Checkout Sessions, Customers, Subscriptions — **Write**,
+    plus Connect enabled on all three (self-service checkout already
+    routes through `stripeAccount` for a connected gym). Invoice
+    Payments, Payment Intents — **Read**, plus Connect enabled (both are
+    read back inside the webhook via `connectRequestOptions` when
+    `event.account` is set). No Refunds permission needed at all —
+    refunds are only ever issued from podHq's `/api/pods/refund`, this
+    app only reacts to the resulting `charge.refunded` webhook event to
+    correct the ledger.
 
     **Real gap found and fixed same day: `src/lib/data/sales.ts` (the
     staff sell/comp panel) never routed through a gym's connected
