@@ -18,6 +18,13 @@ export interface CatalogItem {
   label: string;
   credits: number;
   creditType: string;
+  // Combo memberships only (e.g. Hove's Gym+Recovery Room package) — a
+  // second credit grant alongside the primary one, both funded by the
+  // same single Stripe subscription. Null for every ordinary item. See
+  // 0042_catalog_items_combo_credits.sql for why this lives here rather
+  // than on the memberships table.
+  creditsSecondary: number | null;
+  creditTypeSecondary: string | null;
   priceGBP: number;
   enabled: boolean;
   oneTimePerMember: boolean;
@@ -32,6 +39,8 @@ function mapRow(row: {
   label: string;
   credits: number;
   credit_type: string;
+  credits_secondary: number | null;
+  credit_type_secondary: string | null;
   price_gbp: number;
   enabled: boolean;
   one_time_per_member: boolean;
@@ -45,6 +54,8 @@ function mapRow(row: {
     label: row.label,
     credits: row.credits,
     creditType: row.credit_type,
+    creditsSecondary: row.credits_secondary,
+    creditTypeSecondary: row.credit_type_secondary,
     priceGBP: row.price_gbp,
     enabled: row.enabled,
     oneTimePerMember: row.one_time_per_member,
@@ -97,6 +108,8 @@ export async function createCatalogItem(input: {
   label: string;
   credits: number;
   creditType?: string;
+  creditsSecondary?: number;
+  creditTypeSecondary?: string;
   priceGBP: number;
   oneTimePerMember?: boolean;
 }): Promise<CreateCatalogItemResult> {
@@ -125,6 +138,8 @@ export async function createCatalogItem(input: {
       label: input.label,
       credits: input.credits,
       credit_type: input.creditType ?? "pod",
+      credits_secondary: input.creditsSecondary ?? null,
+      credit_type_secondary: input.creditTypeSecondary ?? null,
       price_gbp: input.priceGBP,
       one_time_per_member: input.oneTimePerMember ?? false,
     })
