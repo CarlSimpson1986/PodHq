@@ -55,6 +55,14 @@ export const grantCreditSchema = z
   })
   .strict();
 
+export const setFoundingMemberSchema = z
+  .object({
+    gym: z.enum(GYM_NAMES).optional(),
+    memberId: z.number().int().positive(),
+    foundingMember: z.boolean(),
+  })
+  .strict();
+
 export const podSettingsQuerySchema = z
   .object({
     gym: z.enum(GYM_NAMES).optional(),
