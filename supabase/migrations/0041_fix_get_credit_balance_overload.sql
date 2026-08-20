@@ -1,0 +1,17 @@
+-- 0039_pod_resources_functions.sql widened get_credit_balance() with a
+-- defaulted p_credit_type param via `create or replace function`, on the
+-- assumption that a default parameter value would replace the original
+-- 1-arg function (0019). It doesn't — Postgres resolves function overloads
+-- by parameter list, and a default doesn't make (bigint) and
+-- (bigint, text default 'pod') the same function signature. Both existed
+-- simultaneously, and PostgREST's RPC endpoint could no longer resolve
+-- which to call for get_credit_balance(p_member_id) alone (PGRST203),
+-- breaking any call site passing only p_member_id — found live 2026-08-20
+-- via the member profile page (src/lib/data/pods.ts), the only one of the
+-- four documented call sites that doesn't also pass p_credit_type.
+--
+-- Drops the old 1-arg overload so the single remaining function resolves
+-- unambiguously, defaulting to 'pod' for callers that only pass
+-- p_member_id — exactly the "zero changes needed" behaviour 0039's own
+-- comment already intended.
+drop function if exists public.get_credit_balance(bigint);
