@@ -1321,9 +1321,61 @@ before moving to the next. Don't jump ahead to a later stage unprompted.
     `customer.subscription.deleted`, `invoice.payment_succeeded`, and
     `charge.refunded` selected, then add its signing secret as
     `STRIPE_WEBHOOK_SECRET_CONNECT` to podhq-client's `.env.local` and
-    Vercel Production env. The webhook-route change itself is still
-    uncommitted as of this note — not yet committed pending the user's
-    go-ahead.
+    Vercel Production env.
+
+    **Fully live-verified end-to-end 2026-08-20**, closing out this
+    session's work. Both restricted keys created (permissions per the
+    tables above, each resource set in both the PERMISSIONS and CONNECT
+    PERMISSIONS columns — confirmed via live screenshots of the actual
+    dashboard, not assumed); a Connect-only webhook endpoint created
+    (the platform "Your account" endpoint deferred — see the note above,
+    nothing live depends on it yet since podhq-client hasn't launched
+    for any real gym and GymFlow is still the live payment system).
+    Local dev servers restarted with the new keys.
+
+    Real bug caught and fixed along the way, unrelated to Connect
+    itself: the member profile page (`getMemberProfile`, `pods.ts:256`)
+    called `get_credit_balance` with only `p_member_id`, which had
+    become ambiguous after `0039_pod_resources_functions.sql` added a
+    second overload with a defaulted `p_credit_type` — Postgres treats
+    differing parameter counts as separate overloads regardless of
+    defaults, so the old 1-arg function was never actually replaced as
+    0039 assumed, and PostgREST couldn't resolve which to call
+    (`PGRST203`). Fixed via `0041_fix_get_credit_balance_overload.sql`
+    (drops the old overload; no application code changes needed), found
+    by reading the dev server's actual terminal output rather than just
+    the browser's truncated error overlay.
+
+    A throwaway test member ("Hove Connect Test", gym: Hove) was created
+    directly via script (same pattern as prior sessions' throwaway test
+    accounts) to work around two local-only blockers: signup requires
+    email confirmation, and podhq-client's self-service `/book` page
+    can't be tested in the same browser as a logged-in podHq admin
+    session (cookies aren't port-scoped on localhost — same known quirk
+    documented in Stage 17). Testing went through podHq's own staff
+    sell panel instead (`/pods/members/108` → Sell a pack → Hove's
+    "Stripe Connect Live Test" £1.00 catalog item → Discount/Full price
+    → embedded Checkout → real Stripe test card `4242 4242 4242 4242`).
+
+    **Confirmed directly in Stripe's dashboard, not just a 200
+    response**: the £1.00 payment appears under Hove's own connected
+    account ("Carl Simpson Coaching") — its own balance (£0.77 after
+    Stripe's fee), its own Payments list, its own lifetime volume —
+    not the platform account. This is the core requirement from this
+    entire session ("each connect gym must charge its own clients with
+    the money landing in that gym's own account") confirmed working
+    end-to-end for a real Stripe transaction.
+
+    **Not yet verified: the credit ledger side.** The member profile
+    page still showed 0 credits after payment — expected, not a bug:
+    the actual credit grant is written by podhq-client's webhook
+    (`payment_intent.succeeded`/`checkout.session.completed`), and the
+    webhook endpoint registered in Stripe points at production
+    (`podhq-client.vercel.app`), which hasn't been deployed with any of
+    this session's changes yet. Deploying podhq-client (and podHq) to
+    Vercel with the new keys/secrets in their Production env, then
+    re-running this same test, is the next step to confirm the full
+    charge-to-ledger loop — not done this session.
 
 ## Database schema
 
