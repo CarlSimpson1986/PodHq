@@ -64,6 +64,9 @@ export function MemberProfileView({
   const [granting, setGranting] = useState(false);
   const [grantOpen, setGrantOpen] = useState(false);
   const [grantError, setGrantError] = useState("");
+  const [foundingMember, setFoundingMemberState] = useState(profile.foundingMember);
+  const [settingFounding, setSettingFounding] = useState(false);
+  const [foundingError, setFoundingError] = useState("");
 
   function rowKey(t: RefundableTransaction) {
     return `${t.type}:${t.id}`;
@@ -90,6 +93,29 @@ export function MemberProfileView({
       setGrantError("Something went wrong. Try again.");
     } finally {
       setGranting(false);
+    }
+  }
+
+  async function handleToggleFounding() {
+    setSettingFounding(true);
+    setFoundingError("");
+    const next = !foundingMember;
+    try {
+      const res = await fetch(`/api/pods/members/${profile.id}/founding-member`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gym: profile.gym, memberId: profile.id, foundingMember: next }),
+      });
+      const body = await res.json();
+      if (body.status !== "ok") {
+        setFoundingError(body.message ?? "Could not update founding member status.");
+        return;
+      }
+      setFoundingMemberState(next);
+    } catch {
+      setFoundingError("Something went wrong. Try again.");
+    } finally {
+      setSettingFounding(false);
     }
   }
 
@@ -173,6 +199,20 @@ export function MemberProfileView({
             ? `Card on file: ${savedPaymentMethod.brand.toUpperCase()} •••• ${savedPaymentMethod.last4} (exp ${savedPaymentMethod.expMonth}/${savedPaymentMethod.expYear})`
             : "No card on file"}
         </p>
+        <div className="mt-1 flex items-center justify-end gap-2">
+          {foundingMember && (
+            <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">Founding member</span>
+          )}
+          <button
+            type="button"
+            onClick={handleToggleFounding}
+            disabled={settingFounding}
+            className="text-xs text-muted-foreground underline decoration-dotted hover:text-foreground disabled:opacity-50"
+          >
+            {settingFounding ? "Saving..." : foundingMember ? "Remove founding status" : "Mark as founding member"}
+          </button>
+        </div>
+        {foundingError && <p className="mt-1 text-right text-xs text-danger">{foundingError}</p>}
       </div>
 
       <div className="flex justify-end">

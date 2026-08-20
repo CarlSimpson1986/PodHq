@@ -66,6 +66,7 @@ export interface MemberProfile {
   waiverSignedAt: string | null;
   createdAt: string;
   creditBalance: number;
+  foundingMember: boolean;
 }
 
 export interface MemberBooking {
@@ -245,7 +246,7 @@ export async function getMemberProfile(memberId: number): Promise<MemberProfile 
   const { data, error } = await admin
     .from("members")
     .select(
-      "id, name, gym, mobile_number, gender, address_line1, address_line2, address_city, address_postcode, waiver_signed_name, waiver_signed_at, created_at"
+      "id, name, gym, mobile_number, gender, address_line1, address_line2, address_city, address_postcode, waiver_signed_name, waiver_signed_at, created_at, founding_member"
     )
     .eq("id", memberId)
     .maybeSingle();
@@ -269,6 +270,7 @@ export async function getMemberProfile(memberId: number): Promise<MemberProfile 
     waiverSignedName: data.waiver_signed_name,
     waiverSignedAt: data.waiver_signed_at,
     createdAt: data.created_at,
+    foundingMember: data.founding_member,
     creditBalance: (balance as number) ?? 0,
   };
 }
@@ -521,6 +523,40 @@ export async function grantCreditToMember(
   });
 
   return { status: "ok", newBalance: (balance as number) ?? 0 };
+}
+
+export type SetFoundingMemberResult = { status: "ok" } | { status: "not_found" } | { status: "error"; message: string };
+
+/**
+ * Hove's Founding Member offer — staff-granted only, never automatic on a
+ * purchase (see 0043_founding_member.sql's own comment: Combo Silver stays
+ * a normal purchasable tier after the founding window closes too, so
+ * buying it can't be what triggers this). Revocation on membership
+ * cancellation happens separately, in the Stripe webhook (podhq-client),
+ * matching this project's existing pattern of Stripe-driven state changes
+ * always being written from the webhook, not the cancel-request route.
+ */
+export async function setFoundingMember(gym: GymName, memberId: number, foundingMember: boolean, actor: StaffActor): Promise<SetFoundingMemberResult> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("members")
+    .update({ founding_member: foundingMember })
+    .eq("id", memberId)
+    .eq("gym", gym)
+    .select("id")
+    .maybeSingle();
+
+  if (error) return { status: "error", message: error.message };
+  if (!data) return { status: "not_found" };
+
+  await logAuthEvent({
+    email: actor.email,
+    userId: actor.userId,
+    eventType: "staff_founding_member_set",
+    detail: JSON.stringify({ gym, memberId, foundingMember }),
+  });
+
+  return { status: "ok" };
 }
 
 export type CancelBookingResult =
