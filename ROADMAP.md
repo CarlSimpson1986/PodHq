@@ -1585,6 +1585,58 @@ before moving to the next. Don't jump ahead to a later stage unprompted.
     Not yet live-tested with a real founding-member purchase — worth
     doing before granting founding status to a real member.
 
+34. **General-purpose coupon system built** — 2026-08-20, same session,
+    following straight on from Founding Member. Deliberately separate
+    systems: Founding Member is a permanent per-member flag on the
+    `members` row; coupons are shareable, member-typed codes with their
+    own configurable usage limits — confirmed with the user across four
+    real design decisions before building (member-redeemed not
+    staff-only, per-coupon configurable usage limit type rather than one
+    fixed rule, either percentage or fixed-£ discount chosen per coupon,
+    and staff select specific items per coupon rather than "all
+    memberships"/"all packs").
+
+    `0044_coupons.sql` — `coupons` (code unique per gym, stored/matched
+    uppercase, no citext dependency), `coupon_items` (many-to-many, which
+    catalog items a coupon applies to), `coupon_redemptions` (audit trail
+    + usage-limit enforcement), and `redeem_coupon()` — an atomic
+    check-and-claim RPC using the same `pg_advisory_xact_lock` pattern as
+    `claim_membership_slot`/`create_booking`, so two members can't both
+    claim the last slot on a capped coupon. Called at Checkout Session
+    *creation* time, before payment — same accepted tradeoff as every
+    other atomic claim in this project (an abandoned checkout still
+    consumes a slot on a capped coupon; there's no signal back to the
+    server when a member just closes the tab).
+
+    podHq: `src/lib/data/coupons.ts` (CRUD), a new "Coupons" section on
+    `/setup` (`coupons-view.tsx`) — same owner-edits/admin-fallback
+    access as the pricing catalog it sits below, with a multi-select
+    item picker built from the same catalog list `CatalogView` already
+    fetches. podhq-client: `findApplicableCoupon` (read-only lookup,
+    deliberately returns identical "not valid" for a real-but-
+    inapplicable code and a nonexistent one — no information leak about
+    which codes exist), `redeemCoupon` (calls the RPC), `applyDiscount`.
+    Both `/api/checkout` and `/api/checkout-membership` accept an
+    optional `couponCode`; a typed-in coupon **overrides** the automatic
+    Founding Member discount rather than stacking with it (an explicit
+    code is a deliberate member action, the founding discount is
+    passive) — a judgment call, not explicitly specified, flagged here
+    in case it needs revisiting. Membership coupons discount the
+    *recurring* price (every renewal), not just the first payment —
+    same reasoning, simplest behaviour, revisit if a first-payment-only
+    promo is ever actually needed.
+
+    `CreditPackage`/`MembershipTier` (podhq-client) both gained
+    `catalogItemId` — the numeric `catalog_items.id` primary key, which
+    `coupon_items` actually references; these types previously only
+    carried the text slug (`item_id`), which wasn't enough to look up a
+    coupon's applicability.
+
+    `npx tsc --noEmit`, `eslint`, `next build`, and `npx vitest run` all
+    pass clean in both repos. Not yet applied to the database or
+    deployed as of this note — migration given to the user to run
+    manually, same as every other migration this session.
+
 ## Database schema
 
 Two tables pre-date this project and were never created by our migrations — they
