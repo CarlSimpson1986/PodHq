@@ -1459,6 +1459,26 @@ before moving to the next. Don't jump ahead to a later stage unprompted.
     writing this note — the insert script's own per-item console output
     is the only verification so far.
 
+31. **Hove's operating hours set to 6am–10pm, and the Calendar grid made
+    resource-aware** — 2026-08-20, same session. Both of Hove's
+    `pod_resources` rows (Gym, Recovery Room — previously defaulting to
+    0–24, i.e. fully open) set to `open_hour: 6, close_hour: 22` via a
+    throwaway script, same pattern as the catalog upload.
+
+    **Real gap found while doing this**: the Week/Day Calendar grid
+    (`calendar-view.tsx`) always rendered all 24 hourly rows regardless
+    of a resource's configured open/close hours — the `HOURS` constant
+    (0–23) was only ever read by the settings-editor's hour-picker
+    dropdowns (which correctly need every hour selectable), never by
+    the grid itself. Fixed with a new `visibleHours` derived from the
+    currently selected resource's `openHour`/`closeHour`, used only for
+    the Week/Day row generation; Month view and the settings dropdowns
+    are unchanged. `npx tsc --noEmit` and `eslint` pass clean.
+
+    Not yet visually confirmed live — worth a look at `/pods/calendar`
+    for Hove to confirm the grid now shows only 06:00–21:00 rows instead
+    of the full day.
+
 ## Database schema
 
 Two tables pre-date this project and were never created by our migrations — they
