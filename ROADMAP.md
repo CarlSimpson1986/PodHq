@@ -1189,6 +1189,120 @@ before moving to the next. Don't jump ahead to a later stage unprompted.
     directly by the user during this session. `npx tsc --noEmit` and
     `eslint` pass clean on the cookie fix.
 
+    **Restricted-key permissions scoped 2026-08-20, neither key created
+    yet.** A prior session (lost mid-discussion to a power cut before it
+    reached ROADMAP.md or a commit) worked out the permission split for
+    the two per-app restricted keys this feature needs — recovered by
+    re-deriving it directly from what each app's code actually calls
+    (`grep` for every `stripe.<resource>.<method>` call site in both
+    repos), not from memory of the lost conversation. The requirement,
+    confirmed by the user same-session: each connected gym must charge
+    its own clients with the money landing in *that gym's own* Stripe
+    balance — already satisfied by the direct-charge design (`checkout`
+    passes `{ stripeAccount }`, the webhook replies via `event.account`,
+    `/api/pods/refund` already routes through the paying gym's account),
+    this note is just the key permissions that design needs to actually
+    run.
+
+    **Correction, same day**: Stripe's restricted-key permission grid
+    actually has *two* independent columns per resource — one for direct
+    (platform-account) requests, and a separate one that applies only
+    when the key is used with the `Stripe-Account` header (i.e. against
+    a connected account). Confirmed against Stripe's own docs, not
+    assumed. Both columns need enabling for every resource a key
+    actually calls against a connected account — a plain "Write"
+    checkbox alone isn't enough.
+
+    **podHq's key** (`src/lib/stripe.ts` — staff sell/comp panel +
+    refunds + Connect account management): Checkout Sessions, Coupons,
+    Customers, Payment Intents, Products, Subscriptions, Refunds — all
+    **Write** (Customers can be Read-only), **with the Connect-column
+    permission also enabled** for all of those, since every one of them
+    now runs against a connected account whenever the target gym has
+    one (see the `sales.ts` fix directly below). Plus **Accounts
+    (Write)** and **Account Links (Write)** for Connect account
+    creation/onboarding itself — these two are direct-only, there's no
+    "connected account" version of "create an account." No `Charges`
+    permission is actually required by any code path (`refunds.create`
+    takes a `payment_intent`, not a charge) despite this app's doc-
+    comment previously saying "Charges: read, Refunds: write" — that
+    comment predated Stage 21's sell/comp panel and has now been
+    corrected in `stripe.ts` directly.
+
+    **podhq-client's key** (`src/lib/stripe.ts` — member-facing checkout
+    + webhook): Checkout Sessions, Customers, Subscriptions — Write,
+    with the Connect-column permission enabled on all three (self-
+    service checkout already routes through `stripeAccount` for a
+    connected gym); Invoice Payments, Payment Intents — Read, same
+    Connect-column requirement (both are read back inside the webhook
+    via `connectRequestOptions` when `event.account` is set). No
+    Refunds permission needed at all — refunds are only ever issued
+    from podHq's `/api/pods/refund`, this app only reacts to the
+    resulting `charge.refunded` webhook event to correct the ledger.
+
+    **Real gap found and fixed same day: `src/lib/data/sales.ts` (the
+    staff sell/comp panel) never routed through a gym's connected
+    account at all** — unlike `refund/route.ts` and podhq-client's
+    `checkout/route.ts`, none of its Stripe calls passed `stripeAccount`.
+    The user's explicit requirement, stated directly: whichever gym is
+    selected — even by admin, who can act on any gym — every charge,
+    pack sale, and membership for that gym's members must happen inside
+    *that gym's own* Stripe account, with no exception for staff-
+    initiated sales. Fixed by threading `getStripeAccountId(gym)`
+    through every Stripe call in the file (`checkout.sessions.create`/
+    `.retrieve`, `coupons.create`, `customers.retrieve`,
+    `paymentIntents.create`, `products.create`, `subscriptions.create`)
+    via a new local `stripeRequestOptions()` helper — same
+    `{ stripeAccount }` pattern already used correctly by
+    `refund/route.ts` and podhq-client's `checkout/route.ts`. This
+    includes the "charge card on file" paths
+    (`chargeSavedCardForPack`/`createMembershipWithSavedCard`/
+    `getSavedPaymentMethod`), which an earlier draft of this note
+    wrongly assumed had to stay platform-account-only — they don't: a
+    Connect-enabled gym's member has their Stripe Customer created
+    fresh under that gym's own connected account from their very first
+    purchase (Hove has zero pre-Connect purchase history), so retrieving
+    that Customer *without* `stripeAccount` would 404, not silently
+    charge the wrong account. The only real edge case is a gym that
+    connects *after* already having platform-account customers — that
+    would strand their existing `stripe_customer_id`s on the wrong
+    account and needs an actual migration, not just this lookup, before
+    card-on-file works for those specific members; not a concern for
+    Hove, flagged here for whichever gym hits it next. `npx tsc --noEmit`
+    and `eslint` pass clean on the changed file.
+
+    **Not yet done**: neither key has actually been created in Stripe's
+    dashboard yet (the user's preference is doing this by hand, not via
+    API/CLI — see `[[feedback_manual_over_automated_admin_actions]]`).
+    When they are, mind the key-swap-between-apps mistake this project
+    has hit twice already (Stage 17's Stripe keys, Stage 28's
+    `SECRET_ENCRYPTION_KEY`) — podHq gets the Accounts/Account Links
+    key, podhq-client does not. Also not yet live-tested — a Hove staff
+    sale end-to-end, confirming the resulting Checkout Session/
+    PaymentIntent/Subscription actually appears in Hove's connected
+    Stripe account rather than the platform account.
+
+    **Also recovered from the same lost session, found still sitting
+    uncommitted on disk in podhq-client** (survived the power cut since
+    it was already saved to disk, just never committed):
+    `src/app/api/webhooks/stripe/route.ts` gained a fallback verification
+    path against a second `STRIPE_WEBHOOK_SECRET_CONNECT` env var — a
+    connected account's direct-charge events arrive at a *separate*
+    webhook endpoint (Stripe's "Connect" endpoint flag can't be toggled
+    on an existing one) with its own signing secret, so the existing
+    single-secret check would reject every Connect event otherwise. Still
+    needed before this can go live, on top of the two keys above: create
+    that second webhook endpoint in Stripe's dashboard ("Listen to events
+    on connected accounts", same URL as the existing endpoint) with
+    `checkout.session.completed`, `payment_intent.succeeded`,
+    `customer.subscription.created`, `customer.subscription.updated`,
+    `customer.subscription.deleted`, `invoice.payment_succeeded`, and
+    `charge.refunded` selected, then add its signing secret as
+    `STRIPE_WEBHOOK_SECRET_CONNECT` to podhq-client's `.env.local` and
+    Vercel Production env. The webhook-route change itself is still
+    uncommitted as of this note — not yet committed pending the user's
+    go-ahead.
+
 ## Database schema
 
 Two tables pre-date this project and were never created by our migrations — they
