@@ -1377,6 +1377,58 @@ before moving to the next. Don't jump ahead to a later stage unprompted.
     re-running this same test, is the next step to confirm the full
     charge-to-ledger loop — not done this session.
 
+30. **Hove's real pricing catalog uploaded** — 2026-08-20, same session.
+    User supplied `MyFitPod_Hove_Pricing_Aug2026.xlsx` (read directly via
+    Python's stdlib `zipfile`/`xml.etree` — no third-party dependency
+    installed, since the file is just XML in a zip) covering PAYG rates,
+    monthly session packs, a competitive analysis, and a Founding Member
+    offer. 22 catalog items created for Hove via a script mirroring
+    `createCatalogItem`'s exact insert shape (slugify + dedup logic),
+    since going through `/setup`'s UI by hand for 22 items wasn't
+    practical and the user asked to upload the data directly instead.
+
+    **Confirmed with the user before writing anything** (four real
+    judgment calls, not assumed):
+    - The sheet's "Monthly Session Packs" (Silver/Gold/Platinum,
+      5/10/20 sessions) are real recurring Stripe subscriptions
+      (`type: "membership"`), not one-time packs — chosen over the
+      simpler one-time-pack alternative.
+    - The 4 "Combo" packs (gym+recovery bundled, e.g. "5+5 Silver"
+      £112) can't be one catalog item — `credit_type` is a single field
+      per item (`pod` or `recovery`, confirmed in `catalog.ts`'s own
+      comment: only those two exist, both from this same Hove work).
+      Resolved by splitting each combo into two linked items (a gym
+      half + a recovery half) whose prices are allocated
+      **proportionally to each component's own standalone rate**, so
+      the pair always sums exactly back to the combo's real price —
+      e.g. Silver 5+5 (£112 total): standalone Gym Silver £65 +
+      Recovery Silver £60 = £125, so gym's share = 65/125×112 = £58.24,
+      recovery's share = 60/125×112 = £53.76. Applied identically to
+      the Gold combo and both PAYG combo rates (Solo, Two people).
+    - PAYG single-session rates also added as real 1-credit
+      `credit_pack` items (Gym pod Solo/Two people/Pro-PT, Recovery
+      room Solo/Two people), so a member wanting one session isn't
+      forced into a multi-session pack.
+    - The Founding Member Offer sheet (lifetime 20%-off-forever perk
+      for early waitlist conversions) was explicitly **not** built —
+      there's no discount-code/permanent-perk mechanism anywhere in
+      the catalog today, and inventing one wasn't in scope for a
+      pricing upload. Flagged here as a real future ask if the user
+      wants to actually run that promotion.
+
+    **One unconfirmed judgment call, flagged rather than asked
+    outright**: PT/Pro packs use `creditType: "pod"` — the same credit
+    pool as ordinary gym sessions — since nothing in the booking system
+    distinguishes a "PT" credit from a regular one today. If PT
+    sessions need to stay a genuinely separate pool (e.g. to prevent a
+    member buying a cheap gym pack and using it for PT-rate bookings),
+    this needs revisiting — a one-line `creditType` change per item,
+    not a schema change.
+
+    Not yet visually confirmed against the live `/setup` UI as of
+    writing this note — the insert script's own per-item console output
+    is the only verification so far.
+
 ## Database schema
 
 Two tables pre-date this project and were never created by our migrations — they
