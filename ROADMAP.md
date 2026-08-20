@@ -1548,6 +1548,43 @@ before moving to the next. Don't jump ahead to a later stage unprompted.
     tested with a real Combo purchase — worth doing before relying on
     it for real Hove members.
 
+33. **Hove Founding Member offer built** — 2026-08-20, same session,
+    following a full pricing viability review (published as an artifact
+    — tier economics, combo savings, capacity math against the real
+    resource hours set earlier this session, and one real gap found: PT
+    and Gym tiers draw from the same `pod` credit pool, so PT's price
+    premium can't actually be enforced by the system. Downgraded from
+    "real revenue leak" to "known theoretical gap, covered by terms of
+    use + how staff already sell" once the user pointed out real PT
+    buying behaviour doesn't shop for the cheapest pool — not worth
+    building a separate credit pool under a two-week launch deadline).
+
+    With a real waitlist confirmed at 150 people, the Founding Member
+    offer's own spreadsheet scenarios (23–45 converts) became concrete
+    enough to build properly rather than track manually. Confirmed with
+    the user: **not a redeemable discount code** — a permanent,
+    staff-granted flag on a specific member's own record. Combo Silver
+    stays the actual product being sold (no new catalog item); the
+    perk is a separate attribute, since Combo Silver remains a normal
+    purchasable tier after the founding window closes too and shouldn't
+    auto-grant the lifetime perk to everyone who ever buys it.
+
+    `0043_founding_member.sql` — `members.founding_member`, default
+    false. podHq: `setFoundingMember` (staff-only, gym-scoped, logged to
+    `auth_events` as `staff_founding_member_set`), a toggle on the
+    member profile page next to Grant credit. podhq-client:
+    `/api/checkout` applies 20% off automatically when the flag is set
+    (computed server-side from the member's own record, never a
+    client-supplied discount); the webhook's
+    `customer.subscription.deleted` handler unconditionally clears the
+    flag on any membership cancellation — "cancel = lose it
+    permanently, no re-entry," matching the original offer exactly.
+
+    `npx tsc --noEmit`, `eslint`, `next build`, and `npx vitest run` all
+    pass clean in both repos; both deployed to production same session.
+    Not yet live-tested with a real founding-member purchase — worth
+    doing before granting founding status to a real member.
+
 ## Database schema
 
 Two tables pre-date this project and were never created by our migrations — they
