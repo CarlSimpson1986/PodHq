@@ -192,6 +192,19 @@ export async function compMembership(
     .insert({ member_id: memberId, amount: tier.credits, reason: "membership", catalog_item_id: tier.itemId, credit_type: tier.creditType });
   if (creditError) return { status: "error", message: creditError.message };
 
+  // Combo memberships grant a second credit type from the same period —
+  // see 0042_catalog_items_combo_credits.sql.
+  if (tier.creditsSecondary && tier.creditTypeSecondary) {
+    const { error: secondaryError } = await admin.from("credits").insert({
+      member_id: memberId,
+      amount: tier.creditsSecondary,
+      reason: "membership",
+      catalog_item_id: tier.itemId,
+      credit_type: tier.creditTypeSecondary,
+    });
+    if (secondaryError) return { status: "error", message: secondaryError.message };
+  }
+
   const { data: balance, error: balanceError } = await admin.rpc("get_credit_balance", {
     p_member_id: memberId,
     p_credit_type: tier.creditType,
@@ -366,6 +379,12 @@ export async function createMembershipCheckoutSession(
             tier_name: tier.name,
             credits_per_period: String(tier.credits),
             credit_type: tier.creditType,
+            // Combo memberships only — see 0042_catalog_items_combo_credits.sql.
+            // Read back by podhq-client's webhook on every renewal, since
+            // credit_type is never stored on the memberships row itself.
+            ...(tier.creditsSecondary && tier.creditTypeSecondary
+              ? { credits_per_period_secondary: String(tier.creditsSecondary), credit_type_secondary: tier.creditTypeSecondary }
+              : {}),
           },
         },
         return_url: `${origin}/pods/members/${memberId}?checkout_session_id={CHECKOUT_SESSION_ID}`,
@@ -563,6 +582,9 @@ export async function createMembershipWithSavedCard(
           tier_name: tier.name,
           credits_per_period: String(tier.credits),
           credit_type: tier.creditType,
+          ...(tier.creditsSecondary && tier.creditTypeSecondary
+            ? { credits_per_period_secondary: String(tier.creditsSecondary), credit_type_secondary: tier.creditTypeSecondary }
+            : {}),
         },
       },
       { idempotencyKey: crypto.randomUUID(), ...requestOptions }

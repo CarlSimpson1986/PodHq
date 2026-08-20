@@ -14,6 +14,18 @@ function formatGBP(amount: number) {
   return new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(amount);
 }
 
+// Derived, not stored — categorizing purely from creditType/creditTypeSecondary
+// avoids a whole extra "category" column/migration. Combo items (secondary
+// set) always group separately regardless of their primary type, since
+// they're a genuinely different product from a plain Gym or Recovery Room
+// item even though they share a primary credit type with one of them.
+const CATEGORY_ORDER = ["Gym", "Recovery Room", "Combination"] as const;
+function categoryFor(item: CatalogItem): (typeof CATEGORY_ORDER)[number] {
+  if (item.creditTypeSecondary) return "Combination";
+  if (item.creditType === "recovery") return "Recovery Room";
+  return "Gym";
+}
+
 interface FormState {
   name: string;
   label: string;
@@ -254,99 +266,130 @@ function CatalogSection({
               <th className="py-2 font-medium" />
             </tr>
           </thead>
-          <tbody>
-            {items.map((item) => {
-              const isEditing = editingId === item.id;
-              return (
-                <tr key={item.id} className="border-b border-card-border last:border-b-0">
-                  {isEditing ? (
-                    <>
-                      <td className="py-2">
-                        <input
-                          value={editForm.name}
-                          onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
-                          className={`${inputClass} w-full`}
-                        />
-                      </td>
-                      <td className="py-2">
-                        <input
-                          value={editForm.label}
-                          onChange={(e) => setEditForm((f) => ({ ...f, label: e.target.value }))}
-                          className={`${inputClass} w-full`}
-                        />
-                      </td>
-                      <td className="py-2">
-                        <input
-                          type="number"
-                          value={editForm.credits}
-                          onChange={(e) => setEditForm((f) => ({ ...f, credits: e.target.value }))}
-                          className={`${inputClass} w-20`}
-                        />
-                      </td>
-                      {/* Not editable — set once at creation, see the form's own note above. */}
-                      <td className="py-2 text-muted-foreground">{item.creditType}</td>
-                      <td className="py-2">
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={editForm.priceGBP}
-                          onChange={(e) => setEditForm((f) => ({ ...f, priceGBP: e.target.value }))}
-                          className={`${inputClass} w-24`}
-                        />
-                      </td>
-                      <td className="py-2">
-                        <input
-                          type="checkbox"
-                          checked={editForm.oneTimePerMember}
-                          onChange={(e) => setEditForm((f) => ({ ...f, oneTimePerMember: e.target.checked }))}
-                        />
-                      </td>
-                      <td className="py-2 text-muted-foreground">{item.enabled ? "Enabled" : "Disabled"}</td>
-                      <td className="py-2 text-right">
-                        <div className="flex justify-end gap-2">
-                          <button type="button" onClick={() => handleSaveEdit(item.id)} disabled={busyId === item.id} className={buttonClass}>
-                            {busyId === item.id ? "Saving..." : "Save"}
-                          </button>
-                          <button type="button" onClick={() => setEditingId(null)} className={secondaryButtonClass}>
-                            Cancel
-                          </button>
-                        </div>
-                      </td>
-                    </>
-                  ) : (
-                    <>
-                      <td className="py-2 text-foreground">{item.name}</td>
-                      <td className="py-2 text-muted-foreground">{item.label}</td>
-                      <td className="py-2 tabular-nums text-foreground">{item.credits}</td>
-                      <td className="py-2 text-muted-foreground">{item.creditType}</td>
-                      <td className="py-2 tabular-nums text-foreground">{formatGBP(item.priceGBP)}</td>
-                      <td className="py-2 text-muted-foreground">{item.oneTimePerMember ? "Yes" : "—"}</td>
-                      <td className="py-2">
-                        <span className={item.enabled ? "text-foreground" : "text-muted-foreground"}>
-                          {item.enabled ? "Enabled" : "Disabled"}
-                        </span>
-                      </td>
-                      <td className="py-2 text-right">
-                        <div className="flex justify-end gap-2">
-                          <button type="button" onClick={() => startEdit(item)} className={secondaryButtonClass}>
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleToggle(item.id, !item.enabled)}
-                            disabled={busyId === item.id}
-                            className={secondaryButtonClass}
-                          >
-                            {busyId === item.id ? "Working..." : item.enabled ? "Disable" : "Enable"}
-                          </button>
-                        </div>
-                      </td>
-                    </>
-                  )}
+          {CATEGORY_ORDER.filter((cat) => items.some((i) => categoryFor(i) === cat)).map((cat) => (
+              <tbody key={cat}>
+                <tr>
+                  <td colSpan={8} className="pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {cat}
+                  </td>
                 </tr>
-              );
-            })}
-          </tbody>
+                {items
+                  .filter((i) => categoryFor(i) === cat)
+                  .map((item) => {
+                    const isEditing = editingId === item.id;
+                    const isCombo = !!item.creditTypeSecondary;
+                    return (
+                      <tr key={item.id} className="border-b border-card-border last:border-b-0">
+                        {isEditing ? (
+                          <>
+                            <td className="py-2">
+                              <input
+                                value={editForm.name}
+                                onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                                className={`${inputClass} w-full`}
+                              />
+                            </td>
+                            <td className="py-2">
+                              <input
+                                value={editForm.label}
+                                onChange={(e) => setEditForm((f) => ({ ...f, label: e.target.value }))}
+                                className={`${inputClass} w-full`}
+                              />
+                            </td>
+                            <td className="py-2">
+                              <input
+                                type="number"
+                                value={editForm.credits}
+                                onChange={(e) => setEditForm((f) => ({ ...f, credits: e.target.value }))}
+                                className={`${inputClass} w-20`}
+                              />
+                              {/* Secondary combo credits aren't editable via this form yet —
+                                  shown read-only so staff don't think it's been dropped. */}
+                              {isCombo && (
+                                <span className="ml-1 text-muted-foreground">
+                                  + {item.creditsSecondary} {item.creditTypeSecondary}
+                                </span>
+                              )}
+                            </td>
+                            {/* Not editable — set once at creation, see the form's own note above. */}
+                            <td className="py-2 text-muted-foreground">
+                              {item.creditType}
+                              {isCombo && ` + ${item.creditTypeSecondary}`}
+                            </td>
+                            <td className="py-2">
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={editForm.priceGBP}
+                                onChange={(e) => setEditForm((f) => ({ ...f, priceGBP: e.target.value }))}
+                                className={`${inputClass} w-24`}
+                              />
+                            </td>
+                            <td className="py-2">
+                              <input
+                                type="checkbox"
+                                checked={editForm.oneTimePerMember}
+                                onChange={(e) => setEditForm((f) => ({ ...f, oneTimePerMember: e.target.checked }))}
+                              />
+                            </td>
+                            <td className="py-2 text-muted-foreground">{item.enabled ? "Enabled" : "Disabled"}</td>
+                            <td className="py-2 text-right">
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSaveEdit(item.id)}
+                                  disabled={busyId === item.id}
+                                  className={buttonClass}
+                                >
+                                  {busyId === item.id ? "Saving..." : "Save"}
+                                </button>
+                                <button type="button" onClick={() => setEditingId(null)} className={secondaryButtonClass}>
+                                  Cancel
+                                </button>
+                              </div>
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="py-2 text-foreground">{item.name}</td>
+                            <td className="py-2 text-muted-foreground">{item.label}</td>
+                            <td className="py-2 tabular-nums text-foreground">
+                              {item.credits}
+                              {isCombo && <span className="text-muted-foreground"> + {item.creditsSecondary}</span>}
+                            </td>
+                            <td className="py-2 text-muted-foreground">
+                              {item.creditType}
+                              {isCombo && ` + ${item.creditTypeSecondary}`}
+                            </td>
+                            <td className="py-2 tabular-nums text-foreground">{formatGBP(item.priceGBP)}</td>
+                            <td className="py-2 text-muted-foreground">{item.oneTimePerMember ? "Yes" : "—"}</td>
+                            <td className="py-2">
+                              <span className={item.enabled ? "text-foreground" : "text-muted-foreground"}>
+                                {item.enabled ? "Enabled" : "Disabled"}
+                              </span>
+                            </td>
+                            <td className="py-2 text-right">
+                              <div className="flex justify-end gap-2">
+                                <button type="button" onClick={() => startEdit(item)} className={secondaryButtonClass}>
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggle(item.id, !item.enabled)}
+                                  disabled={busyId === item.id}
+                                  className={secondaryButtonClass}
+                                >
+                                  {busyId === item.id ? "Working..." : item.enabled ? "Disable" : "Enable"}
+                                </button>
+                              </div>
+                            </td>
+                          </>
+                        )}
+                      </tr>
+                    );
+                  })}
+              </tbody>
+          ))}
         </table>
       )}
     </section>
