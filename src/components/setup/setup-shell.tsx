@@ -5,6 +5,7 @@ import type { CatalogItem } from "@/lib/data/catalog";
 import type { GymName } from "@/lib/data/types";
 import { GymSelect } from "@/components/ui/gym-select";
 import { CatalogView } from "@/components/setup/catalog-view";
+import { CouponsView } from "@/components/setup/coupons-view";
 import { BrevoConfigView } from "@/components/setup/brevo-config-view";
 import { ResendConfigView } from "@/components/setup/resend-config-view";
 import { StripeConnectView } from "@/components/setup/stripe-connect-view";
@@ -38,6 +39,8 @@ export function SetupShell({
       )}
 
       <CatalogView gym={gym} initialItems={initialItems} />
+
+      <CouponsView gym={gym} />
 
       {role === "admin" && (
         <>
