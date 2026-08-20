@@ -1416,14 +1416,14 @@ before moving to the next. Don't jump ahead to a later stage unprompted.
       pricing upload. Flagged here as a real future ask if the user
       wants to actually run that promotion.
 
-    **One unconfirmed judgment call, flagged rather than asked
-    outright**: PT/Pro packs use `creditType: "pod"` — the same credit
-    pool as ordinary gym sessions — since nothing in the booking system
-    distinguishes a "PT" credit from a regular one today. If PT
-    sessions need to stay a genuinely separate pool (e.g. to prevent a
-    member buying a cheap gym pack and using it for PT-rate bookings),
-    this needs revisiting — a one-line `creditType` change per item,
-    not a schema change.
+    **PT credit-type call confirmed by the user, same day**: PT items
+    renamed from "PT/Pro" to plain "PT" (four items —
+    `pt-pro-silver`/`-gold`/`-platinum` memberships and
+    `gym-pod-pro-pt` credit pack; slugs unchanged, only the display
+    `name`/`label` updated, matching `updateCatalogItem`'s own
+    behaviour of never touching the stable slug). `creditType: "pod"`
+    (shared with ordinary gym credits, not a separate pool) is
+    confirmed correct, not just assumed.
 
     Not yet visually confirmed against the live `/setup` UI as of
     writing this note — the insert script's own per-item console output
