@@ -5,6 +5,21 @@ import { logAuthEvent } from "@/lib/audit";
 import type { GymName } from "./types";
 import { getCatalogItemBySlug } from "./catalog";
 import { grantCreditToMember, type StaffActor } from "./pods";
+import { getStripeAccountId } from "./stripe-connect-config";
+
+/**
+ * null for every gym without its own Stripe Connect account (the shared
+ * platform account, unchanged from before Connect existed). A member's
+ * saved stripe_customer_id is only ever meaningful under the same account
+ * that created it — safe today because a Connect-enabled gym (Hove) has no
+ * pre-Connect purchase history to strand on the platform account, but a
+ * gym that connects *after* already having platform-account customers
+ * would need a real migration, not just this lookup, before card-on-file
+ * would work for its existing members.
+ */
+function stripeRequestOptions(stripeAccountId: string | null): { stripeAccount: string } | undefined {
+  return stripeAccountId ? { stripeAccount: stripeAccountId } : undefined;
+}
 
 export type DiscountMode = "ongoing" | "first_payment_only";
 
@@ -86,8 +101,15 @@ export async function getSavedPaymentMethod(memberId: number): Promise<SavedPaym
   const customerId = await getMemberStripeCustomerId(memberId);
   if (!customerId) return null;
 
+  const gym = await getMemberGym(memberId);
+  const stripeAccountId = gym ? await getStripeAccountId(gym) : null;
+
   const stripe = getStripeClient();
-  const customer = await stripe.customers.retrieve(customerId, { expand: ["invoice_settings.default_payment_method"] });
+  const customer = await stripe.customers.retrieve(
+    customerId,
+    { expand: ["invoice_settings.default_payment_method"] },
+    stripeRequestOptions(stripeAccountId)
+  );
   if (customer.deleted) return null;
 
   const pm = customer.invoice_settings?.default_payment_method;
@@ -219,6 +241,7 @@ export async function createPackCheckoutSession(
   const gymMatches = await verifyMemberGym(gym, memberId);
   if (!gymMatches) return { status: "not_found" };
 
+  const stripeAccountId = await getStripeAccountId(gym);
   const stripe = getStripeClient();
   try {
     const existingCustomerId = await getMemberStripeCustomerId(memberId);
@@ -246,7 +269,12 @@ export async function createPackCheckoutSession(
         metadata: { member_id: String(memberId), credits: String(pack.credits), packageId: pack.itemId, creditType: pack.creditType },
         return_url: `${origin}/pods/members/${memberId}?checkout_session_id={CHECKOUT_SESSION_ID}`,
       },
-      { idempotencyKey: crypto.randomUUID() }
+      // A gym with its own Stripe Connect account (Hove onward) gets this
+      // session created directly against it — same direct-charge pattern
+      // as podhq-client's self-service checkout — so the money and the
+      // resulting saved card both land in that gym's own account, not the
+      // shared platform account.
+      { idempotencyKey: crypto.randomUUID(), ...stripeRequestOptions(stripeAccountId) }
     );
 
     if (!session.client_secret) return { status: "error", message: "Could not start checkout." };
@@ -291,6 +319,8 @@ export async function createMembershipCheckoutSession(
   const existing = await getActiveMembershipForMember(memberId);
   if (existing) return { status: "already_active" };
 
+  const stripeAccountId = await getStripeAccountId(gym);
+  const requestOptions = stripeRequestOptions(stripeAccountId);
   const stripe = getStripeClient();
   try {
     const isFirstPaymentDiscount = discountMode === "first_payment_only" && priceGBP < tier.priceGBP;
@@ -298,12 +328,15 @@ export async function createMembershipCheckoutSession(
 
     let couponId: string | undefined;
     if (isFirstPaymentDiscount) {
-      const coupon = await stripe.coupons.create({
-        duration: "once",
-        amount_off: Math.round((tier.priceGBP - priceGBP) * 100),
-        currency: "gbp",
-        name: `${tier.name} — one-off staff discount`,
-      });
+      const coupon = await stripe.coupons.create(
+        {
+          duration: "once",
+          amount_off: Math.round((tier.priceGBP - priceGBP) * 100),
+          currency: "gbp",
+          name: `${tier.name} — one-off staff discount`,
+        },
+        requestOptions
+      );
       couponId = coupon.id;
     }
 
@@ -337,7 +370,7 @@ export async function createMembershipCheckoutSession(
         },
         return_url: `${origin}/pods/members/${memberId}?checkout_session_id={CHECKOUT_SESSION_ID}`,
       },
-      { idempotencyKey: crypto.randomUUID() }
+      { idempotencyKey: crypto.randomUUID(), ...requestOptions }
     );
 
     if (!session.client_secret) return { status: "error", message: "Could not start checkout." };
@@ -387,8 +420,10 @@ export async function chargeSavedCardForPack(
   const customerId = await getMemberStripeCustomerId(memberId);
   if (!customerId) return { status: "no_saved_card" };
 
+  const stripeAccountId = await getStripeAccountId(gym);
+  const requestOptions = stripeRequestOptions(stripeAccountId);
   const stripe = getStripeClient();
-  const customer = await stripe.customers.retrieve(customerId, { expand: ["invoice_settings.default_payment_method"] });
+  const customer = await stripe.customers.retrieve(customerId, { expand: ["invoice_settings.default_payment_method"] }, requestOptions);
   const pm = !customer.deleted ? customer.invoice_settings?.default_payment_method : null;
   const paymentMethodId = typeof pm === "object" && pm !== null ? pm.id : typeof pm === "string" ? pm : null;
   if (!paymentMethodId) return { status: "no_saved_card" };
@@ -410,7 +445,7 @@ export async function chargeSavedCardForPack(
           creditType: pack.creditType,
         },
       },
-      { idempotencyKey: crypto.randomUUID() }
+      { idempotencyKey: crypto.randomUUID(), ...requestOptions }
     );
 
     await logAuthEvent({
@@ -454,8 +489,10 @@ export async function createMembershipWithSavedCard(
   const customerId = await getMemberStripeCustomerId(memberId);
   if (!customerId) return { status: "no_saved_card" };
 
+  const stripeAccountId = await getStripeAccountId(gym);
+  const requestOptions = stripeRequestOptions(stripeAccountId);
   const stripe = getStripeClient();
-  const customer = await stripe.customers.retrieve(customerId, { expand: ["invoice_settings.default_payment_method"] });
+  const customer = await stripe.customers.retrieve(customerId, { expand: ["invoice_settings.default_payment_method"] }, requestOptions);
   const pm = !customer.deleted ? customer.invoice_settings?.default_payment_method : null;
   const paymentMethodId = typeof pm === "object" && pm !== null ? pm.id : typeof pm === "string" ? pm : null;
   if (!paymentMethodId) return { status: "no_saved_card" };
@@ -488,18 +525,21 @@ export async function createMembershipWithSavedCard(
 
     let couponId: string | undefined;
     if (isFirstPaymentDiscount) {
-      const coupon = await stripe.coupons.create({
-        duration: "once",
-        amount_off: Math.round((tier.priceGBP - priceGBP) * 100),
-        currency: "gbp",
-        name: `${tier.name} — one-off staff discount`,
-      });
+      const coupon = await stripe.coupons.create(
+        {
+          duration: "once",
+          amount_off: Math.round((tier.priceGBP - priceGBP) * 100),
+          currency: "gbp",
+          name: `${tier.name} — one-off staff discount`,
+        },
+        requestOptions
+      );
       couponId = coupon.id;
     }
 
     // Unlike Checkout Sessions, the Subscriptions API's price_data takes a
     // real Product id, not inline product_data — create one on the fly.
-    const product = await stripe.products.create({ name: `${tier.name} — ${tier.label}` });
+    const product = await stripe.products.create({ name: `${tier.name} — ${tier.label}` }, requestOptions);
 
     const subscription = await stripe.subscriptions.create(
       {
@@ -525,7 +565,7 @@ export async function createMembershipWithSavedCard(
           credit_type: tier.creditType,
         },
       },
-      { idempotencyKey: crypto.randomUUID() }
+      { idempotencyKey: crypto.randomUUID(), ...requestOptions }
     );
 
     // Finalize the claimed row with the real subscription id — podhq-client's
@@ -564,8 +604,11 @@ export interface CheckoutSessionStatus {
 
 /** Read back after the embedded Checkout's return_url redirect — memberId is checked against the session's own metadata so staff can't probe another member's/gym's session by guessing an id in the URL. */
 export async function getCheckoutSessionStatus(sessionId: string, memberId: number): Promise<CheckoutSessionStatus | null> {
+  const gym = await getMemberGym(memberId);
+  const stripeAccountId = gym ? await getStripeAccountId(gym) : null;
+
   const stripe = getStripeClient();
-  const session = await stripe.checkout.sessions.retrieve(sessionId, { expand: ["subscription"] });
+  const session = await stripe.checkout.sessions.retrieve(sessionId, { expand: ["subscription"] }, stripeRequestOptions(stripeAccountId));
 
   const sessionMemberId =
     session.metadata?.member_id ??
