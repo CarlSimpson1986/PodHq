@@ -1366,16 +1366,46 @@ before moving to the next. Don't jump ahead to a later stage unprompted.
     the money landing in that gym's own account") confirmed working
     end-to-end for a real Stripe transaction.
 
-    **Not yet verified: the credit ledger side.** The member profile
-    page still showed 0 credits after payment — expected, not a bug:
-    the actual credit grant is written by podhq-client's webhook
-    (`payment_intent.succeeded`/`checkout.session.completed`), and the
-    webhook endpoint registered in Stripe points at production
-    (`podhq-client.vercel.app`), which hasn't been deployed with any of
-    this session's changes yet. Deploying podhq-client (and podHq) to
-    Vercel with the new keys/secrets in their Production env, then
-    re-running this same test, is the next step to confirm the full
-    charge-to-ledger loop — not done this session.
+    **Credit ledger side fully verified same day, closing out this
+    thread.** Getting here took two more real bugs, both found via
+    production logs rather than guessed:
+
+    - **Client-side Stripe.js had no connected-account context.**
+      Server-side session creation already passed `stripeAccount`, but
+      `sell-panel.tsx`'s embedded Checkout used a static module-level
+      `loadStripe(publishableKey)` with no account context — Stripe.js
+      itself needs to know which connected account a session belongs
+      to, separately from the server-side call that created it. Found
+      via the exact production error ("provided key does not have
+      access to account..."). Fixed: `createPackCheckoutSession`/
+      `createMembershipCheckoutSession` now return `stripeAccountId`
+      alongside `clientSecret`, threaded through the API route into
+      `sell-panel.tsx`, which builds its Stripe.js instance dynamically
+      (`useMemo` keyed on `stripeAccountId`) instead of once at module
+      load.
+    - **`STRIPE_SECRET_KEY` had a stray leading `=` character** in both
+      `.env.local` and Vercel (`=rk_test_...` instead of `rk_test_...`)
+      — a copy-paste slip that made every podHq Stripe call fail with
+      "Invalid API Key provided," surfacing as a full page crash on the
+      member profile (the saved-card lookup happens during page load,
+      so an invalid key there took the whole page down, not just the
+      sell panel). Found by reading the literal string Stripe's API
+      rejected in the production error log. Fixed by the user correcting
+      the value in both places and redeploying.
+
+    **Verified directly against the database, not just the UI**, for
+    the same Hove Connect Test member (id 108) used throughout this
+    session: exactly one `credits` row — `amount: 1`, `reason:
+    'purchase'`, `credit_type: 'pod'`, `catalog_item_id:
+    'stripe-connect-live-test'`, a real `stripe_payment_intent_id` — and
+    `members.stripe_customer_id` populated, matching the "card on file"
+    shown in the UI. This confirms the full chain end-to-end: Checkout
+    Session created against Hove's connected account → payment
+    succeeded → the Connect webhook endpoint correctly verified the
+    signature and processed the event → credit written to the ledger →
+    card captured for next time. This was the last unverified piece of
+    the entire Stripe Connect thread — the pilot now works fully,
+    top to bottom, for a real Stripe test-mode transaction.
 
 30. **Hove's real pricing catalog uploaded** — 2026-08-20, same session.
     User supplied `MyFitPod_Hove_Pricing_Aug2026.xlsx` (read directly via
