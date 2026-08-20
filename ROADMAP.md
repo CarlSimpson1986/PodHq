@@ -1479,6 +1479,75 @@ before moving to the next. Don't jump ahead to a later stage unprompted.
     for Hove to confirm the grid now shows only 06:00–21:00 rows instead
     of the full day.
 
+32. **Combo memberships fixed to be one real product, plus a Gym/Recovery
+    Room/Combination category selector** — 2026-08-20, same session,
+    driven by the user actually looking at their own real owner account
+    (first genuine live owner-session testing this whole project — MFA
+    had blocked scripting one until now).
+
+    **Real bug found via that live testing**: Stage 30's Combo items
+    (split into "Gym — Combo Gold" + "Recovery — Combo Gold" as two
+    linked catalog rows, sold as two separate memberships) turned out to
+    be fundamentally broken, not just confusingly labelled — `memberships`
+    has a hard `unique (member_id)` constraint (0014), so a member could
+    never actually hold both halves at once; the second purchase would
+    always hit the existing `already_active` check. Confirmed with the
+    user that Combo genuinely needs to be one real membership (one
+    subscription, one price) granting two credit types together.
+
+    **The fix was smaller than first estimated**, because `credit_type`
+    was never stored on `memberships` at all — it only ever travels
+    through the Stripe subscription's metadata and is re-read on every
+    credit grant (first period + each renewal). So no `memberships`
+    migration was needed: `0042_catalog_items_combo_credits.sql` adds
+    nullable `credits_secondary`/`credit_type_secondary` to
+    `catalog_items` only. Threaded through:
+    - `createCatalogItem`/`CatalogItem` (podHq)
+    - `sales.ts`'s membership checkout functions and `compMembership`
+      (podHq) — pass/insert the secondary credit type alongside the
+      primary one
+    - podhq-client's `/api/checkout-membership` (self-service) and the
+      `invoice.payment_succeeded` webhook handler — the secondary
+      credit's `stripe_event_id` uses a `:secondary` suffix, not the raw
+      event id, since reusing it would collide with the primary grant's
+      row under the existing unique constraint and silently drop the
+      secondary grant rather than just guard against redelivery.
+
+    Hove's catalog re-seeded: the four broken half-items deleted,
+    replaced with two real combo memberships — `combo-silver` (5 gym +
+    5 recovery, £112/mo) and `combo-gold` (10 gym + 10 recovery,
+    £205/mo).
+
+    **Also fixed, same real-testing session**: the Setup catalog table
+    (`catalog-view.tsx`) was a flat, unsorted list — real user feedback
+    ("this is confusing") once actually looked at with 13 real
+    membership rows in it. Now grouped into Gym / Recovery Room /
+    Combination sections (derived from `creditType`/
+    `creditTypeSecondary`, no new column), and combo rows show their
+    full secondary grant instead of silently hiding it. The same
+    category grouping was added to podhq-client's `/buy-membership`
+    shop page (`buy-membership-list.tsx`) as an actual tab selector —
+    the feature the user asked for directly ("Gym/Recovery Room/
+    Combination" options when browsing memberships).
+
+    **Confirmed already solid, not touched**: `create_booking()`'s
+    balance check (`where member_id = ... and credit_type = ...`)
+    already correctly segregates gym credits from recovery credits at
+    booking time — verified by reading the actual RPC, not assumed.
+    This was never in question; only the combo *purchase* side was
+    broken.
+
+    Known, deliberate gap: the Setup "Add new"/"Edit" forms don't yet
+    have UI fields for creating a new combo item — Hove's two combo
+    items were seeded via script, same pattern as the original pricing
+    upload. Not blocking Hove's two-week launch since no new combo
+    items need creating before then; flagged as a real follow-up.
+
+    `npx tsc --noEmit`, `eslint`, `next build`, and `npx vitest run` all
+    pass clean in both repos. Not yet deployed to production or live-
+    tested with a real Combo purchase — worth doing before relying on
+    it for real Hove members.
+
 ## Database schema
 
 Two tables pre-date this project and were never created by our migrations — they
