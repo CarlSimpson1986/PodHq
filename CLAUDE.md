@@ -10,13 +10,25 @@
 - Deployed on Vercel
 
 ## Session handoff
-- Before any `git commit`/`git push` that wraps up a working session, add a
-  short summary of that session to `ROADMAP.md` (matching its existing
+- `ROADMAP.md` is `@`-imported into every session and capped at ~15,000
+  characters (Claude Code's import limit) — it holds only a condensed
+  one-line-per-stage index plus the live reference tables (DB schema,
+  pipeline rules, gym names). Full session write-ups go in
+  `ROADMAP_HISTORY.md` instead, which is not auto-loaded.
+- Before any `git commit`/`git push` that wraps up a working session, append
+  a summary of that session to `ROADMAP_HISTORY.md` (matching its existing
   per-stage style: what changed, why, and what's verified vs. still
-  outstanding) — so the next session opens with full context on where things
-  left off, without needing to reconstruct it from the diff or chat history.
+  outstanding), and add or update the matching one-line entry in
+  `ROADMAP.md`'s stage index — so the next session opens with full context
+  on where things left off, without needing to reconstruct it from the diff
+  or chat history.
 - Keep it proportionate: a small fix can be a sentence or two appended to the
-  relevant stage; a new feature gets its own stage entry as usual.
+  relevant entry in `ROADMAP_HISTORY.md`; a new feature gets its own stage
+  entry in both files.
+- If an edit ever pushes `ROADMAP.md` back over ~15,000 characters, trim it
+  further (tighten the index, move more reference detail to
+  `ROADMAP_HISTORY.md`) rather than letting it silently exceed the import
+  limit again.
 
 ## Conventions
 - All components: functional, TypeScript, named exports
