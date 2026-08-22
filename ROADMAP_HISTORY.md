@@ -1663,9 +1663,15 @@ add the matching one-line entry in ROADMAP.md's Stage index.
     `stripe.coupons.create()` calls in `sales.ts` (staff sell/comp
     discount flow, stage 21) were deliberately left untouched — that's
     Stripe's real API object name, unrelated to this feature. `tsc`/
-    `eslint`/`next build`/`vitest` clean in both repos post-rename. Same
-    unapplied-migration status as before the rename — still needs running
-    against Supabase before this feature can go live.
+    `eslint`/`next build`/`vitest` clean in both repos post-rename.
+    **Migration applied live 2026-08-22** — hit the project's known
+    Supabase SQL Editor smart-quote paste-mangling issue on the first
+    attempt (syntax error at `alter`, several statements downstream of
+    the actual corrupted quote); fixed by copying directly from the
+    `.sql` file in a plain text editor instead of from a chat-rendered
+    code block. Verified live via `/setup` — the promo codes card went
+    from "Could not load promo codes" to "No promo codes yet." with no
+    code changes needed.
 
 36. **Aylesbury Berryfields Resend incident** — 2026-08-22, long session.
     User reported Resend "dropped out" for Aylesbury; turned out Aylesbury
