@@ -5,7 +5,7 @@ import type { GymName } from "./types";
 export type DiscountType = "percentage" | "fixed";
 export type UsageLimitType = "once_per_member" | "total_cap" | "unlimited";
 
-export interface Coupon {
+export interface PromoCode {
   id: number;
   gym: GymName;
   code: string;
@@ -14,7 +14,7 @@ export interface Coupon {
   usageLimitType: UsageLimitType;
   usageLimitValue: number | null;
   enabled: boolean;
-  itemIds: number[]; // catalog_items.id — which items this coupon applies to
+  itemIds: number[]; // catalog_items.id — which items this code applies to
   redeemedCount: number;
 }
 
@@ -22,12 +22,12 @@ function normalizeCode(code: string): string {
   return code.trim().toUpperCase();
 }
 
-/** Full list for one gym, including disabled coupons — Setup's own management page. */
-export async function listCoupons(gym: GymName): Promise<Coupon[]> {
+/** Full list for one gym, including disabled codes — Setup's own management page. */
+export async function listPromoCodes(gym: GymName): Promise<PromoCode[]> {
   const admin = createAdminClient();
   const { data, error } = await admin
-    .from("coupons")
-    .select("id, gym, code, discount_type, discount_value, usage_limit_type, usage_limit_value, enabled, coupon_items(catalog_item_id)")
+    .from("promo_codes")
+    .select("id, gym, code, discount_type, discount_value, usage_limit_type, usage_limit_value, enabled, promo_code_items(catalog_item_id)")
     .eq("gym", gym)
     .order("created_at", { ascending: false })
     .returns<
@@ -40,15 +40,15 @@ export async function listCoupons(gym: GymName): Promise<Coupon[]> {
         usage_limit_type: UsageLimitType;
         usage_limit_value: number | null;
         enabled: boolean;
-        coupon_items: { catalog_item_id: number }[];
+        promo_code_items: { catalog_item_id: number }[];
       }[]
     >();
   if (error) throw error;
 
-  const coupons = data ?? [];
-  const counts = await getRedemptionCounts(coupons.map((c) => c.id));
+  const promoCodes = data ?? [];
+  const counts = await getRedemptionCounts(promoCodes.map((c) => c.id));
 
-  return coupons.map((row) => ({
+  return promoCodes.map((row) => ({
     id: row.id,
     gym: row.gym as GymName,
     code: row.code,
@@ -57,26 +57,26 @@ export async function listCoupons(gym: GymName): Promise<Coupon[]> {
     usageLimitType: row.usage_limit_type,
     usageLimitValue: row.usage_limit_value,
     enabled: row.enabled,
-    itemIds: row.coupon_items.map((ci) => ci.catalog_item_id),
+    itemIds: row.promo_code_items.map((ci) => ci.catalog_item_id),
     redeemedCount: counts.get(row.id) ?? 0,
   }));
 }
 
-async function getRedemptionCounts(couponIds: number[]): Promise<Map<number, number>> {
+async function getRedemptionCounts(promoCodeIds: number[]): Promise<Map<number, number>> {
   const counts = new Map<number, number>();
-  if (couponIds.length === 0) return counts;
+  if (promoCodeIds.length === 0) return counts;
   const admin = createAdminClient();
-  const { data, error } = await admin.from("coupon_redemptions").select("coupon_id").in("coupon_id", couponIds);
+  const { data, error } = await admin.from("promo_code_redemptions").select("promo_code_id").in("promo_code_id", promoCodeIds);
   if (error) throw error;
   for (const row of data ?? []) {
-    counts.set(row.coupon_id, (counts.get(row.coupon_id) ?? 0) + 1);
+    counts.set(row.promo_code_id, (counts.get(row.promo_code_id) ?? 0) + 1);
   }
   return counts;
 }
 
-export type CreateCouponResult = { status: "ok"; coupon: Coupon } | { status: "duplicate_code" } | { status: "error"; message: string };
+export type CreatePromoCodeResult = { status: "ok"; promoCode: PromoCode } | { status: "duplicate_code" } | { status: "error"; message: string };
 
-export async function createCoupon(input: {
+export async function createPromoCode(input: {
   gym: GymName;
   code: string;
   discountType: DiscountType;
@@ -84,15 +84,15 @@ export async function createCoupon(input: {
   usageLimitType: UsageLimitType;
   usageLimitValue?: number | null;
   itemIds: number[];
-}): Promise<CreateCouponResult> {
+}): Promise<CreatePromoCodeResult> {
   const admin = createAdminClient();
   const code = normalizeCode(input.code);
 
-  const { data: existing } = await admin.from("coupons").select("id").eq("gym", input.gym).eq("code", code).maybeSingle();
+  const { data: existing } = await admin.from("promo_codes").select("id").eq("gym", input.gym).eq("code", code).maybeSingle();
   if (existing) return { status: "duplicate_code" };
 
-  const { data: coupon, error } = await admin
-    .from("coupons")
+  const { data: promoCode, error } = await admin
+    .from("promo_codes")
     .insert({
       gym: input.gym,
       code,
@@ -107,15 +107,15 @@ export async function createCoupon(input: {
 
   if (input.itemIds.length > 0) {
     const { error: itemsError } = await admin
-      .from("coupon_items")
-      .insert(input.itemIds.map((catalogItemId) => ({ coupon_id: coupon.id, catalog_item_id: catalogItemId })));
+      .from("promo_code_items")
+      .insert(input.itemIds.map((catalogItemId) => ({ promo_code_id: promoCode.id, catalog_item_id: catalogItemId })));
     if (itemsError) return { status: "error", message: itemsError.message };
   }
 
   return {
     status: "ok",
-    coupon: {
-      id: coupon.id,
+    promoCode: {
+      id: promoCode.id,
       gym: input.gym,
       code,
       discountType: input.discountType,
@@ -129,13 +129,13 @@ export async function createCoupon(input: {
   };
 }
 
-export type SetCouponEnabledResult = { status: "ok" } | { status: "not_found" } | { status: "error"; message: string };
+export type SetPromoCodeEnabledResult = { status: "ok" } | { status: "not_found" } | { status: "error"; message: string };
 
-/** gym is checked alongside id so an owner can never disable another gym's coupon by guessing its numeric id. */
-export async function setCouponEnabled(gym: GymName, id: number, enabled: boolean): Promise<SetCouponEnabledResult> {
+/** gym is checked alongside id so an owner can never disable another gym's promo code by guessing its numeric id. */
+export async function setPromoCodeEnabled(gym: GymName, id: number, enabled: boolean): Promise<SetPromoCodeEnabledResult> {
   const admin = createAdminClient();
   const { data, error } = await admin
-    .from("coupons")
+    .from("promo_codes")
     .update({ enabled, updated_at: new Date().toISOString() })
     .eq("id", id)
     .eq("gym", gym)
