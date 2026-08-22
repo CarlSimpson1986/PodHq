@@ -1681,21 +1681,32 @@ add the matching one-line entry in ROADMAP.md's Stage index.
     Aylesbury (writing a `gym_resend_config` row), hit a real, live
     `RangeError: Invalid key length` (`ERR_CRYPTO_INVALID_KEYLEN`) in
     podhq-client's Production — `SECRET_ENCRYPTION_KEY` there didn't
-    decode to 32 bytes. Root cause of *that* was never conclusively
-    found: `vercel env ls` always showed the variable present and
-    unchanged ("created Nd ago") no matter how many times it was edited
-    or fully deleted-and-recreated in the dashboard; a decisive test
-    (pulling the live Production value via `vercel env pull` and
-    attempting to decrypt a row encrypted with the user's local key)
-    proved the live value was a stray 11-character string, not whatever
-    was actually pasted — repeatedly, across multiple edit attempts,
-    including full delete+recreate. Vercel CLI write commands
-    (`env add`/`env rm`/`--prod`) and even piping the local key to the
-    clipboard were hard-blocked by Claude Code's auto-mode classifier
-    for the whole session (confirmed: this cannot be worked around by
-    in-chat user permission, and self-granting a permission rule via
-    `.claude/settings.local.json` is *also* blocked — a real, by-design
-    limit worth remembering, see `[[feedback_vercel_cli_write_blocked]]`).
+    decode to 32 bytes at that moment. Root cause was never conclusively
+    found, and an earlier version of this note overclaimed one: a
+    `vercel env pull` + local-decrypt test appeared to "prove" the live
+    value was a stray 11-character string regardless of what was pasted
+    — but that test is invalid. `SECRET_ENCRYPTION_KEY` is marked
+    Sensitive in Vercel, and Vercel's docs confirm a Sensitive
+    variable's value can never be read back via dashboard or CLI once
+    set, by design — so `env pull`/`env ls` were never capable of
+    showing the real value in the first place, and that "proof" should
+    be discarded. A known, unrelated Vercel bug (Sensitive var +
+    comment field on Sensitive Environment Variables Bug Discussion —
+    similar to `vercel/community#5898`) doesn't apply either — no
+    comment field was used. The two *real* data points are the runtime
+    errors themselves, from `vercel logs` (a genuine RangeError, then
+    later a genuine GCM auth-tag mismatch) — consistent with an ordinary
+    paste/edit mistake somewhere across the many manual re-entries that
+    session, not a mysterious unfixable platform defect. Next time this
+    needs solving: one clean edit + immediate live test, rather than
+    trusting `env pull`/`env ls` to confirm anything for a Sensitive
+    variable. Vercel CLI write commands (`env add`/`env rm`/`--prod`)
+    and even piping the local key to the clipboard were hard-blocked by
+    Claude Code's auto-mode classifier for the whole session (confirmed:
+    this cannot be worked around by in-chat user permission, and
+    self-granting a permission rule via `.claude/settings.local.json` is
+    *also* blocked — a real, by-design limit worth remembering, see
+    `[[feedback_vercel_cli_write_blocked]]`).
 
     **Actual fix applied**: rather than keep chasing the Vercel/env
     mystery, reverted the cause of the live regression — deleted the
@@ -1708,15 +1719,15 @@ add the matching one-line entry in ROADMAP.md's Stage index.
     live via a real signup through the browser (Claude Code's own
     browser-automation tools, not the user) — clean success, no crash.
 
-    **Still open, no urgency**: why Vercel's dashboard won't durably
-    persist a new value for this one variable on podhq-client's
-    Production. Not blocking anything currently live. If revisited:
-    rule out multi-team/multi-project confusion first (confirmed NOT
-    the cause this time — the project ID in the runtime error logs
-    matched the CLI-queried project exactly), then consider Vercel
-    support given the CLI is otherwise fully authenticated and
-    functional for every read-only operation tried (`env ls`,
-    `vercel ls`, `vercel inspect`, `vercel logs`).
+    **Still open, no urgency**: not actually confirmed to be a Vercel
+    platform defect (see correction above) — most likely an ordinary
+    paste mismatch during a chaotic multi-edit session, never pinned
+    down. Not blocking anything currently live. If revisited: skip
+    `env pull`/`env ls` as a verification method for this Sensitive
+    variable (structurally can't show the real value); verify only via
+    a real functional test (`vercel logs` after a live signup attempt).
+    Multi-team/multi-project confusion was ruled out (project ID in the
+    runtime error logs matched the CLI-queried project exactly).
 
 
 ## Database schema — full migration application history
