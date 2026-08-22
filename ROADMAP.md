@@ -56,6 +56,7 @@ Full detail for each entry (bug, fix, live verification) is in `ROADMAP_HISTORY.
 33. **Hove Founding Member offer** — permanent staff-granted 20%-off flag, cleared on cancellation. Discount verified live 2026-08-22.
 34. **Promo code system** (renamed from "coupons" 2026-08-22 — collided with the existing `gift_vouchers` feature) — gym-scoped codes, atomic `redeem_promo_code()` RPC. Migration applied live 2026-08-22, verified via `/setup`.
 35. **`members` table wiped clean** — all 24 rows were QA/test data (no real podhq-client customers yet); full FK-ordered wipe run live 2026-08-22 to reset for a fresh test pass.
+36. **`cancel_booking()` cancellation window fixed 2hr→3hr** (migration `0046`, shared DB) — real business policy per GymFlow, not just a docs/Ts&Cs fix. Written, not yet applied live — see podhq-client's ROADMAP.md.
 
 ## Database schema
 
@@ -75,7 +76,8 @@ Key shared-schema migrations (full narrative + gotchas in `ROADMAP_HISTORY.md`):
 
 - `0040` (08-19) `gym_stripe_config` — per-gym Stripe Connect account id (not secret, no encryption).
 - `0026` (08-14) `stripe_refunds` — `stripe_payment_intent_id` on `credits`/`gift_vouchers`, `+'refund'` reason.
-- `0020` (08-12) `cancel_booking()` RPC — 2hr refund/forfeit policy, advisory-lock race safety.
+- `0020` (08-12) `cancel_booking()` RPC — refund/forfeit policy (now 3hr, see `0046`), advisory-lock race safety.
+- `0046` (08-22) `cancel_booking()` window corrected 2hr→3hr, matching GymFlow's real policy.
 - `0019` (08-11) `get_credit_balance()` RPC — avoids the 1000-row PostgREST truncation cap on ledger sums.
 - `0018` (08-11) `gym_kisi_mapping` +capacity/hours; `create_booking()` enforces capacity via advisory lock.
 - `0017` (08-11) `members` +mobile/gender/address/waiver columns (podhq-client Access onboarding).
