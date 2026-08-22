@@ -1589,8 +1589,15 @@ add the matching one-line entry in ROADMAP.md's Stage index.
 
     `npx tsc --noEmit`, `eslint`, `next build`, and `npx vitest run` all
     pass clean in both repos; both deployed to production same session.
-    Not yet live-tested with a real founding-member purchase — worth
-    doing before granting founding status to a real member.
+
+    **Live-tested 2026-08-22** (same session as stages 35-36): a test
+    member flagged `founding_member = true` at Hove bought "Gym pod —
+    Solo" (base £15.00) with no promo code entered — Stripe's real
+    Checkout Session (Sandbox, on Hove's own connected account) correctly
+    showed £12.00, exactly 20% off, confirming the discount applies
+    automatically per `[[project_aylesbury_resend_incident]]`-style live
+    verification (browser automation, stopped before entering card
+    details). Not tested: the cancellation-triggered revocation.
 
 34. **General-purpose coupon system built** — 2026-08-20, same session,
     following straight on from Founding Member. Deliberately separate
