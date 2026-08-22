@@ -35,11 +35,11 @@ Full detail for each entry (bug, fix, live verification) is in `ROADMAP_HISTORY.
 12. **Deploy** — live at podhq.vercel.app. Two cert-error red herrings resolved.
 13. **Admin PDF export** — per-gym P&L PDF for a date range. Done 2026-08-06.
 14. **Permanent account deletion** (admin) — type-to-confirm UI, audit-logged, FK fix. Verified live.
-15. **Pods backend** (`/pods`) — manual booking, per-gym capacity/hours. RPC verified; UI never click-tested (MFA).
+15. **Pods backend** (`/pods`) — manual booking, per-gym capacity/hours. RPC verified; UI click-tested live 2026-08-22 (see Stage 19).
 16. **Other income** — `gym_other_income`, feeds P&L + Revenue combined card, kept out of GymFlow Revenue.
 17. **Staff refunds** — Stripe refund API, ledger corrected via `charge.refunded` webhook. Verified live 2026-08-14.
 18. **`/pods`→"Access"** — live Kisi door-unlock log, 15s polling on today only.
-19. **Member profiles + Calendar** — `/pods/members/[id]`, `/pods/calendar` (grid, slot detail, cancel).
+19. **Member profiles + Calendar** — `/pods/members/[id]`, `/pods/calendar` (grid, slot detail, cancel). Book/detail/cancel flow verified live 2026-08-22.
 20. **Light theme** — content area dark→light w/ WCAG fixes; sidebar reverted to black same day.
 21. **Staff sell/comp + card-on-file + catalog** (`/setup`) — embedded Stripe Checkout, live `catalog_items` table.
 22. **OWASP audit** — critical IDOR fix, Stripe idempotency, TOCTOU fix, atomic rate limiter, dep patches.
@@ -47,7 +47,7 @@ Full detail for each entry (bug, fix, live verification) is in `ROADMAP_HISTORY.
 24. **Health check + tests** — `/api/health`, Vitest added, `resolveGym` duplication consolidated.
 25. **Calendar redesign + gold-to-sidebar-only** — full/partial/empty slot states + waitlist count.
 26. **Shared Auth Site-URL bug** — magic-link callback missing from allowlist. Fixed 2026-08-17.
-27. **Revenue month drill-down** (`/revenue`) — GymFlow-style date-range dropdown. Not click-tested (MFA).
+27. **Revenue month drill-down** (`/revenue`) — GymFlow-style date-range dropdown. Verified live 2026-08-22.
 28. **Setup gym pickers merged** — plus `SECRET_ENCRYPTION_KEY` missing from Vercel Production found & fixed.
 29. **Stripe Connect — Hove pilot** — per-gym Connect accounts, direct charges. Verified live end-to-end 2026-08-20.
 30. **Hove pricing catalog uploaded** — 22 items from real spreadsheet, combo pricing allocated proportionally.

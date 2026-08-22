@@ -107,6 +107,8 @@ add the matching one-line entry in ROADMAP.md's Stage index.
     it for real staff use; the underlying `create_booking()` RPC and
     `/api/pods/*` route logic it calls are verified as above.
 
+    **UI finally click-tested live 2026-08-22** — the manual-booking flow now lives under `/pods/calendar` (see Stage 19), not a separate settings-style `/pods` form as originally scoped; superseded by that page's grid+modal design. The user logged in themselves (MFA, as always, isn't scriptable) and handed the session to Claude via claude-in-chrome. See Stage 19 below for the actual click-test.
+
     See podhq-client's ROADMAP.md for the matching self-service-side live
     verification (hours filtering, the BST timezone fix, regression check
     on normal all-day bookings).
@@ -433,6 +435,26 @@ add the matching one-line entry in ROADMAP.md's Stage index.
     date; nav highlighting confirmed fixed (Calendar and Access no
     longer both light up). `npx tsc --noEmit` and `eslint` both pass
     clean across every file touched this session.
+
+    **Full book→cancel round-trip click-tested live 2026-08-22** (the
+    gap above was viewing only — Cancel was seen present but not
+    actually exercised, and nothing was ever booked through the UI).
+    User logged into a real admin session (MFA, not scriptable); Claude
+    drove the rest via claude-in-chrome. Confirmed an existing full slot
+    (Mon 09:00 Aylesbury Berryfields, 1/1 + 1 waiting) correctly showed
+    booking history including a prior cancellation, the current booked
+    member, and the waitlist entry. Then, on an empty slot (Wed 12:00),
+    searched the member select (a native `<select>`, not a filtered
+    autocomplete — 20+ leftover test-member names from past QA sessions
+    are visible in the list, e.g. "Pilot Test Member", "PodHQ Refund
+    Test" — cosmetic data-hygiene debt, not a bug), selected a real
+    member, and clicked Book: the grid cell went from 0/1 to 1/1 live,
+    confirmed via `getSlotDetail`. Clicked Cancel — a genuine two-step
+    inline Confirm/Back control, not a plain `confirm()` — confirmed,
+    and the row correctly flipped to "Cancelled" with the grid cell back
+    to 0/1. No leftover test data: the cancelled booking is
+    indistinguishable in the DB from the real pre-existing cancelled
+    rows already visible on that slot.
 
 20. **Switched from dark-only to a light theme** — same session, 2026-08-14,
     at the user's request after installing the `ui-ux-pro-max` Claude Code
@@ -993,6 +1015,21 @@ add the matching one-line entry in ROADMAP.md's Stage index.
     verified via local dev server startup + full build only, pushed to
     production on the user's own explicit go-ahead after describing the
     change rather than a live click-through.
+
+    **Click-tested live 2026-08-22.** User logged into a real admin
+    session (MFA); Claude drove the rest via claude-in-chrome against
+    local dev. Opened the dropdown — presets (Last month/QTD/Last
+    quarter/YTD/Full year) on the left, a month grid on the right with
+    future months (Aug–Dec 2026, past the last completed month)
+    correctly greyed out and unclickable. Navigated the year back to
+    2025 (all 12 months selectable again) and picked Mar 2025: header,
+    card label ("Selected month revenue"), and every figure (£10,680.68,
+    541 transactions, £19.74 avg) updated correctly with a visible
+    "Loading…" state during the fetch — confirming the stale-closure fix
+    above actually holds under a real double-state-update click, not
+    just in the code. Also checked a preset: Year to date correctly
+    showed "Jan 2026 – Jul 2026", £152,353.72, 5,681 transactions. No
+    console errors during any of it.
 
 28. **`/setup`'s three gym pickers merged into one, 2026-08-18** — surfaced
     while scoping Hove's onboarding (new per-gym Resend + Brevo accounts,
