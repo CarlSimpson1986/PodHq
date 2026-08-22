@@ -567,7 +567,7 @@ export type CancelBookingResult =
 
 /**
  * Staff-initiated cancellation from the Calendar's slot panel — reuses the
- * same cancel_booking() RPC and 2-hour refund/forfeit policy as the
+ * same cancel_booking() RPC and 3-hour refund/forfeit policy as the
  * member-facing Cancel button in podhq-client, rather than inventing a
  * separate staff policy. The booking's own member_id is looked up
  * server-side (never trusts a client-supplied id), which also doubles as
