@@ -54,7 +54,7 @@ Full detail for each entry (bug, fix, live verification) is in `ROADMAP_HISTORY.
 31. **Hove hours set 6am–10pm** — Calendar grid made resource-aware (`visibleHours`).
 32. **Combo memberships fixed** — was two linked items (broken by `memberships.member_id` unique), now one product via `credits_secondary`.
 33. **Hove Founding Member offer** — permanent staff-granted 20%-off flag, cleared on cancellation.
-34. **Promo code system** (renamed from "coupons" 2026-08-22 — collided with the existing `gift_vouchers` feature) — gym-scoped codes, atomic `redeem_promo_code()` RPC. Check `ROADMAP_HISTORY.md` for apply status.
+34. **Promo code system** (renamed from "coupons" 2026-08-22 — collided with the existing `gift_vouchers` feature) — gym-scoped codes, atomic `redeem_promo_code()` RPC. Migration applied live 2026-08-22, verified via `/setup`.
 
 ## Database schema
 
