@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { GYM_NAMES } from "@/lib/data/types";
 
-export const createCouponSchema = z
+export const createPromoCodeSchema = z
   .object({
     gym: z.enum(GYM_NAMES).optional(),
     code: z.string().min(2).max(30),
@@ -13,7 +13,7 @@ export const createCouponSchema = z
   })
   .strict()
   .refine((data) => data.usageLimitType !== "total_cap" || typeof data.usageLimitValue === "number", {
-    message: "A total-cap coupon needs a usage limit value.",
+    message: "A total-cap promo code needs a usage limit value.",
     path: ["usageLimitValue"],
   })
   .refine((data) => data.discountType !== "percentage" || data.discountValue <= 100, {
@@ -21,4 +21,4 @@ export const createCouponSchema = z
     path: ["discountValue"],
   });
 
-export const setCouponEnabledSchema = z.object({ gym: z.enum(GYM_NAMES).optional(), enabled: z.boolean() }).strict();
+export const setPromoCodeEnabledSchema = z.object({ gym: z.enum(GYM_NAMES).optional(), enabled: z.boolean() }).strict();

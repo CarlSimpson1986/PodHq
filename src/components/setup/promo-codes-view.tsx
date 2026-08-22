@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { Coupon, DiscountType, UsageLimitType } from "@/lib/data/coupons";
+import type { PromoCode, DiscountType, UsageLimitType } from "@/lib/data/promo-codes";
 import type { CatalogItem } from "@/lib/data/catalog";
 import type { GymName } from "@/lib/data/types";
 
@@ -11,14 +11,14 @@ const secondaryButtonClass =
   "rounded-md border border-card-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-background disabled:opacity-50";
 const inputClass = "rounded-md border border-card-border bg-card px-2 py-1 text-sm text-foreground";
 
-function formatDiscount(coupon: Coupon) {
-  return coupon.discountType === "percentage" ? `${coupon.discountValue}%` : `£${coupon.discountValue.toFixed(2)}`;
+function formatDiscount(promoCode: PromoCode) {
+  return promoCode.discountType === "percentage" ? `${promoCode.discountValue}%` : `£${promoCode.discountValue.toFixed(2)}`;
 }
 
-function formatLimit(coupon: Coupon) {
-  if (coupon.usageLimitType === "unlimited") return `Unlimited (${coupon.redeemedCount} used)`;
-  if (coupon.usageLimitType === "once_per_member") return `Once per member (${coupon.redeemedCount} used)`;
-  return `${coupon.redeemedCount} / ${coupon.usageLimitValue} used`;
+function formatLimit(promoCode: PromoCode) {
+  if (promoCode.usageLimitType === "unlimited") return `Unlimited (${promoCode.redeemedCount} used)`;
+  if (promoCode.usageLimitType === "once_per_member") return `Once per member (${promoCode.redeemedCount} used)`;
+  return `${promoCode.redeemedCount} / ${promoCode.usageLimitValue} used`;
 }
 
 interface FormState {
@@ -39,8 +39,8 @@ const emptyForm: FormState = {
   itemIds: [],
 };
 
-export function CouponsView({ gym }: { gym: GymName | null }) {
-  const [coupons, setCoupons] = useState<Coupon[]>([]);
+export function PromoCodesView({ gym }: { gym: GymName | null }) {
+  const [promoCodes, setPromoCodes] = useState<PromoCode[]>([]);
   const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -51,24 +51,24 @@ export function CouponsView({ gym }: { gym: GymName | null }) {
 
   const load = useCallback(async (nextGym: GymName | null) => {
     if (!nextGym) {
-      setCoupons([]);
+      setPromoCodes([]);
       setCatalogItems([]);
       return;
     }
     setLoading(true);
     setError("");
     try {
-      const [couponsRes, catalogRes] = await Promise.all([
-        fetch(`/api/setup/coupons?gym=${encodeURIComponent(nextGym)}`),
+      const [promoCodesRes, catalogRes] = await Promise.all([
+        fetch(`/api/setup/promo-codes?gym=${encodeURIComponent(nextGym)}`),
         fetch(`/api/setup/catalog?gym=${encodeURIComponent(nextGym)}`),
       ]);
-      const couponsBody = await couponsRes.json();
+      const promoCodesBody = await promoCodesRes.json();
       const catalogBody = await catalogRes.json();
-      if (couponsBody.status !== "ok" || catalogBody.status !== "ok") {
-        setError(couponsBody.message ?? catalogBody.message ?? "Could not load coupons.");
+      if (promoCodesBody.status !== "ok" || catalogBody.status !== "ok") {
+        setError(promoCodesBody.message ?? catalogBody.message ?? "Could not load promo codes.");
         return;
       }
-      setCoupons(couponsBody.coupons);
+      setPromoCodes(promoCodesBody.promoCodes);
       setCatalogItems(catalogBody.items);
     } catch {
       setError("Something went wrong. Try again.");
@@ -79,7 +79,7 @@ export function CouponsView({ gym }: { gym: GymName | null }) {
 
   useEffect(() => {
     // Deferred a tick — same pattern as calendar-view.tsx's fetchRange —
-    // so this effect's own setLoading/setCoupons calls aren't reachable
+    // so this effect's own setLoading/setPromoCodes calls aren't reachable
     // synchronously from the effect body itself. No initial-render skip
     // (unlike catalog-view.tsx): this component has no server-provided
     // initial data, it always needs to fetch, including on mount.
@@ -99,13 +99,13 @@ export function CouponsView({ gym }: { gym: GymName | null }) {
       return;
     }
     if (form.usageLimitType === "total_cap" && !(usageLimitValue && usageLimitValue > 0)) {
-      setError("A total-cap coupon needs a positive usage limit.");
+      setError("A total-cap promo code needs a positive usage limit.");
       return;
     }
     setError("");
     setSaving(true);
     try {
-      const res = await fetch("/api/setup/coupons", {
+      const res = await fetch("/api/setup/promo-codes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -120,7 +120,7 @@ export function CouponsView({ gym }: { gym: GymName | null }) {
       });
       const body = await res.json();
       if (body.status !== "ok") {
-        setError(body.message ?? "Could not create this coupon.");
+        setError(body.message ?? "Could not create this promo code.");
         return;
       }
       setForm(emptyForm);
@@ -133,19 +133,19 @@ export function CouponsView({ gym }: { gym: GymName | null }) {
     }
   }
 
-  async function handleToggleEnabled(coupon: Coupon) {
+  async function handleToggleEnabled(promoCode: PromoCode) {
     if (!gym) return;
-    setBusyId(coupon.id);
+    setBusyId(promoCode.id);
     setError("");
     try {
-      const res = await fetch(`/api/setup/coupons/${coupon.id}`, {
+      const res = await fetch(`/api/setup/promo-codes/${promoCode.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gym, enabled: !coupon.enabled }),
+        body: JSON.stringify({ gym, enabled: !promoCode.enabled }),
       });
       const body = await res.json();
       if (body.status !== "ok") {
-        setError(body.message ?? "Could not update this coupon.");
+        setError(body.message ?? "Could not update this promo code.");
         return;
       }
       load(gym);
@@ -164,8 +164,8 @@ export function CouponsView({ gym }: { gym: GymName | null }) {
   if (!gym) {
     return (
       <section className="card-glass p-4">
-        <h2 className="text-sm font-semibold text-foreground">Coupons</h2>
-        <p className="mt-3 text-sm text-muted-foreground">Select a gym above to manage its coupons.</p>
+        <h2 className="text-sm font-semibold text-foreground">Promo Codes</h2>
+        <p className="mt-3 text-sm text-muted-foreground">Select a gym above to manage its promo codes.</p>
       </section>
     );
   }
@@ -174,9 +174,9 @@ export function CouponsView({ gym }: { gym: GymName | null }) {
     <section className="card-glass p-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-sm font-semibold text-foreground">Coupons</h2>
+          <h2 className="text-sm font-semibold text-foreground">Promo Codes</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Members redeem these themselves at checkout — each coupon applies only to the specific items you pick below.
+            Members redeem these themselves at checkout — each code applies only to the specific items you pick below.
           </p>
         </div>
         {!adding && (
@@ -272,8 +272,8 @@ export function CouponsView({ gym }: { gym: GymName | null }) {
       {error && <p className="mt-2 text-xs text-danger">{error}</p>}
       {loading && <p className="mt-2 text-xs text-muted-foreground">Loading...</p>}
 
-      {coupons.length === 0 ? (
-        <p className="mt-3 text-sm text-muted-foreground">No coupons yet.</p>
+      {promoCodes.length === 0 ? (
+        <p className="mt-3 text-sm text-muted-foreground">No promo codes yet.</p>
       ) : (
         <div className="mt-3 overflow-x-auto">
           <table className="w-full text-left text-sm">
@@ -288,25 +288,25 @@ export function CouponsView({ gym }: { gym: GymName | null }) {
               </tr>
             </thead>
             <tbody>
-              {coupons.map((coupon) => (
-                <tr key={coupon.id} className="border-b border-card-border last:border-b-0">
-                  <td className="py-2 font-mono text-foreground">{coupon.code}</td>
-                  <td className="py-2 text-foreground">{formatDiscount(coupon)}</td>
-                  <td className="py-2 text-muted-foreground">{formatLimit(coupon)}</td>
-                  <td className="py-2 text-muted-foreground">{coupon.itemIds.map(itemLabel).join(", ")}</td>
+              {promoCodes.map((promoCode) => (
+                <tr key={promoCode.id} className="border-b border-card-border last:border-b-0">
+                  <td className="py-2 font-mono text-foreground">{promoCode.code}</td>
+                  <td className="py-2 text-foreground">{formatDiscount(promoCode)}</td>
+                  <td className="py-2 text-muted-foreground">{formatLimit(promoCode)}</td>
+                  <td className="py-2 text-muted-foreground">{promoCode.itemIds.map(itemLabel).join(", ")}</td>
                   <td className="py-2">
-                    <span className={coupon.enabled ? "text-foreground" : "text-muted-foreground"}>
-                      {coupon.enabled ? "Enabled" : "Disabled"}
+                    <span className={promoCode.enabled ? "text-foreground" : "text-muted-foreground"}>
+                      {promoCode.enabled ? "Enabled" : "Disabled"}
                     </span>
                   </td>
                   <td className="py-2 text-right">
                     <button
                       type="button"
-                      onClick={() => handleToggleEnabled(coupon)}
-                      disabled={busyId === coupon.id}
+                      onClick={() => handleToggleEnabled(promoCode)}
+                      disabled={busyId === promoCode.id}
                       className={secondaryButtonClass}
                     >
-                      {busyId === coupon.id ? "Working..." : coupon.enabled ? "Disable" : "Enable"}
+                      {busyId === promoCode.id ? "Working..." : promoCode.enabled ? "Disable" : "Enable"}
                     </button>
                   </td>
                 </tr>
