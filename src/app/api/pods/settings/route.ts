@@ -93,6 +93,7 @@ export async function POST(request: NextRequest) {
       podCapacity: parsed.data.podCapacity,
       openHour: parsed.data.openHour,
       closeHour: parsed.data.closeHour,
+      equipment: parsed.data.equipment,
     });
 
     if (!updated) {

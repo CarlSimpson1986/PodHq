@@ -1,0 +1,18 @@
+-- Lets each pod's real resistance equipment gate what podhq-client's AI
+-- Coach can prescribe there, instead of every gym drawing from one
+-- catalog tuned to Hove's equipment (flagged by Carl: "Lat pull down and
+-- rows need to be on a dual pulley cable machine etc"). No CHECK
+-- constraint — same "TS union validated at the API boundary, not a DB
+-- CHECK" convention as credit_type/access_provider on this same table
+-- (see that migration's own comment); the union lives in
+-- src/lib/data/types.ts (EQUIPMENT_TYPES), duplicated in podhq-client's
+-- src/lib/coach/types.ts.
+--
+-- No backfill: every existing row lands on the default empty array, which
+-- podhq-client's generation logic treats as "unconfigured -> unrestricted"
+-- (today's exact behavior, full catalog, no filtering) — so this ships
+-- with zero behavior change for every live gym. Carl narrows gyms down
+-- one at a time via the pod Settings panel as their real equipment is
+-- confirmed, same incremental per-gym sign-off already used for this
+-- catalog's own Hove content.
+alter table public.pod_resources add column equipment text[] not null default '{}';

@@ -57,6 +57,16 @@ export const LEAD_STATUSES = ["new_lead", "contacted", "trial"] as const;
 
 export type LeadStatus = (typeof LEAD_STATUSES)[number];
 
+// pod_resources.equipment — gates which exercises podhq-client's AI Coach
+// can prescribe at a given pod. Duplicated verbatim in podhq-client's
+// src/lib/coach/types.ts, same cross-repo convention as GYM_NAMES above
+// (that file's src/lib/gym.ts comment: "must match podHq's GYM_NAMES
+// exactly"). One "cable_machine" category deliberately covers both dual-
+// and single-pulley setups — see that file's own comment.
+export const EQUIPMENT_TYPES = ["barbell_rack", "cable_machine", "dumbbells", "leg_extension_curl_machine"] as const;
+
+export type EquipmentType = (typeof EQUIPMENT_TYPES)[number];
+
 export interface RevenueRow {
   id: number;
   gym: string;
