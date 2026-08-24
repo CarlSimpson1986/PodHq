@@ -1,0 +1,14 @@
+-- Tracks whether a member has already accepted the Health Centre's
+-- "reduce today's session" recovery suggestion for a given
+-- workout_sessions row (podhq-client, applyRecoveryAdjustment in
+-- src/lib/coach/workout-session.ts). Null = not applied.
+--
+-- Without this, recoveryAdvice was recomputed fresh from live wearable
+-- data on every session load with nothing recording that the member had
+-- already acted on it — reopening an unstarted session (exit and come
+-- back before starting) re-showed the banner, and tapping "Reduce" again
+-- re-multiplied the already-discounted weight_target_kg by
+-- DELOAD_WEIGHT_MULTIPLIER a second time, compounding the reduction.
+-- Found via a Carl-requested "review this as a user" walkthrough,
+-- 2026-08-24, the same day the feature shipped.
+alter table public.workout_sessions add column recovery_adjusted_at timestamptz;
