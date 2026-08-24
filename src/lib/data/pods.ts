@@ -1,7 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logAuthEvent } from "@/lib/audit";
-import type { GymName } from "./types";
+import type { EquipmentType, GymName } from "./types";
 
 export interface StaffActor {
   userId: string;
@@ -39,6 +39,11 @@ export interface PodResource {
   podCapacity: number;
   openHour: number;
   closeHour: number;
+  // Which pod_resources.equipment categories this pod actually has —
+  // gates podhq-client's AI Coach exercise selection there (see
+  // 0056_pod_resources_equipment.sql). Empty means unconfigured, which
+  // podhq-client treats as unrestricted, not "no equipment."
+  equipment: EquipmentType[];
 }
 
 export interface AccessEvent {
@@ -80,7 +85,9 @@ export async function getPodResourcesForGym(gym: GymName): Promise<PodResource[]
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("pod_resources")
-    .select("id, gym, resource_key, label, credit_type, slot_duration_minutes, access_provider, pod_capacity, open_hour, close_hour")
+    .select(
+      "id, gym, resource_key, label, credit_type, slot_duration_minutes, access_provider, pod_capacity, open_hour, close_hour, equipment"
+    )
     .eq("gym", gym)
     .order("resource_key");
 
@@ -97,6 +104,7 @@ export async function getPodResourcesForGym(gym: GymName): Promise<PodResource[]
     podCapacity: row.pod_capacity,
     openHour: row.open_hour,
     closeHour: row.close_hour,
+    equipment: (row.equipment ?? []) as EquipmentType[],
   }));
 }
 
@@ -104,7 +112,9 @@ export async function getPodResourceById(resourceId: number): Promise<PodResourc
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("pod_resources")
-    .select("id, gym, resource_key, label, credit_type, slot_duration_minutes, access_provider, pod_capacity, open_hour, close_hour")
+    .select(
+      "id, gym, resource_key, label, credit_type, slot_duration_minutes, access_provider, pod_capacity, open_hour, close_hour, equipment"
+    )
     .eq("id", resourceId)
     .maybeSingle();
 
@@ -122,13 +132,14 @@ export async function getPodResourceById(resourceId: number): Promise<PodResourc
     podCapacity: data.pod_capacity,
     openHour: data.open_hour,
     closeHour: data.close_hour,
+    equipment: (data.equipment ?? []) as EquipmentType[],
   };
 }
 
 export async function updatePodResourceSettings(
   resourceId: number,
   gym: GymName,
-  settings: { podCapacity: number; openHour: number; closeHour: number }
+  settings: { podCapacity: number; openHour: number; closeHour: number; equipment: EquipmentType[] }
 ): Promise<boolean> {
   const admin = createAdminClient();
   // gym re-checked here, not just trusted from the caller's own scope
@@ -136,7 +147,12 @@ export async function updatePodResourceSettings(
   // write in this file (createManualBooking, cancelBookingAsStaff).
   const { data, error } = await admin
     .from("pod_resources")
-    .update({ pod_capacity: settings.podCapacity, open_hour: settings.openHour, close_hour: settings.closeHour })
+    .update({
+      pod_capacity: settings.podCapacity,
+      open_hour: settings.openHour,
+      close_hour: settings.closeHour,
+      equipment: settings.equipment,
+    })
     .eq("id", resourceId)
     .eq("gym", gym)
     .select("id")

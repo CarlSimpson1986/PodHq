@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { GYM_NAMES } from "@/lib/data/types";
+import { GYM_NAMES, EQUIPMENT_TYPES } from "@/lib/data/types";
 
 export const podBookingsQuerySchema = z
   .object({
@@ -76,6 +76,7 @@ export const updatePodSettingsSchema = z
     podCapacity: z.number().int().min(1).max(50),
     openHour: z.number().int().min(0).max(23),
     closeHour: z.number().int().min(1).max(24),
+    equipment: z.array(z.enum(EQUIPMENT_TYPES)),
   })
   .strict()
   .refine((v) => v.openHour < v.closeHour, { message: "Open hour must be before close hour.", path: ["openHour"] });

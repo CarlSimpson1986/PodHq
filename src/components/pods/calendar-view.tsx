@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { GymSelect } from "@/components/ui/gym-select";
-import type { GymName } from "@/lib/data/types";
+import { EQUIPMENT_TYPES, type EquipmentType, type GymName } from "@/lib/data/types";
 import type { PodBooking, PodMember, PodResource, SlotDetail, WaitlistCount } from "@/lib/data/pods";
 
 type ViewMode = "day" | "week" | "month";
@@ -44,6 +44,13 @@ function isSameDay(a: Date, b: Date): boolean {
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
 
+const EQUIPMENT_LABELS: Record<EquipmentType, string> = {
+  barbell_rack: "Barbell rack",
+  cable_machine: "Cable machine",
+  dumbbells: "Dumbbells",
+  leg_extension_curl_machine: "Leg extension/curl machine",
+};
+
 function formatHour(h: number) {
   return `${String(h).padStart(2, "0")}:00`;
 }
@@ -80,6 +87,7 @@ export function CalendarView({
   const [capacityDraft, setCapacityDraft] = useState(resource?.podCapacity ?? 1);
   const [openHourDraft, setOpenHourDraft] = useState(resource?.openHour ?? 0);
   const [closeHourDraft, setCloseHourDraft] = useState(resource?.closeHour ?? 24);
+  const [equipmentDraft, setEquipmentDraft] = useState<EquipmentType[]>(resource?.equipment ?? []);
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
 
@@ -97,6 +105,11 @@ export function CalendarView({
     setCapacityDraft(resource?.podCapacity ?? 1);
     setOpenHourDraft(resource?.openHour ?? 0);
     setCloseHourDraft(resource?.closeHour ?? 24);
+    setEquipmentDraft(resource?.equipment ?? []);
+  }
+
+  function toggleEquipmentDraft(equipment: EquipmentType) {
+    setEquipmentDraft((prev) => (prev.includes(equipment) ? prev.filter((e) => e !== equipment) : [...prev, equipment]));
   }
 
   // Range covered by the current view.
@@ -162,7 +175,14 @@ export function CalendarView({
       const res = await fetch("/api/pods/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gym, resourceId, podCapacity: capacityDraft, openHour: openHourDraft, closeHour: closeHourDraft }),
+        body: JSON.stringify({
+          gym,
+          resourceId,
+          podCapacity: capacityDraft,
+          openHour: openHourDraft,
+          closeHour: closeHourDraft,
+          equipment: equipmentDraft,
+        }),
       });
       const body = await res.json();
       if (body.status !== "ok") {
@@ -170,7 +190,11 @@ export function CalendarView({
         return;
       }
       setResources((prev) =>
-        prev.map((r) => (r.id === resourceId ? { ...r, podCapacity: capacityDraft, openHour: openHourDraft, closeHour: closeHourDraft } : r))
+        prev.map((r) =>
+          r.id === resourceId
+            ? { ...r, podCapacity: capacityDraft, openHour: openHourDraft, closeHour: closeHourDraft, equipment: equipmentDraft }
+            : r
+        )
       );
       setEditingSettings(false);
     } catch {
@@ -309,6 +333,24 @@ export function CalendarView({
             <button type="button" onClick={handleSaveSettings} disabled={savingSettings || !resourceId} className={buttonClass}>
               {savingSettings ? "Saving..." : "Save"}
             </button>
+          </div>
+          <div className="mt-4">
+            <p className="mb-2 text-xs text-muted-foreground">
+              AI Coach equipment — gates which exercises this pod&apos;s members can be prescribed. Leave unchecked/
+              empty while unconfirmed: an empty list means unrestricted, not &ldquo;no equipment&rdquo;.
+            </p>
+            <div className="flex flex-wrap gap-4">
+              {EQUIPMENT_TYPES.map((equipment) => (
+                <label key={equipment} className="flex items-center gap-2 text-xs text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={equipmentDraft.includes(equipment)}
+                    onChange={() => toggleEquipmentDraft(equipment)}
+                  />
+                  {EQUIPMENT_LABELS[equipment]}
+                </label>
+              ))}
+            </div>
           </div>
           {settingsError && <p className="mt-2 text-xs text-danger">{settingsError}</p>}
           {!resource && <p className="mt-2 text-xs text-warning">This gym has no pod configured yet.</p>}
