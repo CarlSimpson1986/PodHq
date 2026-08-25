@@ -1,0 +1,13 @@
+-- Adds heart-rate-variability to the daily wearable snapshot (podhq-client,
+-- 2026-08-25 Health tab redesign — src/lib/wearables/google-health.ts's
+-- fetchHeartRateVariability, src/lib/data/wearables.ts's WearableSnapshot).
+-- Google Health's daily-heart-rate-variability data type is confirmed
+-- present in the live discovery document, but the exact `list` response
+-- field name (dailyHeartRateVariability.rmssdMillis) is a best-effort
+-- guess, not yet confirmed against a real synced response — same
+-- "ship it, then correct the field name from real Vercel logs" path
+-- steps/resting-heart-rate both went through on 2026-08-24. Nullable,
+-- same as every other wearable metric — a member with no HRV data yet
+-- (unsynced, or a device that doesn't report it) is a null row, not a
+-- missing row.
+alter table public.member_wearable_data add column if not exists hrv_ms integer;
