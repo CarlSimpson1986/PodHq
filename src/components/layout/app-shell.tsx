@@ -98,7 +98,8 @@ const NAV_ITEMS = [
     icon: (
       <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.5}>
         <path d="M3 5.5A1.5 1.5 0 0 1 4.5 4h11A1.5 1.5 0 0 1 17 5.5v6A1.5 1.5 0 0 1 15.5 13H9l-3.5 3v-3H4.5A1.5 1.5 0 0 1 3 11.5v-6Z" strokeLinejoin="round" />
-        <path d="M6.5 7.5h7M6.5 10h4.5" strokeLinecap="round" />
+        <path d="M8.6 7c.15-.85.95-1.4 1.8-1.4.95 0 1.75.6 1.75 1.45 0 .75-.5 1.05-1.05 1.4-.5.3-.85.6-.85 1.2" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx="10.25" cy="10.75" r="0.55" fill="currentColor" stroke="none" />
       </svg>
     ),
   },
