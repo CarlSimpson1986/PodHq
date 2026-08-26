@@ -2053,3 +2053,64 @@ notification path.
 `next build` all clean in both repos. **Not yet tested live** — blocked
 on Carl applying migration `0063` first; no chat question can actually
 reach `/chat-questions` until that table exists.
+
+**Update, same day**: Carl applied the migration via the Supabase SQL
+Editor (first attempt failed with `relation "public.help_faq_items" does
+not exist` — only half the script had been pasted; a full re-paste of
+both `create table` statements succeeded). Genuinely exercised same
+session: he asked POD chat "can I use my membership at other gyms?", it
+correctly flagged itself as uncertain (the Terms & Conditions document
+defines "the Network" as "any My Fit Pod gyms" collectively, without
+ever stating membership is single-location, so the model filled that gap
+with a guess rather than a hard no) — the question reached the Chat
+Questions queue and the staff email arrived, confirming the whole loop
+end to end, not just a clean build.
+
+38. **Cross-gym PAYG booking + Access-log visiting-member fix — 2026-08-26, same session.** That flagged question turned out to be real, repeated demand — Carl said a few members had asked before, not a one-off. Confirmed the actual policy first: membership is meant to be locked to one home gym (matches what the app already does). Scoped the fix to **PAYG only**, deliberately not membership — a subscription's `sessions_per_week` capacity planning assumes members drawn from that gym's own catchment (same reasoning the leaderboard's per-member streak target already documents elsewhere), so opening membership access network-wide risks oversubscribing a popular gym; PAYG credits carry no such assumption.
+
+Real finding while scoping this: it needed **no RPC or migration changes
+at all**. `credits` (0009_pod_booking.sql) has no `gym` column — a
+balance is already summed per-member only, gym-agnostic by design.
+`create_booking()`/`cancel_booking()` (0039_pod_resources_functions.sql)
+already derive a booking's gym from the resource row (`p_resource_id`),
+not from a trusted separate parameter — a change made back in 0039
+specifically to prevent a caller passing a resource from one gym
+alongside a stated gym for another. So the *entire* restriction blocking
+cross-gym booking lived at podhq-client's app layer only: `/book`
+always fetched `getPodResourcesForGym(member.gym)` and never anything
+else. Opening that up (PAYG-gated, server-enforced not just UI-hidden)
+was the whole fix — full detail in podhq-client's own ROADMAP.
+
+**Money stays with the selling gym** — Carl was explicit about this: a
+member's PAYG credit purchase pays whichever gym's Stripe Connect
+account they bought it from, regardless of where they later spend the
+credit; untouched by this change. What he did want was visibility into
+which gym actually *hosted* a session, separate from which gym sold the
+credits — `bookings.gym`/`waitlist_entries.gym` already capture the
+hosting gym correctly (they're derived from the resource, not the
+member) once cross-gym booking works, no schema change needed.
+
+**Real bug found and fixed while adding that visibility**:
+`getAccessEventsForGym()` (the live Kisi unlock log behind `/pods`'
+Access page) filtered `pod_access_events` by `.eq("members.gym", gym)` —
+the *member's* home gym, not where the door event actually happened.
+Before cross-gym booking existed the two were always identical, so this
+was latent and harmless; now, a visiting member's genuine unlock at gym
+B's own door would have been filtered *out* of gym B's own Access log,
+because their `members.gym` says gym A. Fixed by filtering on
+`bookings.gym` instead (joined via the event's `booking_id`, which is
+`not null` — a safe inner join) — `bookings` already carries its own
+`gym` column directly, no need to route through `pod_resources` for the
+filter. `members.gym` is still fetched (as `memberHomeGym`) so the UI can
+show a "(visiting from X)" tag — added to both the Access log
+(`pods-view.tsx`) and the Calendar's slot-detail panel (`getSlotDetail`,
+`calendar-view.tsx`), the two places staff actually see who's booked
+into or unlocking their gym's pod.
+
+**Verified**: `npx tsc --noEmit`, `eslint`, `npx vitest run` (9/9), and
+`next build` all clean in both repos. **Not yet tested live** — no
+test-account password in this session; the underlying booking mechanism
+(gym-agnostic `create_booking()`) is exactly what every existing booking
+already uses today, so the untested surface is specifically the new
+`/book` gym-switcher UI and the two authorization checks, not the RPC
+path itself.
