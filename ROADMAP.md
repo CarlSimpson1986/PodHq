@@ -57,6 +57,7 @@ Full detail for each entry (bug, fix, live verification) is in `ROADMAP_HISTORY.
 34. **Promo code system** (renamed from "coupons" 2026-08-22 — collided with the existing `gift_vouchers` feature) — gym-scoped codes, atomic `redeem_promo_code()` RPC. Migration applied live 2026-08-22, verified via `/setup`.
 35. **`members` table wiped clean** — all 24 rows were QA/test data (no real podhq-client customers yet); full FK-ordered wipe run live 2026-08-22 to reset for a fresh test pass.
 36. **`cancel_booking()` cancellation window fixed 2hr→3hr** (migration `0046`, shared DB) — real business policy per GymFlow, not just a docs/Ts&Cs fix. Written, not yet applied live — see podhq-client's ROADMAP.md.
+37. **Chat Questions + Help FAQ** (`/chat-questions`) — review queue for podhq-client's POD help-chat questions it couldn't answer, plus the FAQ itself moved off a static code file into a DB table this page can edit live (no redeploy). Migration `0063` written, not yet applied — see podhq-client's ROADMAP.md.
 
 ## Database schema
 

@@ -2001,3 +2001,55 @@ on filter change), WCAG 2.1 AA + colour-blind-safe chart palette + data-table
 alternative for every chart, Chrome/Safari-iOS/Edge with mobile Safari as
 primary target, GBP formatting throughout (2dp, thousands separator). (PWA
 offline shell was descoped from this app to `podhq-client` — see Stage 11.)
+
+37. **Chat Questions + Help FAQ built — 2026-08-26.** Carl asked how to
+automate turning questions podhq-client's POD help chat couldn't answer
+into a growing FAQ, framing it explicitly as "how big companies do
+continuous improvement" — landed on: log every unanswered question, email
+staff immediately, and let admin publish a real answer straight to a
+DB-backed FAQ with no code deploy, rather than the smaller "log + staff
+manually edits a code file" version discussed first.
+
+Migration `0063_help_faq_and_chat_questions.sql` (written this session,
+**not yet applied** — Carl runs migrations via the Supabase SQL Editor
+himself, same as every migration before this one; a Claude session has no
+DB DDL access): two tables, RLS enabled with no policies on either (same
+"service-role client only, after an app-level session/role check"
+convention as `gym_brevo_config`/`catalog_items` — every read/write here
+goes through `getGymScope`/`resolveGym` first, RLS is defence-in-depth
+only). `help_faq_items` is franchisor-level (no `gym` column) — one
+answer changes what every gym's members hear, so writes are admin-only,
+same reasoning as Brevo config being admin-only rather than
+owner-editable like pricing. `help_chat_unanswered_questions`
+denormalizes `gym` directly onto the row (not just via `member_id`) so
+the queue never needs to join back to `members`, same pattern
+`bookings`/`credits` already use.
+
+New `/chat-questions` page (nav added to `app-shell.tsx`, visible to both
+roles — not `ADMIN_ONLY_HREFS`, same as Setup): an "Unanswered questions"
+queue (owner's own gym only; admin gets the same `GymSelect` fallback-
+access pattern as Setup/pricing, `null` = every gym's queue, not just an
+empty state) where either role can mark a question resolved, but only
+admin can also type an answer and publish it straight to the FAQ in the
+same action (`POST /api/chat-questions/[id]/resolve` with an optional
+`addToFaq` body — rejected server-side for a non-admin, not just hidden
+in the UI). A separate admin-only "Help FAQ" section below it is full
+CRUD (add/edit/remove) against `help_faq_items` directly, for building
+the initial FAQ out or fixing an existing answer without going through
+the queue.
+
+podhq-client side (its own ROADMAP.md has the member-facing detail):
+`help-bot.ts`'s FAQ moved from a static `src/lib/faq.ts` array to a live
+read of `help_faq_items` (`src/lib/data/help-faq.ts` there); its system
+prompt now tells the model to end an "I'm not sure" reply with a hidden
+`<<STAFF_FOLLOWUP>>` marker (stripped before the member sees it) so
+`/api/member/help-chat` knows to log the question and email this app's
+`getStaffRecipients(gym)` — reusing the same staff-notification
+infrastructure `staff_new_signup` etc. already use, just a new
+`unanswered_chat_question` event type, rather than building a second
+notification path.
+
+**Verified**: `npx tsc --noEmit`, `eslint`, `npx vitest run` (9/9), and
+`next build` all clean in both repos. **Not yet tested live** — blocked
+on Carl applying migration `0063` first; no chat question can actually
+reach `/chat-questions` until that table exists.
