@@ -59,7 +59,8 @@ Full detail for each entry (bug, fix, live verification) is in `ROADMAP_HISTORY.
 36. **`cancel_booking()` cancellation window fixed 2hr→3hr** (migration `0046`, shared DB) — real business policy per GymFlow, not just a docs/Ts&Cs fix. Written, not yet applied live — see podhq-client's ROADMAP.md.
 37. **Chat Questions + Help FAQ** (`/chat-questions`) — review queue for podhq-client's unanswered POD-chat questions; FAQ moved off a static code file to a DB table this page can edit live. Migration `0063` applied live 2026-08-26, confirmed working end to end.
 38. **Cross-gym PAYG booking + Access-log fix** — a PAYG member can book/waitlist at any gym via podhq-client's `/book`. Fixed a real bug this surfaced: the Access log filtered by the *member's* home gym, not where the door event happened.
-39. **Cross-gym booking for members** (migration `0064`) — `create_booking()`/`cancel_booking()` spend/refund a network PAYG top-up for subscribers, vs. subscription credit staying home-only. Applied 2026-08-26; not tested live yet.
+39. **Cross-gym booking for members** (migration `0064`) — `create_booking()`/`cancel_booking()` spend/refund a network PAYG top-up for subscribers, vs. subscription credit staying home-only. Applied 2026-08-26, confirmed live via Carl's own test account.
+40. **Network credit scoped to gym packs; chat hardened** (`0065`) — PT/Recovery excluded via `catalog_items.network_eligible`. Both LLM chats got injection resistance + an abuse redirect. Restored 3 FAQ answers dropped earlier.
 
 ## Database schema
 
@@ -191,26 +192,23 @@ see. Use `Revenue` for financial metrics (ARPM, revenue totals), `attendance`
 for engagement/usage metrics (active members, at-risk members in Stage 6).
 
 **Known, still-open gap:** Hackney and Crewe have had zero `attendance` rows
-for some recent months despite having real `Revenue` — cause unknown as of
-2026-07-26 (possibly a different door-entry setup, or a GymFlow sync issue).
-Not fixable by changing queries — an upstream pipeline question. Pages that
-aggregate attendance surface which gyms are missing data for the period
-rather than silently producing a misleadingly low aggregate. (A separate,
-similar-looking Aylesbury Berryfields `Revenue` gap for Jan–May 2026 **was**
-investigated and resolved 2026-07-28 — re-running the upstream automation
-backfilled it cleanly, confirmed not app-caused. Full investigation notes in
+for some recent months despite real `Revenue` — cause unknown as of
+2026-07-26 (possibly a different door-entry setup, or a GymFlow sync issue),
+an upstream pipeline question, not fixable by changing queries. Pages that
+aggregate attendance surface which gyms are missing data rather than
+silently producing a misleadingly low aggregate. (A similar Aylesbury
+Berryfields `Revenue` gap **was** resolved 2026-07-28 — re-running the
+upstream automation backfilled it, confirmed not app-caused. Full notes in
 `ROADMAP_HISTORY.md`.)
 
 **Future system change:** moving from Kisi to **PDK (ProdataKey)** for door
-access, which will give proper day-to-day check-in/check-out timeseries
-data — richer than the current monthly GymFlow attendance CSV. Don't
-over-invest in working around the current CSV's limitations if PDK is coming.
+access — richer day-to-day check-in/out data than the current monthly
+GymFlow CSV. Don't over-invest working around the CSV's limits.
 
 ## Feature specs — key fixed lists
 
-Full original pre-build specs (Stages 5-9, superseded by the index above)
-are in `ROADMAP_HISTORY.md`. Kept here — fixed lists a new feature must stay
-consistent with:
+Full original pre-build specs (Stages 5-9) are in `ROADMAP_HISTORY.md`.
+Kept here — fixed lists a new feature must stay consistent with:
 
 **Outgoings categories** (fixed, no free text, keeps figures cross-gym
 comparable): Rent/Lease, Staff Wages, Utilities, Insurance, Equipment,

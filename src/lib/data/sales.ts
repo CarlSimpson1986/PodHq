@@ -279,7 +279,13 @@ export async function createPackCheckoutSession(
             },
           },
         ],
-        metadata: { member_id: String(memberId), credits: String(pack.credits), packageId: pack.itemId, creditType: pack.creditType },
+        metadata: {
+          member_id: String(memberId),
+          credits: String(pack.credits),
+          packageId: pack.itemId,
+          creditType: pack.creditType,
+          networkEligible: String(pack.networkEligible),
+        },
         return_url: `${origin}/pods/members/${memberId}?checkout_session_id={CHECKOUT_SESSION_ID}`,
       },
       // A gym with its own Stripe Connect account (Hove onward) gets this
@@ -462,6 +468,7 @@ export async function chargeSavedCardForPack(
           source: "staff_saved_card",
           packageId: pack.itemId,
           creditType: pack.creditType,
+          networkEligible: String(pack.networkEligible),
         },
       },
       { idempotencyKey: crypto.randomUUID(), ...requestOptions }

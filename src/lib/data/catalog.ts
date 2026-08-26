@@ -28,6 +28,11 @@ export interface CatalogItem {
   priceGBP: number;
   enabled: boolean;
   oneTimePerMember: boolean;
+  // Whether a PAYG purchase of this item can become a cross-gym network
+  // credit for a member with an active membership (podhq-client,
+  // 2026-08-26) — false for a PT pack or Recovery Room pack. See
+  // 0065_catalog_network_eligible.sql.
+  networkEligible: boolean;
 }
 
 function mapRow(row: {
@@ -44,6 +49,7 @@ function mapRow(row: {
   price_gbp: number;
   enabled: boolean;
   one_time_per_member: boolean;
+  network_eligible: boolean;
 }): CatalogItem {
   return {
     id: row.id,
@@ -59,6 +65,7 @@ function mapRow(row: {
     priceGBP: row.price_gbp,
     enabled: row.enabled,
     oneTimePerMember: row.one_time_per_member,
+    networkEligible: row.network_eligible,
   };
 }
 
