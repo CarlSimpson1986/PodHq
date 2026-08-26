@@ -50,6 +50,7 @@ export interface AccessEvent {
   id: number;
   memberId: number;
   memberName: string;
+  memberHomeGym: string;
   resourceId: number | null;
   resourceLabel: string | null;
   attemptedAt: string;
@@ -204,11 +205,19 @@ export async function getBookingsForGymAndDate(gym: GymName, date: Date): Promis
 /**
  * Door-unlock attempts (success and blocked) for the "Access" log —
  * distinct from bookings: this is what actually happened at the door,
- * timestamped by attempted_at, not the booked slot_start. Filtered via
- * members.gym since pod_access_events itself has no gym column. Resource
- * is joined transitively via booking_id -> bookings.resource_id (kept
- * off pod_access_events itself deliberately — low event volume, a join
- * is cheap and avoids a second column to keep in sync).
+ * timestamped by attempted_at, not the booked slot_start.
+ *
+ * Filtered via bookings.gym (the event's own booking, joined via
+ * booking_id), NOT members.gym — those could always diverge in theory,
+ * but only became reachable with cross-gym PAYG booking (podhq-client,
+ * 2026-08-26): before that, a member could only ever unlock a door at
+ * their own gym, so the two filters were equivalent. Filtering on
+ * members.gym here was found to be a real bug, not just imprecise —
+ * it would have made a visiting member's real unlock at *this* gym's own
+ * door invisible to this gym's own Access log, filtered out because
+ * their home gym didn't match. members.gym is still fetched (as
+ * memberHomeGym) so the UI can flag a visiting member, same as the
+ * Calendar's slot detail panel (getSlotDetail above).
  */
 export async function getAccessEventsForGym(gym: GymName, date: Date): Promise<AccessEvent[]> {
   const admin = createAdminClient();
@@ -219,8 +228,8 @@ export async function getAccessEventsForGym(gym: GymName, date: Date): Promise<A
 
   const { data, error } = await admin
     .from("pod_access_events")
-    .select("id, member_id, attempted_at, success, kisi_response, members!inner(name, gym), bookings(resource_id, pod_resources(label))")
-    .eq("members.gym", gym)
+    .select("id, member_id, attempted_at, success, kisi_response, members(name, gym), bookings!inner(resource_id, gym, pod_resources(label))")
+    .eq("bookings.gym", gym)
     .gte("attempted_at", startOfDay.toISOString())
     .lt("attempted_at", endOfDay.toISOString())
     .order("attempted_at", { ascending: false })
@@ -231,8 +240,8 @@ export async function getAccessEventsForGym(gym: GymName, date: Date): Promise<A
         attempted_at: string;
         success: boolean;
         kisi_response: string | null;
-        members: { name: string } | null;
-        bookings: { resource_id: number; pod_resources: { label: string } | null } | null;
+        members: { name: string; gym: string } | null;
+        bookings: { resource_id: number; gym: string; pod_resources: { label: string } | null } | null;
       }[]
     >();
 
@@ -242,6 +251,7 @@ export async function getAccessEventsForGym(gym: GymName, date: Date): Promise<A
     id: row.id,
     memberId: row.member_id,
     memberName: row.members?.name ?? "Unknown member",
+    memberHomeGym: row.members?.gym ?? gym,
     resourceId: row.bookings?.resource_id ?? null,
     resourceLabel: row.bookings?.pod_resources?.label ?? null,
     attemptedAt: row.attempted_at,
@@ -420,12 +430,14 @@ export interface SlotBookingEntry {
   bookingId: number;
   memberId: number;
   memberName: string;
+  memberHomeGym: string;
   status: PodBooking["status"];
 }
 
 export interface SlotWaitlistEntry {
   memberId: number;
   memberName: string;
+  memberHomeGym: string;
 }
 
 export interface SlotDetail {
@@ -442,6 +454,11 @@ export interface SlotDetail {
  * caller's resolved scope would leak that gym's slot detail, since
  * resourceId alone carries no ownership check back to the caller's own
  * gym scope.
+ *
+ * memberHomeGym (members.gym, not the booking's own gym) lets the UI flag
+ * a visiting member — cross-gym PAYG booking (podhq-client, 2026-08-26)
+ * means a booking's gym and its member's home gym can now genuinely
+ * differ, which staff have no other way to notice here.
  */
 export async function getSlotDetail(gym: GymName, resourceId: number, slotStartIso: string): Promise<SlotDetail> {
   const admin = createAdminClient();
@@ -449,19 +466,21 @@ export async function getSlotDetail(gym: GymName, resourceId: number, slotStartI
   const [bookingsResult, waitlistResult] = await Promise.all([
     admin
       .from("bookings")
-      .select("id, member_id, status, members(name)")
+      .select("id, member_id, status, members(name, gym)")
       .eq("gym", gym)
       .eq("resource_id", resourceId)
       .eq("slot_start", slotStartIso)
-      .returns<{ id: number; member_id: number; status: PodBooking["status"]; members: { name: string } | null }[]>(),
+      .returns<
+        { id: number; member_id: number; status: PodBooking["status"]; members: { name: string; gym: string } | null }[]
+      >(),
     admin
       .from("waitlist_entries")
-      .select("member_id, members(name)")
+      .select("member_id, members(name, gym)")
       .eq("gym", gym)
       .eq("resource_id", resourceId)
       .eq("slot_start", slotStartIso)
       .eq("status", "waiting")
-      .returns<{ member_id: number; members: { name: string } | null }[]>(),
+      .returns<{ member_id: number; members: { name: string; gym: string } | null }[]>(),
   ]);
 
   if (bookingsResult.error) throw bookingsResult.error;
@@ -472,11 +491,13 @@ export async function getSlotDetail(gym: GymName, resourceId: number, slotStartI
       bookingId: row.id,
       memberId: row.member_id,
       memberName: row.members?.name ?? "Unknown member",
+      memberHomeGym: row.members?.gym ?? gym,
       status: row.status,
     })),
     waitlist: (waitlistResult.data ?? []).map((row) => ({
       memberId: row.member_id,
       memberName: row.members?.name ?? "Unknown member",
+      memberHomeGym: row.members?.gym ?? gym,
     })),
   };
 }

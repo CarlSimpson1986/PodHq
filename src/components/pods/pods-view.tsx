@@ -135,6 +135,9 @@ export function PodsView({
                     <Link href={`/pods/members/${e.memberId}`} className="text-accent hover:underline">
                       {e.memberName}
                     </Link>
+                    {e.memberHomeGym !== gym && (
+                      <span className="ml-1.5 text-xs text-muted-foreground">(visiting from {e.memberHomeGym})</span>
+                    )}
                   </td>
                   <td className="py-2 text-muted-foreground">{e.resourceLabel ?? "—"}</td>
                   <td className="py-2">

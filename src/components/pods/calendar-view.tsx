@@ -623,7 +623,12 @@ function SlotPanel({
               <ul className="mb-4 space-y-1">
                 {detail.bookings.map((b) => (
                   <li key={b.bookingId} className="flex items-center justify-between rounded-md border border-card-border px-2 py-1.5 text-sm">
-                    <span className="text-foreground">{b.memberName}</span>
+                    <span className="text-foreground">
+                      {b.memberName}
+                      {b.memberHomeGym !== gym && (
+                        <span className="ml-1.5 text-xs text-muted-foreground">(visiting from {b.memberHomeGym})</span>
+                      )}
+                    </span>
                     <span className="flex items-center gap-2">
                       <span className="text-xs text-muted-foreground capitalize">{b.status.replace("_", "-")}</span>
                       {b.status === "booked" &&
@@ -660,6 +665,9 @@ function SlotPanel({
                 {detail.waitlist.map((w) => (
                   <li key={w.memberId} className="rounded-md border border-card-border px-2 py-1.5 text-sm text-foreground">
                     {w.memberName}
+                    {w.memberHomeGym !== gym && (
+                      <span className="ml-1.5 text-xs text-muted-foreground">(visiting from {w.memberHomeGym})</span>
+                    )}
                   </li>
                 ))}
               </ul>
