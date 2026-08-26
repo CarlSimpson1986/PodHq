@@ -58,7 +58,8 @@ Full detail for each entry (bug, fix, live verification) is in `ROADMAP_HISTORY.
 35. **`members` table wiped clean** — all 24 rows were QA/test data (no real podhq-client customers yet); full FK-ordered wipe run live 2026-08-22 to reset for a fresh test pass.
 36. **`cancel_booking()` cancellation window fixed 2hr→3hr** (migration `0046`, shared DB) — real business policy per GymFlow, not just a docs/Ts&Cs fix. Written, not yet applied live — see podhq-client's ROADMAP.md.
 37. **Chat Questions + Help FAQ** (`/chat-questions`) — review queue for podhq-client's unanswered POD-chat questions; FAQ moved off a static code file to a DB table this page can edit live. Migration `0063` applied live 2026-08-26, confirmed working end to end.
-38. **Cross-gym PAYG booking + Access-log fix** — a PAYG member can now book/waitlist at any gym via podhq-client's `/book`; membership stays home-gym-locked. Found & fixed a real bug this surfaced: the Access log filtered by the *member's* home gym, not where the door event happened — a visiting member's unlock would've been invisible to the hosting gym's own log.
+38. **Cross-gym PAYG booking + Access-log fix** — a PAYG member can book/waitlist at any gym via podhq-client's `/book`. Fixed a real bug this surfaced: the Access log filtered by the *member's* home gym, not where the door event happened.
+39. **Cross-gym booking for members** (migration `0064`) — `create_booking()`/`cancel_booking()` spend/refund a network PAYG top-up for subscribers, vs. subscription credit staying home-only. Applied 2026-08-26; not tested live yet.
 
 ## Database schema
 
