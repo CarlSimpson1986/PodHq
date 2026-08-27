@@ -1,0 +1,15 @@
+-- Blank first-time exercise weight, 2026-08-27. Carl: pre-filling a
+-- "conservative" starting weight is still the app guessing, and a
+-- beginner reading a blank field can genuinely misjudge what's safe on
+-- their own (e.g. "the bar plus 10kg", without realising an empty
+-- barbell is already ~20kg). Every exercise now starts genuinely blank
+-- the very first time a member ever does it — they log their own real
+-- chosen weight, and the existing RPE-based progression takes over from
+-- their second time on, same as it always has for every session after
+-- the first. See podhq-client's generate-workout.ts (computeWeightKg).
+--
+-- workout_sets.weight_target_kg was `not null` because it was always
+-- computed with a real number before (either a catalog starting weight
+-- or an RPE-adjusted prior weight) — now genuinely null for a set whose
+-- exercise has no history yet.
+alter table public.workout_sets alter column weight_target_kg drop not null;
