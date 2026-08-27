@@ -57,11 +57,12 @@ Full detail for each entry (bug, fix, live verification) is in `ROADMAP_HISTORY.
 34. **Promo code system** (renamed from "coupons" 2026-08-22 — collided with the existing `gift_vouchers` feature) — gym-scoped codes, atomic `redeem_promo_code()` RPC. Migration applied live 2026-08-22, verified via `/setup`.
 35. **`members` table wiped clean** — all 24 rows were QA/test data (no real podhq-client customers yet); full FK-ordered wipe run live 2026-08-22 to reset for a fresh test pass.
 36. **`cancel_booking()` cancellation window fixed 2hr→3hr** (migration `0046`, shared DB) — real business policy per GymFlow, not just a docs/Ts&Cs fix. Written, not yet applied live — see podhq-client's ROADMAP.md.
-37. **Chat Questions + Help FAQ** (`/chat-questions`) — review queue for podhq-client's unanswered POD-chat questions; FAQ moved off a static code file to a DB table this page can edit live. Migration `0063` applied live 2026-08-26, confirmed working end to end.
-38. **Cross-gym PAYG booking + Access-log fix** — a PAYG member can book/waitlist at any gym via podhq-client's `/book`. Fixed a real bug this surfaced: the Access log filtered by the *member's* home gym, not where the door event happened.
-39. **Cross-gym booking for members** (migration `0064`) — `create_booking()`/`cancel_booking()` spend/refund a network PAYG top-up for subscribers, vs. subscription credit staying home-only. Applied 2026-08-26, confirmed live via Carl's own test account.
-40. **Network credit scoped to gym packs; chat hardened** (`0065`) — PT/Recovery excluded via `catalog_items.network_eligible`. Both LLM chats got injection resistance + an abuse redirect. Restored 3 FAQ answers dropped earlier.
+37. **Chat Questions + Help FAQ** (`/chat-questions`) — review queue for unanswered POD-chat questions; FAQ moved off a static file to a DB table this page can edit live. `0063` applied 08-26, verified.
+38. **Cross-gym PAYG booking + Access-log fix** — a PAYG member can book/waitlist at any gym via `/book`. Fixed a bug this surfaced: Access log filtered by the *member's* home gym, not where the door event happened.
+39. **Cross-gym booking for members** (`0064`) — `create_booking()`/`cancel_booking()` spend/refund a network PAYG top-up for subscribers, vs. subscription credit staying home-only. Applied 08-26, confirmed live.
+40. **Network credit scoped to gym packs; chat hardened** (`0065`) — PT/Recovery excluded via `network_eligible`. Both LLM chats got injection resistance + an abuse redirect. Restored 3 dropped FAQ answers.
 41. **"Find a Professional" directory** (`/professionals`, `0066`) — admin PT profile CRUD + recent-inquiries list, feeding podhq-client's directory (Solo60-modelled, inquiry form not slot booking). Written 08-27, not yet live.
+42. **Hypertrophy A/B/C workout templates** (`0067`) — keyed on `block_type`+`block_started_at`, not a block-row FK (implicit-block case has none). Generation logic all in podhq-client — see its ROADMAP.md. Written 08-27, not yet live.
 
 ## Database schema
 
@@ -79,11 +80,10 @@ change to this shared DB needs noting on both sides — see its ROADMAP.md too.
 
 Key recent shared-schema migrations (full list + narrative/gotchas in `ROADMAP_HISTORY.md`):
 
-- `0066` (08-27) `professionals`/`professional_inquiries` — PT directory + inquiry log, no CHECK constraints on tag arrays (zod at the API boundary instead).
+- `0067` (08-27) `workout_templates`/`workout_template_exercises` — A/B/C rotation, keyed on `block_type`+`block_started_at` not a block-row FK.
+- `0066` (08-27) `professionals`/`professional_inquiries` — PT directory + inquiry log, no CHECK constraints on tag arrays.
 - `0065` (08-26) `catalog_items.network_eligible` — scopes the network PAYG discount away from PT/Recovery packs.
 - `0064` (08-26) `create_booking()`/`cancel_booking()` — network top-up credit for subscribers booking away from home gym.
-- `0046` (08-22) `cancel_booking()` window corrected 2hr→3hr, matching GymFlow's real policy.
-- `0040` (08-19) `gym_stripe_config` — per-gym Stripe Connect account id (not secret, no encryption).
 
 **`Revenue`** (capital R — quote in SQL: `public."Revenue"`)
 
