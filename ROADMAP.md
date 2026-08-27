@@ -61,6 +61,7 @@ Full detail for each entry (bug, fix, live verification) is in `ROADMAP_HISTORY.
 38. **Cross-gym PAYG booking + Access-log fix** — a PAYG member can book/waitlist at any gym via podhq-client's `/book`. Fixed a real bug this surfaced: the Access log filtered by the *member's* home gym, not where the door event happened.
 39. **Cross-gym booking for members** (migration `0064`) — `create_booking()`/`cancel_booking()` spend/refund a network PAYG top-up for subscribers, vs. subscription credit staying home-only. Applied 2026-08-26, confirmed live via Carl's own test account.
 40. **Network credit scoped to gym packs; chat hardened** (`0065`) — PT/Recovery excluded via `catalog_items.network_eligible`. Both LLM chats got injection resistance + an abuse redirect. Restored 3 FAQ answers dropped earlier.
+41. **"Find a Professional" directory** (`/professionals`, `0066`) — admin PT profile CRUD + recent-inquiries list, feeding podhq-client's directory (Solo60-modelled, inquiry form not slot booking). Written 08-27, not yet live.
 
 ## Database schema
 
@@ -76,16 +77,13 @@ its migrations (`0009_pod_booking.sql` onward: `members`, `credits`,
 `gift_vouchers`, etc.) live in this repo's `supabase/migrations/` folder. A
 change to this shared DB needs noting on both sides — see its ROADMAP.md too.
 
-Key shared-schema migrations (full narrative + gotchas in `ROADMAP_HISTORY.md`):
+Key recent shared-schema migrations (full list + narrative/gotchas in `ROADMAP_HISTORY.md`):
 
-- `0040` (08-19) `gym_stripe_config` — per-gym Stripe Connect account id (not secret, no encryption).
-- `0026` (08-14) `stripe_refunds` — `stripe_payment_intent_id` on `credits`/`gift_vouchers`, `+'refund'` reason.
-- `0020` (08-12) `cancel_booking()` RPC — refund/forfeit policy (now 3hr, see `0046`), advisory-lock race safety.
+- `0066` (08-27) `professionals`/`professional_inquiries` — PT directory + inquiry log, no CHECK constraints on tag arrays (zod at the API boundary instead).
+- `0065` (08-26) `catalog_items.network_eligible` — scopes the network PAYG discount away from PT/Recovery packs.
+- `0064` (08-26) `create_booking()`/`cancel_booking()` — network top-up credit for subscribers booking away from home gym.
 - `0046` (08-22) `cancel_booking()` window corrected 2hr→3hr, matching GymFlow's real policy.
-- `0019` (08-11) `get_credit_balance()` RPC — avoids the 1000-row PostgREST truncation cap on ledger sums.
-- `0018` (08-11) `gym_kisi_mapping` +capacity/hours; `create_booking()` enforces capacity via advisory lock.
-- `0017` (08-11) `members` +mobile/gender/address/waiver columns (podhq-client Access onboarding).
-- `0014` (08-11) `memberships` table + `credits.reason` +`'membership'`.
+- `0040` (08-19) `gym_stripe_config` — per-gym Stripe Connect account id (not secret, no encryption).
 
 **`Revenue`** (capital R — quote in SQL: `public."Revenue"`)
 
@@ -215,10 +213,10 @@ comparable): Rent/Lease, Staff Wages, Utilities, Insurance, Equipment,
 Software/Subscriptions, Cleaning, Card/Merchant Fees, Other. Excludes
 **Marketing** — captured via `ad_spend` instead, to avoid double-entry.
 
-**Out of scope for v1**: push notifications, churn rate (no join/cancel
-dates from GymFlow), automated ad-spend ingestion, multi-language,
-gym-to-gym owner comparisons. (Stripe billing/light theme/PDF export were
-all later built anyway — see Stages 13, 17, 20-22, 29-34.)
+**Out of scope for v1**: push notifications, churn rate, automated
+ad-spend ingestion, multi-language, gym-to-gym owner comparisons. (Stripe
+billing/light theme/PDF export were later built anyway — Stages 13, 17,
+20-22, 29-34.)
 
 **Non-functional**: <2s dashboard load, WCAG 2.1 AA + colour-blind-safe
 charts + data-table alternative for every chart, GBP formatting (2dp,
