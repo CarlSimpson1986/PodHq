@@ -2166,3 +2166,13 @@ RLS enabled, no policies — same convention as `0063`'s tables. All the actual 
 **Stage 3 (split-day / build-your-own workout) deliberately paused here** — Carl chose to build it in the same overall pass rather than defer it, but it's genuinely its own chunk of UI/generation work; checkpointed after Stages 1-2 while Carl applies this migration himself.
 
 **Verified**: `npx tsc --noEmit`, `eslint`, `npx vitest run` (105/105 in podhq-client, 7 new), and `next build` all clean. **Not yet applied live** — same as every migration this session, needs Carl's own paste into Supabase's SQL Editor; nothing in the new generation path has touched a real database or a real browser session yet.
+
+43. **Migrations `0066`/`0067`/`0068` applied and verified live — 2026-08-28.** Carl pasted all three into Supabase's SQL Editor himself. Verified from this session rather than taken on trust, since Carl said only "I think I have done these":
+
+- `professionals`/`professional_inquiries` (`0066`) — confirmed via a direct service-role query, both tables queryable, 0 rows (expected — no real trainers seeded yet).
+- `workout_templates`/`workout_template_exercises` (`0067`) — **first check found this one had NOT actually applied**, despite Carl's belief: both tables missing (`Could not find the table 'public.workout_templates' in the schema cache`), and `workout_sessions.template_id` didn't exist either. Flagged to Carl, he pasted it properly, re-verified — all three now present.
+- `weight_target_kg` NOT NULL drop (`0068`) — no column-nullability introspection available over PostgREST/REST, so verified empirically: inserted a real `workout_sets` row with `weight_target_kg: null` (valid FK to an existing `workout_exercises` row, otherwise-minimal fields), insert succeeded, row immediately deleted as cleanup. Confirms the constraint is actually gone, not just believed to be.
+
+Also backfilled this file and `ROADMAP.md`'s stage index — the `0068` blank-weight change (already written up in full on podhq-client's side) had never been logged on podHq's side, so the two repos' docs had drifted out of sync for that change specifically.
+
+**Hypertrophy A/B/C rotation and blank first-time weight are now live but not yet exercised through a real booking/workout session in the browser** — the checks above confirm the schema is correct and reachable, not that `generateWorkoutTemplateSet`/`getOrCreateWorkoutSession`/the blank-weight `workout-view.tsx` flow behave correctly end-to-end for a real member. Same for the Professionals directory UI. A live click-through pass (or Stage 3, split-day workout, still not started) is the natural next step.

@@ -61,8 +61,9 @@ Full detail for each entry (bug, fix, live verification) is in `ROADMAP_HISTORY.
 38. **Cross-gym PAYG booking + Access-log fix** — a PAYG member can book/waitlist at any gym via `/book`. Fixed a bug this surfaced: Access log filtered by the *member's* home gym, not where the door event happened.
 39. **Cross-gym booking for members** (`0064`) — `create_booking()`/`cancel_booking()` spend/refund a network PAYG top-up for subscribers, vs. subscription credit staying home-only. Applied 08-26, confirmed live.
 40. **Network credit scoped to gym packs; chat hardened** (`0065`) — PT/Recovery excluded via `network_eligible`. Both LLM chats got injection resistance + an abuse redirect. Restored 3 dropped FAQ answers.
-41. **"Find a Professional" directory** (`/professionals`, `0066`) — admin PT profile CRUD + recent-inquiries list, feeding podhq-client's directory (Solo60-modelled, inquiry form not slot booking). Written 08-27, not yet live.
-42. **Hypertrophy A/B/C workout templates** (`0067`) — keyed on `block_type`+`block_started_at`, not a block-row FK (implicit-block case has none). Generation logic all in podhq-client — see its ROADMAP.md. Written 08-27, not yet live.
+41. **"Find a Professional" directory** (`/professionals`, `0066`) — admin PT profile CRUD + recent-inquiries list, feeding podhq-client's directory (Solo60-modelled, inquiry form not slot booking). Applied & verified live 2026-08-28.
+42. **Hypertrophy A/B/C workout templates** (`0067`) — keyed on `block_type`+`block_started_at`, not a block-row FK. Generation logic in podhq-client. Live 2026-08-28; Stage 3 (split-day/custom) not started.
+43. **Blank first-time exercise weight** (`0068`) — drops `workout_sets.weight_target_kg` NOT NULL; every exercise starts blank the member's first time on it instead of a guessed default. Generation logic in podhq-client's `generate-workout.ts`. Applied & verified live 2026-08-28.
 
 ## Database schema
 
@@ -78,12 +79,7 @@ its migrations (`0009_pod_booking.sql` onward: `members`, `credits`,
 `gift_vouchers`, etc.) live in this repo's `supabase/migrations/` folder. A
 change to this shared DB needs noting on both sides — see its ROADMAP.md too.
 
-Key recent shared-schema migrations (full list + narrative/gotchas in `ROADMAP_HISTORY.md`):
-
-- `0067` (08-27) `workout_templates`/`workout_template_exercises` — A/B/C rotation, keyed on `block_type`+`block_started_at` not a block-row FK.
-- `0066` (08-27) `professionals`/`professional_inquiries` — PT directory + inquiry log, no CHECK constraints on tag arrays.
-- `0065` (08-26) `catalog_items.network_eligible` — scopes the network PAYG discount away from PT/Recovery packs.
-- `0064` (08-26) `create_booking()`/`cancel_booking()` — network top-up credit for subscribers booking away from home gym.
+Recent shared-schema migrations are covered in the stage index above (39-43); narrative/gotchas for each are in `ROADMAP_HISTORY.md`.
 
 **`Revenue`** (capital R — quote in SQL: `public."Revenue"`)
 
