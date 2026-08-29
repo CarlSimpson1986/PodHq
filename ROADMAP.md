@@ -56,14 +56,15 @@ Full detail for each entry (bug, fix, live verification) is in `ROADMAP_HISTORY.
 33. **Hove Founding Member offer** — permanent staff-granted 20%-off flag, cleared on cancellation. Discount verified live 2026-08-22.
 34. **Promo code system** (renamed from "coupons" 2026-08-22 — collided with the existing `gift_vouchers` feature) — gym-scoped codes, atomic `redeem_promo_code()` RPC. Migration applied live 2026-08-22, verified via `/setup`.
 35. **`members` table wiped clean** — all 24 rows were QA/test data (no real podhq-client customers yet); full FK-ordered wipe run live 2026-08-22 to reset for a fresh test pass.
-36. **`cancel_booking()` cancellation window fixed 2hr→3hr** (migration `0046`, shared DB) — real business policy per GymFlow, not just a docs/Ts&Cs fix. Written, not yet applied live — see podhq-client's ROADMAP.md.
+36. **`cancel_booking()` window fixed 2hr→3hr** (`0046`, shared DB) — real GymFlow policy, not just docs. Not yet applied live — see podhq-client's ROADMAP.md.
 37. **Chat Questions + Help FAQ** (`/chat-questions`) — review queue for unanswered POD-chat questions; FAQ moved off a static file to a DB table this page can edit live. `0063` applied 08-26, verified.
-38. **Cross-gym PAYG booking + Access-log fix** — a PAYG member can book/waitlist at any gym via `/book`. Fixed a bug this surfaced: Access log filtered by the *member's* home gym, not where the door event happened.
-39. **Cross-gym booking for members** (`0064`) — `create_booking()`/`cancel_booking()` spend/refund a network PAYG top-up for subscribers, vs. subscription credit staying home-only. Applied 08-26, confirmed live.
+38. **Cross-gym PAYG booking + Access-log fix** — PAYG members can book/waitlist at any gym via `/book`; fixed Access log filtering by home gym instead of where the door event happened.
+39. **Cross-gym booking for members** (`0064`) — `create_booking()`/`cancel_booking()` spend/refund a network top-up for subscribers; subscription credit stays home-only. Applied 08-26, confirmed live.
 40. **Network credit scoped to gym packs; chat hardened** (`0065`) — PT/Recovery excluded via `network_eligible`. Both LLM chats got injection resistance + an abuse redirect. Restored 3 dropped FAQ answers.
-41. **"Find a Professional" directory** (`/professionals`, `0066`) — admin PT profile CRUD + recent-inquiries list, feeding podhq-client's directory (Solo60-modelled, inquiry form not slot booking). Applied & verified live 2026-08-28.
+41. **"Find a Professional" directory** (`/professionals`, `0066`) — admin PT profile CRUD + inquiries list, feeding podhq-client's directory (inquiry form, not slot booking). Applied & verified live 2026-08-28.
 42. **Hypertrophy A/B/C workout templates** (`0067`) — keyed on `block_type`+`block_started_at`, not a block-row FK. Generation logic in podhq-client. Live 2026-08-28; Stage 3 (split-day/custom) not started.
-43. **Blank first-time exercise weight** (`0068`) — drops `workout_sets.weight_target_kg` NOT NULL; every exercise starts blank the member's first time on it instead of a guessed default. Generation logic in podhq-client's `generate-workout.ts`. Applied & verified live 2026-08-28.
+43. **Blank first-time exercise weight** (`0068`) — drops `workout_sets.weight_target_kg` NOT NULL, so every exercise starts blank first time, no guessed default. Applied & verified live 2026-08-28.
+44. **Daily activity level (`0069`) + new `kettlebells` equipment type** — TDEE now occupational-activity-only, `sessions_per_week` stays programming-only. `EQUIPMENT_TYPES` past its original 4; fixed all 3 `pod_resources` rows found sitting at accidentally-unrestricted `equipment: []`. Stage 3 + ~95-exercise video library built in podhq-client. Applied & verified live 2026-08-29.
 
 ## Database schema
 

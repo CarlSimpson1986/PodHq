@@ -63,7 +63,7 @@ export type LeadStatus = (typeof LEAD_STATUSES)[number];
 // (that file's src/lib/gym.ts comment: "must match podHq's GYM_NAMES
 // exactly"). One "cable_machine" category deliberately covers both dual-
 // and single-pulley setups — see that file's own comment.
-export const EQUIPMENT_TYPES = ["barbell_rack", "cable_machine", "dumbbells", "leg_extension_curl_machine"] as const;
+export const EQUIPMENT_TYPES = ["barbell_rack", "cable_machine", "dumbbells", "leg_extension_curl_machine", "kettlebells"] as const;
 
 export type EquipmentType = (typeof EQUIPMENT_TYPES)[number];
 
