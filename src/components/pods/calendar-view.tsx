@@ -49,6 +49,7 @@ const EQUIPMENT_LABELS: Record<EquipmentType, string> = {
   cable_machine: "Cable machine",
   dumbbells: "Dumbbells",
   leg_extension_curl_machine: "Leg extension/curl machine",
+  kettlebells: "Kettlebells",
 };
 
 function formatHour(h: number) {
