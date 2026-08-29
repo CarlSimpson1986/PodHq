@@ -56,17 +56,18 @@ Full detail for each entry (bug, fix, live verification) is in `ROADMAP_HISTORY.
 33. **Hove Founding Member offer** — permanent staff-granted 20%-off flag, cleared on cancellation. Discount verified live 2026-08-22.
 34. **Promo code system** (renamed from "coupons" — collided with `gift_vouchers`) — gym-scoped codes, atomic `redeem_promo_code()` RPC. Applied live 2026-08-22, verified via `/setup`.
 35. **`members` table wiped clean** — all 24 rows were QA/test data; full FK-ordered wipe run live 2026-08-22 to reset for a fresh test pass.
-36. **`cancel_booking()` window fixed 2hr→3hr** (`0046`, shared DB) — real GymFlow policy, not just docs. Not yet applied live — see podhq-client's ROADMAP.md.
-37. **Chat Questions + Help FAQ** (`/chat-questions`) — review queue for unanswered POD-chat questions; FAQ moved off a static file to a DB table. `0063` applied 08-26, verified.
+36. **`cancel_booking()` window fixed 2hr→3hr** (`0046`, shared DB) — real GymFlow policy. Not yet applied live — see podhq-client's ROADMAP.md.
+37. **Chat Questions + Help FAQ** (`/chat-questions`) — review queue for unanswered POD-chat questions. `0063` applied 08-26, verified.
 38. **Cross-gym PAYG booking + Access-log fix** — PAYG members can book/waitlist at any gym; fixed Access log filtering by home gym instead of where the door event happened.
 39. **Cross-gym booking for members** (`0064`) — `create_booking()`/`cancel_booking()` spend/refund a network top-up for subscribers. Applied 08-26, confirmed live.
-40. **Network credit scoped to gym packs; chat hardened** (`0065`) — PT/Recovery excluded via `network_eligible`. Both LLM chats got injection resistance + an abuse redirect.
+40. **Network credit scoped to gym packs; chat hardened** (`0065`) — PT/Recovery excluded via `network_eligible`. Both LLM chats got injection resistance.
 41. **"Find a Professional" directory** (`/professionals`, `0066`) — admin PT profile CRUD + inquiries list, feeding podhq-client's directory. Applied & verified live 2026-08-28.
-42. **Hypertrophy A/B/C workout templates** (`0067`) — keyed on `block_type`+`block_started_at`, not a block-row FK. Generation/exercise-count logic in podhq-client. Live 2026-08-28.
-43. **Blank first-time exercise weight** (`0068`) — drops `workout_sets.weight_target_kg` NOT NULL, so every exercise starts blank first time, no guessed default. Applied & verified live 2026-08-28.
-44. **Daily activity level (`0069`) + `kettlebells` equipment type** — TDEE now occupational-activity-only. Fixed all 3 `pod_resources` rows found at accidentally-unrestricted `equipment: []`. Applied & verified live 2026-08-29.
+42. **Hypertrophy A/B/C workout templates** (`0067`) — keyed on `block_type`+`block_started_at`, not a block-row FK. Generation logic in podhq-client. Live 2026-08-28.
+43. **Blank first-time exercise weight** (`0068`) — drops `workout_sets.weight_target_kg` NOT NULL. Applied & verified live 2026-08-28.
+44. **Daily activity level (`0069`) + `kettlebells` equipment type** — TDEE now occupational-activity-only. Applied & verified live 2026-08-29.
 45. **Daily habit checklist** (`0070`, shared DB) — `member_habits`/`habit_logs`, insert-only ticks. Applied & verified live 2026-08-29 — full "Today's Mission" feature built on top in podhq-client (see its ROADMAP.md).
-46. **Custom-workout rest field** (`0071`, shared DB) — nullable `rest_seconds` on `workout_exercises`, Stage 1 of podhq-client's CrossFit-style custom-format work (see its ROADMAP.md). Applied live 2026-08-29.
+46. **Custom-workout rest field** (`0071`, shared DB) — nullable `rest_seconds` on `workout_exercises`, Stage 1 of podhq-client's CrossFit-style custom-format work. Applied live 2026-08-29.
+47. **AMRAP format** (`0072`, shared DB) — `format`/`time_cap_seconds`/`rounds_completed` etc. on `workout_sessions`, `duration_seconds` on `workout_sets`. Stage 2 of the same custom-format work (see podhq-client's ROADMAP.md). Applied live 2026-08-29.
 
 ## Database schema
 
