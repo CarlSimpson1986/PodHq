@@ -58,13 +58,14 @@ Full detail for each entry (bug, fix, live verification) is in `ROADMAP_HISTORY.
 35. **`members` table wiped clean** — all 24 rows were QA/test data (no real podhq-client customers yet); full FK-ordered wipe run live 2026-08-22 to reset for a fresh test pass.
 36. **`cancel_booking()` window fixed 2hr→3hr** (`0046`, shared DB) — real GymFlow policy, not just docs. Not yet applied live — see podhq-client's ROADMAP.md.
 37. **Chat Questions + Help FAQ** (`/chat-questions`) — review queue for unanswered POD-chat questions; FAQ moved off a static file to a DB table this page can edit live. `0063` applied 08-26, verified.
-38. **Cross-gym PAYG booking + Access-log fix** — PAYG members can book/waitlist at any gym via `/book`; fixed Access log filtering by home gym instead of where the door event happened.
+38. **Cross-gym PAYG booking + Access-log fix** — PAYG members can book/waitlist at any gym; fixed Access log filtering by home gym instead of where the door event happened.
 39. **Cross-gym booking for members** (`0064`) — `create_booking()`/`cancel_booking()` spend/refund a network top-up for subscribers; subscription credit stays home-only. Applied 08-26, confirmed live.
 40. **Network credit scoped to gym packs; chat hardened** (`0065`) — PT/Recovery excluded via `network_eligible`. Both LLM chats got injection resistance + an abuse redirect. Restored 3 dropped FAQ answers.
 41. **"Find a Professional" directory** (`/professionals`, `0066`) — admin PT profile CRUD + inquiries list, feeding podhq-client's directory (inquiry form, not slot booking). Applied & verified live 2026-08-28.
-42. **Hypertrophy A/B/C workout templates** (`0067`) — keyed on `block_type`+`block_started_at`, not a block-row FK. Generation logic in podhq-client. Live 2026-08-28; Stage 3 (split-day/custom) not started.
+42. **Hypertrophy A/B/C workout templates** (`0067`) — keyed on `block_type`+`block_started_at`, not a block-row FK. Generation/exercise-count logic in podhq-client. Live 2026-08-28.
 43. **Blank first-time exercise weight** (`0068`) — drops `workout_sets.weight_target_kg` NOT NULL, so every exercise starts blank first time, no guessed default. Applied & verified live 2026-08-28.
-44. **Daily activity level (`0069`) + new `kettlebells` equipment type** — TDEE now occupational-activity-only, `sessions_per_week` stays programming-only. `EQUIPMENT_TYPES` past its original 4; fixed all 3 `pod_resources` rows found sitting at accidentally-unrestricted `equipment: []`. Stage 3 + ~95-exercise video library built in podhq-client. Applied & verified live 2026-08-29.
+44. **Daily activity level (`0069`) + `kettlebells` equipment type** — TDEE now occupational-activity-only. Fixed all 3 `pod_resources` rows found at accidentally-unrestricted `equipment: []`. Applied & verified live 2026-08-29.
+45. **Daily habit checklist** (`0070`, shared DB) — `member_habits`/`habit_logs`, insert-only ticks. Applied & verified live 2026-08-29 — full "Today's Mission" feature built on top in podhq-client (see its ROADMAP.md).
 
 ## Database schema
 
