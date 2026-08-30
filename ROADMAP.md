@@ -66,6 +66,7 @@ Full detail for each entry (bug, fix, live verification) is in `ROADMAP_HISTORY.
 50. **HIIT interval timer + reps tally** (`0074`, shared DB) — Stage 4 of custom formats. Live 2026-08-30.
 51. **Weekly weigh-in + measurements** (`0075`, shared DB) — `member_body_measurements`, syncs `coach_profiles.weight_kg`. Live 2026-08-30.
 52. **Session history + workout stats** (podhq-client) — `/training/history`, fixed HIIT mislabel bug.
+53. **Cardio equipment logging** (`0076`, shared DB) — `/setup` names machines; `gym_cardio_equipment`/`member_cardio_logs`. Live 2026-08-30.
 
 ## Database schema
 
@@ -129,22 +130,15 @@ change to this shared DB needs noting on both sides — see its ROADMAP.md too.
 
 **Never query `users_gyms` (or any table) via the session-scoped client
 relying on RLS as the actual authorization check — use the service-role
-client after verifying the session separately.** RLS on `users_gyms` is
-documented defense-in-depth (see the migration file), not the primary
-authorization path; every data-layer query already followed this except
-`getGymScope`, which used the session client and depended on RLS's
-`user_id = auth.uid()` policy passing. Found 2026-07-26: a real admin
-account intermittently got "No gym or role is assigned to this account" —
-not an error, `auth.uid()` was transiently failing to resolve (a
-token-refresh timing gap), which RLS turns into a silent empty result,
-indistinguishable from "this account genuinely has no gym" unless you
-already suspect it. Fixed by having `getGymScope` take just `userId` (already
-verified by the caller via `supabase.auth.getUser()`) and query via
-`createAdminClient()` instead — no RLS dependency, no timing gap possible.
-If a future data-layer function is tempted to take a session-scoped
-`SupabaseClient` and query through it, don't — verify the session once
-(`getUser()`), then query via the admin client, matching every other
-function in `src/lib/data/`.
+client after verifying the session separately.** RLS is defense-in-depth,
+not the primary authorization path. Found 2026-07-26: `getGymScope` used
+the session client and depended on RLS's `auth.uid()` check, which
+transiently failed on a token-refresh timing gap, giving a real admin a
+silent empty result indistinguishable from "no gym assigned." Fixed by
+having `getGymScope` take just `userId` (verified by the caller via
+`getUser()`) and query via `createAdminClient()` instead. Any new
+data-layer function should do the same — verify the session once, then
+query via the admin client, matching `src/lib/data/`.
 
 ## Data pipeline
 
