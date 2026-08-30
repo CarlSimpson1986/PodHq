@@ -1,6 +1,7 @@
 import { createSessionClient } from "@/lib/supabase/server";
 import { getGymScope } from "@/lib/auth/gym-scope";
 import { listCatalogItems } from "@/lib/data/catalog";
+import { listCardioEquipment } from "@/lib/data/cardio-equipment";
 import { SetupShell } from "@/components/setup/setup-shell";
 import { AppShell } from "@/components/layout/app-shell";
 
@@ -42,12 +43,12 @@ export default async function SetupPage() {
   }
 
   const gym = scope.role === "owner" ? scope.gym : null;
-  const items = gym ? await listCatalogItems(gym) : [];
+  const [items, cardioEquipment] = gym ? await Promise.all([listCatalogItems(gym), listCardioEquipment(gym)]) : [[], []];
 
   return (
     <AppShell role={scope.role}>
       <div className="mx-auto max-w-5xl px-4 py-8">
-        <SetupShell role={scope.role} initialGym={gym} initialItems={items} />
+        <SetupShell role={scope.role} initialGym={gym} initialItems={items} initialCardioEquipment={cardioEquipment} />
       </div>
     </AppShell>
   );

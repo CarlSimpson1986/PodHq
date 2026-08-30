@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import type { CatalogItem } from "@/lib/data/catalog";
+import type { CardioEquipment } from "@/lib/data/cardio-equipment";
 import type { GymName } from "@/lib/data/types";
 import { GymSelect } from "@/components/ui/gym-select";
 import { CatalogView } from "@/components/setup/catalog-view";
 import { PromoCodesView } from "@/components/setup/promo-codes-view";
+import { CardioEquipmentView } from "@/components/setup/cardio-equipment-view";
 import { BrevoConfigView } from "@/components/setup/brevo-config-view";
 import { ResendConfigView } from "@/components/setup/resend-config-view";
 import { StripeConnectView } from "@/components/setup/stripe-connect-view";
@@ -20,10 +22,12 @@ export function SetupShell({
   role,
   initialGym,
   initialItems,
+  initialCardioEquipment,
 }: {
   role: "admin" | "owner";
   initialGym: GymName | null;
   initialItems: CatalogItem[];
+  initialCardioEquipment: CardioEquipment[];
 }) {
   const [gym, setGym] = useState<GymName | null>(initialGym);
 
@@ -41,6 +45,8 @@ export function SetupShell({
       <CatalogView gym={gym} initialItems={initialItems} />
 
       <PromoCodesView gym={gym} />
+
+      <CardioEquipmentView gym={gym} initialItems={initialCardioEquipment} />
 
       {role === "admin" && (
         <>
