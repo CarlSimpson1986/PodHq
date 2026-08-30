@@ -63,6 +63,9 @@ Full detail for each entry (bug, fix, live verification) is in `ROADMAP_HISTORY.
 47. **AMRAP format** (`0072`, shared DB) — `format`/`time_cap_seconds`/`rounds_completed` etc. on `workout_sessions`, `duration_seconds` on `workout_sets`. Stage 2 of the same custom-format work (see podhq-client's ROADMAP.md). Applied live 2026-08-29.
 48. **Rounds-For-Time** (`0073`, shared DB) — `target_rounds`/`elapsed_seconds`, Stage 3 of the same work; corrected same day to reps-only + a required time cap (see podhq-client's ROADMAP.md). Live 2026-08-30.
 49. **Coaching review** (podhq-client, no shared-DB change) — injury-keyword bug, experience-scaled RPE, block-gate thin-sample fix, check-in-pain feedback loop. See its ROADMAP.md.
+50. **HIIT interval timer + reps tally** (`0074`, shared DB) — Stage 4 of custom formats. Live 2026-08-30.
+51. **Weekly weigh-in + measurements** (`0075`, shared DB) — `member_body_measurements`, syncs `coach_profiles.weight_kg`. Live 2026-08-30.
+52. **Session history + workout stats** (podhq-client) — `/training/history`, fixed HIIT mislabel bug.
 
 ## Database schema
 
@@ -77,8 +80,6 @@ its migrations (`0009_pod_booking.sql` onward: `members`, `credits`,
 `bookings`, `gym_kisi_mapping`, `pod_access_events`, `memberships`,
 `gift_vouchers`, etc.) live in this repo's `supabase/migrations/` folder. A
 change to this shared DB needs noting on both sides — see its ROADMAP.md too.
-
-Recent shared-schema migrations are covered in the stage index above (39-43); narrative/gotchas for each are in `ROADMAP_HISTORY.md`.
 
 **`Revenue`** (capital R — quote in SQL: `public."Revenue"`)
 
@@ -185,18 +186,16 @@ see. Use `Revenue` for financial metrics (ARPM, revenue totals), `attendance`
 for engagement/usage metrics (active members, at-risk members in Stage 6).
 
 **Known, still-open gap:** Hackney and Crewe have had zero `attendance` rows
-for some recent months despite real `Revenue` — cause unknown as of
-2026-07-26 (possibly a different door-entry setup, or a GymFlow sync issue),
-an upstream pipeline question, not fixable by changing queries. Pages that
-aggregate attendance surface which gyms are missing data rather than
-silently producing a misleadingly low aggregate. (A similar Aylesbury
-Berryfields `Revenue` gap **was** resolved 2026-07-28 — re-running the
-upstream automation backfilled it, confirmed not app-caused. Full notes in
-`ROADMAP_HISTORY.md`.)
+for some months despite real `Revenue` — cause unknown, an upstream
+pipeline question, not fixable by changing queries.
+Pages that aggregate attendance surface which gyms are missing data rather
+than silently producing a misleadingly low aggregate. (A similar Aylesbury
+Berryfields `Revenue` gap **was** resolved 2026-07-28 — upstream re-run,
+confirmed not app-caused. Full notes in `ROADMAP_HISTORY.md`.)
 
 **Future system change:** moving from Kisi to **PDK (ProdataKey)** for door
-access — richer day-to-day check-in/out data than the current monthly
-GymFlow CSV. Don't over-invest working around the CSV's limits.
+access — richer data than the current monthly GymFlow CSV. Don't
+over-invest working around the CSV's limits.
 
 ## Feature specs — key fixed lists
 
@@ -210,8 +209,7 @@ Software/Subscriptions, Cleaning, Card/Merchant Fees, Other. Excludes
 
 **Out of scope for v1**: push notifications, churn rate, automated
 ad-spend ingestion, multi-language, gym-to-gym owner comparisons. (Stripe
-billing/light theme/PDF export were later built anyway — Stages 13, 17,
-20-22, 29-34.)
+billing/light theme/PDF export were later built anyway.)
 
 **Non-functional**: <2s dashboard load, WCAG 2.1 AA + colour-blind-safe
 charts + data-table alternative for every chart, GBP formatting (2dp,
