@@ -5,17 +5,10 @@ stage step by step — explain what's about to be built and why, ask before
 proceeding on anything that could go multiple ways, confirm each stage works
 before moving to the next. Don't jump ahead to a later stage unprompted.
 
-> **Full session-by-session build history lives in `ROADMAP_HISTORY.md`.**
-> This file is `@`-imported every session via CLAUDE.md, capped at ~15,000
-> characters — the old all-in-one file had grown to 165KB. Here: a condensed
-> stage index + the live reference tables (DB schema, pipeline rules, gym
-> names). For the exact bug, the reasoning, or what was verified live, read
-> `ROADMAP_HISTORY.md`.
->
-> **Session handoff:** before wrapping up a session, append a full write-up
-> to `ROADMAP_HISTORY.md` (matching its per-stage style), and add/update the
-> one-line entry below. A small fix can be a sentence in the history entry; a
-> new feature gets its own entry in both files.
+> Full session-by-session build history lives in `ROADMAP_HISTORY.md`
+> (not auto-loaded) — this file is just the condensed stage index + live
+> reference tables. See CLAUDE.md's "Session handoff" section for the
+> full write-up/update convention.
 
 ## Stage index
 
@@ -68,6 +61,8 @@ Full detail for each entry (bug, fix, live verification) is in `ROADMAP_HISTORY.
 45. **Daily habit checklist** (`0070`, shared DB) — `member_habits`/`habit_logs`, insert-only ticks. Applied & verified live 2026-08-29 — full "Today's Mission" feature built on top in podhq-client (see its ROADMAP.md).
 46. **Custom-workout rest field** (`0071`, shared DB) — nullable `rest_seconds` on `workout_exercises`, Stage 1 of podhq-client's CrossFit-style custom-format work. Applied live 2026-08-29.
 47. **AMRAP format** (`0072`, shared DB) — `format`/`time_cap_seconds`/`rounds_completed` etc. on `workout_sessions`, `duration_seconds` on `workout_sets`. Stage 2 of the same custom-format work (see podhq-client's ROADMAP.md). Applied live 2026-08-29.
+48. **Rounds-For-Time** (`0073`, shared DB) — `target_rounds`/`elapsed_seconds`, Stage 3 of the same work; corrected same day to reps-only + a required time cap (see podhq-client's ROADMAP.md). Live 2026-08-30.
+49. **Coaching review** (podhq-client, no shared-DB change) — injury-keyword bug, experience-scaled RPE, block-gate thin-sample fix, check-in-pain feedback loop. See its ROADMAP.md.
 
 ## Database schema
 
