@@ -67,6 +67,7 @@ Full detail for each entry (bug, fix, live verification) is in `ROADMAP_HISTORY.
 51. **Weekly weigh-in + measurements** (`0075`, shared DB) — `member_body_measurements`, syncs `coach_profiles.weight_kg`. Live 2026-08-30.
 52. **Session history + workout stats** (podhq-client) — `/training/history`, fixed HIIT mislabel bug.
 53. **Cardio equipment logging** (`0076`, shared DB) — `/setup` names machines; `gym_cardio_equipment`/`member_cardio_logs`. Live 2026-08-30.
+54. **Full security audit, both repos** (`0077`, shared DB) — 2 parallel deep audits; one real gap found (`member_body_measurements` missing RLS) and fixed same day. Everything else clean.
 
 ## Database schema
 
