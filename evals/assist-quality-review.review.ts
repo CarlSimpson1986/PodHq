@@ -36,6 +36,27 @@ const SAMPLE: { label: string; question: string; scope: GymScope; requestedGym?:
     question: "Who's at risk of leaving?",
     scope: { role: "admin", gym: null },
   },
+  {
+    label: "Hackney — P&L, previously untouched by this sample",
+    question: "How's my P&L looking this month?",
+    scope: { role: "owner", gym: "Hackney" },
+  },
+  {
+    label: "Admin filtered to one gym — a different path than owner scope or all-gyms",
+    question: "How's this gym doing?",
+    scope: { role: "admin", gym: null },
+    requestedGym: "Kingston upon Thames",
+  },
+  {
+    label: "Fairford Leys — top customers, previously untouched by this sample",
+    question: "Who are my top customers?",
+    scope: { role: "owner", gym: "Fairford Leys" },
+  },
+  {
+    label: "Milton Keynes — member engagement, previously untouched by this sample",
+    question: "How engaged are my members?",
+    scope: { role: "owner", gym: "Milton Keynes" },
+  },
 ];
 
 describe.skipIf(!process.env.ANTHROPIC_API_KEY)("Pod Assist — quality spot-check (read the output, don't just check it passed)", () => {
