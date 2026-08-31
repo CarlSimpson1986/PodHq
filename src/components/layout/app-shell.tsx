@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { Logo } from "@/components/layout/logo";
+import { AssistWidget } from "@/components/assist/assist-widget";
 
 const NAV_ITEMS = [
   {
@@ -222,6 +223,8 @@ export function AppShell({ children, role }: { children: ReactNode; role?: "admi
           );
         })}
       </nav>
+
+      {role && <AssistWidget role={role} />}
     </div>
   );
 }

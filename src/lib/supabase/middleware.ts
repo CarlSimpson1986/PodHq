@@ -15,7 +15,15 @@ const PUBLIC_API_PREFIXES = ["/api/auth/"];
 // future route added under it a silent public opt-in by default. /api/health
 // has no session to check (an external uptime monitor hits it), so it needs
 // its own explicit allowlist entry rather than sharing one.
-const PUBLIC_API_EXACT_PATHS = ["/api/health"];
+//
+// /api/assist/digest is the same situation from a different cause: Vercel
+// Cron calls it with no browser session at all, so this gate would
+// otherwise 307 every cron-triggered request to /login before the route's
+// own CRON_SECRET bearer check ever runs — found live 2026-08-31 (curl
+// with no/wrong Authorization header returned 307, not the route's own
+// 401). Exact path, not a prefix on /api/assist, so /api/assist itself
+// (the real chat endpoint, which must stay session-gated) is unaffected.
+const PUBLIC_API_EXACT_PATHS = ["/api/health", "/api/assist/digest"];
 
 function isPublicPath(pathname: string) {
   if (PUBLIC_PATHS.includes(pathname)) return true;
