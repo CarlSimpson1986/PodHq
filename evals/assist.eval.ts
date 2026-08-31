@@ -1,7 +1,18 @@
 import { describe, it, expect } from "vitest";
 import type { GymScope } from "@/lib/auth/gym-scope";
 import { resolveAssistContext } from "@/lib/assist/tools";
-import { runAssistQuery } from "@/lib/assist/agent";
+import { runAssistQuery, ASSIST_FALLBACK_EMPTY_ANSWER, ASSIST_FALLBACK_TOO_MANY_STEPS } from "@/lib/assist/agent";
+
+/**
+ * Guards against the 2026-08-31 max_tokens bug's failure mode on every
+ * test below: a silent fallback answer that would still pass a bare
+ * length/pattern check on its own. Call this alongside each test's own
+ * specific assertions, not instead of them.
+ */
+function expectRealAnswer(answer: string) {
+  expect(answer).not.toBe(ASSIST_FALLBACK_EMPTY_ANSWER);
+  expect(answer).not.toBe(ASSIST_FALLBACK_TOO_MANY_STEPS);
+}
 
 // These evals make real Anthropic API calls (real cost, non-deterministic
 // output) against the real Supabase data layer — deliberately kept out of
@@ -20,6 +31,7 @@ describe.skipIf(!hasApiKey)("Pod Assist — functional evals", () => {
     async () => {
       const ctx = resolveAssistContext(OWNER_SCOPE);
       const result = await runAssistQuery("How's revenue this month?", ctx);
+      expectRealAnswer(result.answer);
       expect(result.toolCalls.map((c) => c.name)).toContain("get_revenue_summary");
       expect(result.answer).toMatch(/£/);
     },
@@ -31,6 +43,7 @@ describe.skipIf(!hasApiKey)("Pod Assist — functional evals", () => {
     async () => {
       const ctx = resolveAssistContext(OWNER_SCOPE);
       const result = await runAssistQuery("Who's at risk of leaving?", ctx);
+      expectRealAnswer(result.answer);
       expect(result.toolCalls.map((c) => c.name)).toContain("get_at_risk_members");
     },
     30000
@@ -41,6 +54,7 @@ describe.skipIf(!hasApiKey)("Pod Assist — functional evals", () => {
     async () => {
       const ctx = resolveAssistContext(OWNER_SCOPE);
       const result = await runAssistQuery("Why did revenue change this month? Explain what's driving it.", ctx);
+      expectRealAnswer(result.answer);
       // The system prompt's hard rule is "don't answer a why-question from
       // one number alone" — this is the actual behavioural claim
       // root-cause chaining rests on, so assert the shape of the
@@ -58,6 +72,7 @@ describe.skipIf(!hasApiKey)("Pod Assist — functional evals", () => {
     async () => {
       const ctx = resolveAssistContext(ADMIN_SCOPE, "Hove");
       const result = await runAssistQuery("How's Hove doing this month?", ctx);
+      expectRealAnswer(result.answer);
       // Regression guard for the tools.ts review finding: get_dashboard_summary
       // ignores gym filtering entirely, so a naive answer could report the
       // franchise-wide blended figure as if it were Hove's own number.
@@ -73,6 +88,7 @@ describe.skipIf(!hasApiKey)("Pod Assist — functional evals", () => {
     async () => {
       const ctx = resolveAssistContext(OWNER_SCOPE);
       const result = await runAssistQuery("Compare my revenue to Hackney's.", ctx);
+      expectRealAnswer(result.answer);
       for (const call of result.toolCalls) {
         expect(call.gym).toBe("Hove");
       }
