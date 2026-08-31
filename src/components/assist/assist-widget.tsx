@@ -72,7 +72,18 @@ export function AssistWidget({ role }: AssistWidgetProps) {
         aria-label={open ? "Close Pod Assist" : "Open Pod Assist"}
         className="fixed bottom-20 right-4 z-50 h-14 w-14 overflow-hidden rounded-full border border-card-border shadow-[0_12px_32px_-8px_rgba(0,0,0,0.8)] transition-transform hover:scale-105 md:bottom-6 md:right-6"
       >
-        <img src="/pod-assist-icon.png" alt="Pod Assist" className="h-full w-full object-cover" />
+        {/* pod-assist-icon.png is a full app-icon square (mark + "POD ASSIST /
+            BUSINESS ANALYST" text stacked below it) — object-cover alone
+            just squeezes the whole square into this circle, making the
+            actual mark tiny with illegible text peeking in at the edge.
+            scale/origin below crop to just the mark's own bounding box
+            (measured directly from the image: x 22-80%, y 15-55% of the
+            square), not a redesigned asset. */}
+        <img
+          src="/pod-assist-icon.png"
+          alt="Pod Assist"
+          className="h-full w-full origin-[53%_10%] scale-[1.6] object-cover"
+        />
       </button>
     </>
   );
