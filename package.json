@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "eval": "vitest run --config vitest.eval.config.ts"
+    "eval": "vitest run --config vitest.eval.config.ts",
+    "quality-review": "vitest run --config vitest.quality-review.config.ts --reporter=verbose"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.122.0",
