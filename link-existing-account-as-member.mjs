@@ -1,4 +1,4 @@
-// Throwaway: links an EXISTING Supabase Auth user (e.g. carlsimpson83@yahoo.co.uk,
+// Throwaway: links an EXISTING Supabase Auth user (e.g. owner@example.com,
 // which already exists as a podHq staff login, shared Supabase Auth project)
 // to a new podhq-client members row, without going through /signup — that
 // path silently no-ops for an email that already exists elsewhere in this
