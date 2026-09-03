@@ -58,7 +58,7 @@ Full detail for each entry (bug, fix, live verification) is in `ROADMAP_HISTORY.
 42. **Hypertrophy A/B/C workout templates** (`0067`) — keyed on `block_type`+`block_started_at`, not a block-row FK. Generation logic in podhq-client. Live 2026-08-28.
 43. **Blank first-time exercise weight** (`0068`) — drops `workout_sets.weight_target_kg` NOT NULL. Applied & verified live 2026-08-28.
 44. **Daily activity level (`0069`) + `kettlebells` equipment type** — TDEE now occupational-activity-only. Applied & verified live 2026-08-29.
-45. **Daily habit checklist** (`0070`, shared DB) — `member_habits`/`habit_logs`, insert-only ticks. Live 2026-08-29 — full "Today's Mission" built on top in podhq-client (see its ROADMAP.md).
+45. **Daily habit checklist** (`0070`, shared DB) — `member_habits`/`habit_logs`, insert-only ticks. Live 2026-08-29 — full "Today's Mission" built on top in podhq-client (see its ROADMAP.md). `0082` (2026-09-03) adds `member_habits.unit`.
 46-48. **Custom-workout formats** (`0071`-`0073`, shared DB) — rest field, AMRAP (`format`/`time_cap_seconds`/`rounds_completed`), Rounds-For-Time (`target_rounds`/`elapsed_seconds`, corrected same day to reps-only + required time cap). Stages 1-3 of podhq-client's CrossFit-style work (see its ROADMAP.md). Live 2026-08-29 to 08-30.
 49. **Coaching review** (podhq-client) — injury-keyword, RPE-scaling, block-gate & check-in-pain fixes. See its ROADMAP.md.
 50. **HIIT interval timer + reps tally** (`0074`, shared DB) — Stage 4 of custom formats. Live 2026-08-30.
