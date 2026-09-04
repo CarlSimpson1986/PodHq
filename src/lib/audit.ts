@@ -21,7 +21,8 @@ export type AuthEventType =
   | "staff_refund_issued"
   | "setup_brevo_key_updated"
   | "setup_resend_key_updated"
-  | "setup_stripe_connect_started";
+  | "setup_stripe_connect_started"
+  | "setup_stripe_standalone_key_updated";
 
 interface LogAuthEventInput {
   email: string;

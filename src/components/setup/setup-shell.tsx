@@ -11,6 +11,7 @@ import { CardioEquipmentView } from "@/components/setup/cardio-equipment-view";
 import { BrevoConfigView } from "@/components/setup/brevo-config-view";
 import { ResendConfigView } from "@/components/setup/resend-config-view";
 import { StripeConnectView } from "@/components/setup/stripe-connect-view";
+import { StripeStandaloneConfigView } from "@/components/setup/stripe-standalone-view";
 
 // One shared gym selection for the whole /setup page, admin-only (an owner's
 // gym is fixed, no selector at all — see page.tsx). Previously each card
@@ -53,6 +54,7 @@ export function SetupShell({
           <BrevoConfigView gym={gym} />
           <ResendConfigView gym={gym} />
           <StripeConnectView gym={gym} />
+          <StripeStandaloneConfigView gym={gym} />
         </>
       )}
     </div>

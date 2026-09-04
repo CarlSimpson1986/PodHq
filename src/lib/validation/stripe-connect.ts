@@ -6,3 +6,11 @@ export const startStripeConnectSchema = z
     gym: z.enum(GYM_NAMES),
   })
   .strict();
+
+export const upsertStripeStandaloneConfigSchema = z
+  .object({
+    gym: z.enum(GYM_NAMES),
+    apiKey: z.string().trim().min(10).max(500),
+    webhookSecret: z.string().trim().min(10).max(500),
+  })
+  .strict();
