@@ -51,12 +51,12 @@ Full detail for each entry (bug, fix, live verification) is in `ROADMAP_HISTORY.
 35. **`members` table wiped clean** — all 24 rows were QA/test data; full FK-ordered wipe run live 2026-08-22 to reset for a fresh test pass.
 36. **`cancel_booking()` window fixed 2hr→3hr** (`0046`, shared DB) — real GymFlow policy. Applied & verified live 2026-08-30 via the booking UI (refund boundary confirmed both sides of 3hrs).
 37. **Chat Questions + Help FAQ** (`/chat-questions`) — review queue for unanswered POD-chat questions. `0063` applied 08-26, verified.
-38. **Cross-gym PAYG booking + Access-log fix** — PAYG members can book/waitlist at any gym; fixed Access log filtering by home gym instead of where the door event happened.
-39. **Cross-gym booking for members** (`0064`) — `create_booking()`/`cancel_booking()` spend/refund a network top-up for subscribers. Applied 08-26, confirmed live.
+38. **Cross-gym PAYG booking + Access-log fix** — PAYG members can book/waitlist at any gym; fixed Access log filtering by home gym instead of where the event happened.
+39. **Cross-gym booking for members** (`0064`) — `create_booking()`/`cancel_booking()` spend/refund a network top-up for subscribers. Live 2026-08-26.
 40. **Network credit scoped to gym packs; chat hardened** (`0065`) — PT/Recovery excluded via `network_eligible`. Both LLM chats got injection resistance.
-41. **"Find a Professional" directory** (`/professionals`, `0066`) — admin PT profile CRUD + inquiries list, feeding podhq-client's directory. Applied & verified live 2026-08-28.
+41. **"Find a Professional" directory** (`/professionals`, `0066`) — admin PT profile CRUD + inquiries list, feeding podhq-client's directory. Live 2026-08-28.
 42. **Hypertrophy A/B/C workout templates** (`0067`) — keyed on `block_type`+`block_started_at`, not a block-row FK. Live 2026-08-28.
-43. **Blank first-time exercise weight** (`0068`) — drops `workout_sets.weight_target_kg` NOT NULL. Applied & verified live 2026-08-28.
+43. **Blank first-time exercise weight** (`0068`) — drops `workout_sets.weight_target_kg` NOT NULL. Live 2026-08-28.
 44. **Daily activity level (`0069`) + `kettlebells` equipment type** — TDEE now occupational-activity-only. Applied & verified live 2026-08-29.
 45. **Daily habit checklist** (`0070`, shared DB) — `member_habits`/`habit_logs`, insert-only ticks. Live 2026-08-29 — full "Today's Mission" built on podhq-client (see its ROADMAP.md). `0082`: `member_habits.unit`; `0083`: `member_workout_manual_logs`.
 46-48. **Custom-workout formats** (`0071`-`0073`) — rest field, AMRAP (`format`/`time_cap_seconds`/`rounds_completed`), Rounds-For-Time (`target_rounds`/`elapsed_seconds`). Stages 1-3 of podhq-client's CrossFit-style work. Live 2026-08-29 to 08-30.
@@ -67,7 +67,7 @@ Full detail for each entry (bug, fix, live verification) is in `ROADMAP_HISTORY.
 53. **Cardio equipment logging** (`0076`) — `/setup` names machines; `gym_cardio_equipment`/`member_cardio_logs`. Live 2026-08-30.
 54. **Full security audit, both repos** (`0077`) — 2 parallel deep audits; one real gap found (missing RLS) and fixed same day.
 55. **Pod Assist** (`0078`) — owner/admin AI chat agent, Claude tool-calling over existing data functions (never free-text SQL), floating widget w/ route-aware prompts, marketing-playbook tool, monthly digest via Vercel Cron. Full security-eval suite. Verified live end-to-end 2026-08-31 — caught & fixed 2 real bugs first (token-budget truncation, cron-auth routing bypass).
-56. **Standalone Stripe for owned gyms** (`0084`) — Hove/Berryfields are Carl's own, not franchisees; encrypted per-gym key/webhook-secret on `/setup`, separate from Connect. Verified live at Hove: real `sk_live_` key, real Checkout Session against "My Fit Pod Hove".
+56. **Standalone Stripe for owned gyms + Stripe-fed Revenue** (`0084`) — Hove/Berryfields are Carl's own, not franchisees; encrypted key/webhook-secret on `/setup`. Webhook writes real purchases into `Revenue` (GymFlow never sees app sales); current-month clamp lifted for these gyms. Verified live at Hove end to end.
 
 ## Database schema
 
