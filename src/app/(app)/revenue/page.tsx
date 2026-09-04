@@ -1,6 +1,7 @@
 import { createSessionClient } from "@/lib/supabase/server";
 import { getGymScope } from "@/lib/auth/gym-scope";
 import { getRevenueSummaryForRange } from "@/lib/data/revenue";
+import { getStripeStandaloneConfigSummary } from "@/lib/data/stripe-connect-config";
 import { RevenueSummaryView } from "@/components/revenue/revenue-summary-view";
 
 export default async function RevenuePage() {
@@ -30,10 +31,17 @@ export default async function RevenuePage() {
 
   const gym = scope.role === "owner" ? scope.gym : null;
   const summary = await getRevenueSummaryForRange(gym, "last_month");
+  const isStandalone = gym ? (await getStripeStandaloneConfigSummary(gym)).hasKey : false;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
-      <RevenueSummaryView role={scope.role} initialPreset="last_month" initialGym={gym} initialSummary={summary} />
+      <RevenueSummaryView
+        role={scope.role}
+        initialPreset="last_month"
+        initialGym={gym}
+        initialSummary={summary}
+        initialIsStandalone={isStandalone}
+      />
     </div>
   );
 }

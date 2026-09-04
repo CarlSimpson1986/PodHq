@@ -21,29 +21,43 @@ function formatRange(range: MonthRange): string {
 const currentYear = new Date().getUTCFullYear();
 
 // Mirrors getDefaultReportMonth() server-side (src/lib/data/dashboard.ts) —
-// the pipeline never has current-month data, so the month picker's upper
-// bound is last calendar month, not this one. The server clamps
-// independently too (resolveDateRange's "month" case) — this is only a UX
-// nicety so the picker doesn't even offer an out-of-range month.
+// the GymFlow-fed pipeline never has current-month data, so the month
+// picker's upper bound defaults to last calendar month, not this one. The
+// server clamps independently too (resolveDateRange's "month" case) — this
+// is only a UX nicety so the picker doesn't even offer an out-of-range
+// month. Widened to the actual current month for a gym on the standalone
+// Stripe path (0084_gym_stripe_standalone.sql) — see isStandalone below —
+// since that gym's current-month data is genuinely real, written live by
+// the webhook, not backfilled monthly.
 const now = new Date();
 const lastCompletedMonthDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
 const LAST_COMPLETED_MONTH = `${lastCompletedMonthDate.getUTCFullYear()}-${String(
   lastCompletedMonthDate.getUTCMonth() + 1
 ).padStart(2, "0")}`;
+const CURRENT_MONTH = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
 
 interface RevenueSummaryViewProps {
   role: "admin" | "owner";
   initialPreset: DateRangePreset;
   initialGym: GymName | null;
   initialSummary: RevenueRangeSummary;
+  initialIsStandalone: boolean;
 }
 
-export function RevenueSummaryView({ role, initialPreset, initialGym, initialSummary }: RevenueSummaryViewProps) {
+export function RevenueSummaryView({
+  role,
+  initialPreset,
+  initialGym,
+  initialSummary,
+  initialIsStandalone,
+}: RevenueSummaryViewProps) {
   const [preset, setPreset] = useState(initialPreset);
   const [year, setYear] = useState(currentYear);
   const [month, setMonth] = useState(LAST_COMPLETED_MONTH);
   const [gym, setGym] = useState<GymName | null>(initialGym);
   const [summary, setSummary] = useState<RevenueRangeSummary | null>(initialSummary);
+  const [isStandalone, setIsStandalone] = useState(initialIsStandalone);
+  const monthCeiling = isStandalone ? CURRENT_MONTH : LAST_COMPLETED_MONTH;
   // Tracked separately from `summary` — the dropdown trigger needs a range
   // to display even when a fetch errors and summary is cleared to null
   // (see below), otherwise the one control that lets a user recover from
@@ -73,6 +87,7 @@ export function RevenueSummaryView({ role, initialPreset, initialGym, initialSum
         }
         setSummary(body.summary);
         setRange(body.summary.range);
+        setIsStandalone(Boolean(body.isStandalone));
       } catch {
         setSummary(null);
         setError("Something went wrong. Try again.");
@@ -115,7 +130,7 @@ export function RevenueSummaryView({ role, initialPreset, initialGym, initialSum
           preset={preset}
           month={month}
           range={range}
-          lastCompletedMonth={LAST_COMPLETED_MONTH}
+          lastCompletedMonth={monthCeiling}
           disabled={isPending}
           onPreset={handlePresetChange}
           onSelectYear={handleSelectYear}

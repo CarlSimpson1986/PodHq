@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { GYM_NAMES, type GymName } from "./types";
 import { getDefaultReportMonth, getRevenueTrend, shiftMonth } from "./dashboard";
 import { sumOtherIncomeForRange } from "./other-income";
+import { getStripeStandaloneConfigSummary } from "./stripe-connect-config";
 
 export type DateRangePreset = "last_month" | "qtd" | "last_quarter" | "ytd" | "full_year" | "month";
 
@@ -50,18 +51,29 @@ function monthCount(range: MonthRange): number {
   return (ey - sy) * 12 + (em - sm) + 1;
 }
 
+function currentCalendarMonth(): string {
+  const now = new Date();
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
 /**
- * All presets anchor on the last completed month (see getDefaultReportMonth),
- * never literal "today" — the pipeline never has current-month data, so e.g.
- * "QTD" means "quarter containing the last completed month, through that
- * month", not "calendar quarter to date" in the usual sense.
+ * All presets anchor on the last completed month (see getDefaultReportMonth)
+ * by default, never literal "today" — the GymFlow-fed pipeline never has
+ * current-month data, so e.g. "QTD" means "quarter containing the last
+ * completed month, through that month", not "calendar quarter to date" in
+ * the usual sense. `ceilingMonth` overrides this anchor — used by
+ * getRevenueSummaryForRange for a gym on the standalone Stripe path
+ * (0084_gym_stripe_standalone.sql), where current-month data is genuinely
+ * real (written live by the webhook, not backfilled monthly), so clamping
+ * it away would hide real revenue rather than avoid a false gap.
  */
 export function resolveDateRange(
   preset: DateRangePreset,
   year?: number,
-  month?: string
+  month?: string,
+  ceilingMonth?: string
 ): { range: MonthRange; label: string } {
-  const refMonth = getDefaultReportMonth();
+  const refMonth = ceilingMonth ?? getDefaultReportMonth();
   const refYear = Number(refMonth.slice(0, 4));
 
   switch (preset) {
@@ -290,7 +302,12 @@ export async function getRevenueSummaryForRange(
   year?: number,
   month?: string
 ): Promise<RevenueRangeSummary> {
-  const { range, label } = resolveDateRange(preset, year, month);
+  // Only unclamped for a single named gym on the standalone Stripe path —
+  // not the "all gyms" admin view (gym === null), where blending one
+  // gym's real current-month data against every other gym's genuine zero
+  // would misrepresent the combined total, not just fill a gap.
+  const ceilingMonth = gym && (await getStripeStandaloneConfigSummary(gym)).hasKey ? currentCalendarMonth() : undefined;
+  const { range, label } = resolveDateRange(preset, year, month, ceilingMonth);
 
   const sameRangeLastYear: MonthRange = {
     start: shiftMonth(range.start, -12),

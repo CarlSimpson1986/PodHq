@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createSessionClient } from "@/lib/supabase/server";
 import { getGymScope } from "@/lib/auth/gym-scope";
 import { getRevenueSummaryForRange } from "@/lib/data/revenue";
+import { getStripeStandaloneConfigSummary } from "@/lib/data/stripe-connect-config";
 import { revenueSummaryQuerySchema } from "@/lib/validation/revenue";
 import { checkRateLimit } from "@/lib/rate-limit";
 
@@ -46,7 +47,12 @@ export async function GET(request: NextRequest) {
     const gym = scope.role === "owner" ? scope.gym : (parsed.data.gym ?? null);
 
     const summary = await getRevenueSummaryForRange(gym, parsed.data.preset, parsed.data.year, parsed.data.month);
-    return NextResponse.json({ status: "ok", role: scope.role, gym, summary });
+    // Lets the client's month-picker offer the current month too, for a
+    // gym on the standalone Stripe path — see resolveDateRange's
+    // ceilingMonth. "All gyms" (gym === null) always reports false, same
+    // reasoning as the server-side clamp itself.
+    const isStandalone = gym ? (await getStripeStandaloneConfigSummary(gym)).hasKey : false;
+    return NextResponse.json({ status: "ok", role: scope.role, gym, summary, isStandalone });
   } catch (err) {
     // A transient failure (token-refresh race, DB blip) — distinct from
     // "no gym assigned", which is a real, permanent account state. Client
