@@ -127,6 +127,16 @@ const NAV_ITEMS = [
     ),
   },
   {
+    href: "/exercise-videos",
+    label: "Exercise Videos",
+    icon: (
+      <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.5}>
+        <rect x="2.5" y="4" width="15" height="12" rx="2" />
+        <path d="M8.5 7.5 12.5 10 8.5 12.5Z" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
     href: "/admin",
     label: "Admin",
     icon: (
@@ -138,7 +148,7 @@ const NAV_ITEMS = [
   },
 ];
 
-const ADMIN_ONLY_HREFS = ["/admin", "/professionals"];
+const ADMIN_ONLY_HREFS = ["/admin", "/professionals", "/exercise-videos"];
 
 export function AppShell({ children, role }: { children: ReactNode; role?: "admin" | "owner" }) {
   const pathname = usePathname();

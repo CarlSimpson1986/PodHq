@@ -22,7 +22,9 @@ export type AuthEventType =
   | "setup_brevo_key_updated"
   | "setup_resend_key_updated"
   | "setup_stripe_connect_started"
-  | "setup_stripe_standalone_key_updated";
+  | "setup_stripe_standalone_key_updated"
+  | "exercise_video_uploaded"
+  | "exercise_video_deleted";
 
 interface LogAuthEventInput {
   email: string;
