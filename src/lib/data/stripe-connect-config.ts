@@ -1,7 +1,8 @@
 import "server-only";
+import Stripe from "stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripeClient } from "@/lib/stripe";
-import { encryptSecret } from "@/lib/crypto/secret-encryption";
+import { encryptSecret, decryptSecret } from "@/lib/crypto/secret-encryption";
 import type { GymName } from "./types";
 
 export interface StripeConnectStatus {
@@ -68,9 +69,18 @@ export async function startStripeConnectOnboarding(
   return { status: "ok", url: accountLink.url };
 }
 
-// Used by the refund route to know which Stripe account a payment was
-// actually processed on — null means the platform account (every gym
-// today, until it's been through onboarding above).
+// Connect-only — returns null for a standalone gym (Hove/Berryfields),
+// since a standalone row's onboarding_complete is always false (see
+// upsertStripeStandaloneConfig below). Kept only for the Connect
+// onboarding flow itself; every other caller that touches Stripe for a
+// specific gym should use getGymStripeContext instead, which also
+// handles the standalone case correctly. Found 2026-09-05 wargaming
+// production: the refund route (and sales.ts's checkout/comp functions)
+// used this + the platform getStripeClient() directly, so any
+// Stripe-touching staff action for a standalone gym silently ran
+// against the *platform* account instead of that gym's real one —
+// broken for Hove/Berryfields specifically since 0084 shipped, no error
+// until wargaming actually tried a live refund and got a generic 500.
 export async function getStripeAccountId(gym: GymName): Promise<string | null> {
   const admin = createAdminClient();
   const { data, error } = await admin
@@ -81,6 +91,39 @@ export async function getStripeAccountId(gym: GymName): Promise<string | null> {
   if (error) throw error;
   if (!data || !data.onboarding_complete) return null;
   return data.stripe_account_id;
+}
+
+export interface GymStripeContext {
+  client: Stripe;
+  requestOptions?: Stripe.RequestOptions;
+}
+
+// Resolves which Stripe account a gym's payments actually go through —
+// checked in order: (1) a standalone gym (Carl's own, e.g. Hove) has its
+// own real account and its own key, used directly, no stripeAccount
+// header at all; (2) a franchisee gym that's completed Stripe Connect
+// onboarding gets the shared platform key + a stripeAccount request
+// option; (3) no config at all falls back to the shared platform
+// account, exactly as every gym behaved before Connect existed. Ported
+// from podhq-client's identical helper (src/lib/data/stripe-config.ts
+// there) — every route here that creates or reads a Stripe object for a
+// specific gym should go through this, not getStripeAccountId directly.
+export async function getGymStripeContext(gym: GymName): Promise<GymStripeContext> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("gym_stripe_config")
+    .select("stripe_account_id, onboarding_complete, api_key_encrypted")
+    .eq("gym", gym)
+    .maybeSingle();
+  if (error) throw error;
+
+  if (data?.api_key_encrypted) {
+    return { client: new Stripe(decryptSecret(data.api_key_encrypted)) };
+  }
+  if (data?.onboarding_complete && data.stripe_account_id) {
+    return { client: getStripeClient(), requestOptions: { stripeAccount: data.stripe_account_id } };
+  }
+  return { client: getStripeClient() };
 }
 
 export type CompleteReturnResult =

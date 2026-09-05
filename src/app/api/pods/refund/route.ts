@@ -2,8 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createSessionClient } from "@/lib/supabase/server";
 import { getGymScope } from "@/lib/auth/gym-scope";
 import { lookupRefundableTransaction } from "@/lib/data/refunds";
-import { getStripeAccountId } from "@/lib/data/stripe-connect-config";
-import { getStripeClient } from "@/lib/stripe";
+import { getGymStripeContext } from "@/lib/data/stripe-connect-config";
 import { createRefundSchema } from "@/lib/validation/refunds";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logAuthEvent } from "@/lib/audit";
@@ -64,17 +63,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: "error", message: "Transaction not found." }, { status: 404 });
     }
 
-    const stripe = getStripeClient();
-    // A payment processed on a gym's own connected account (Stripe Connect)
-    // only exists there, not on the platform account — refunds.create()
-    // needs to be told which account to look in, or it 404s ("no such
-    // payment_intent") even though the payment is perfectly real. null
-    // (the platform account) is passed through as undefined, matching
-    // every gym's behaviour before Connect existed.
-    const stripeAccountId = await getStripeAccountId(lookup.memberGym);
+    // A payment processed on a gym's own account — standalone (Hove/
+    // Berryfields, own key entirely) or Connect (a franchisee's connected
+    // account) — only exists there, not on the shared platform account.
+    // getGymStripeContext resolves the right client/account for whichever
+    // of those applies, falling back to the platform account only when
+    // neither does (every gym's behaviour before Connect existed).
+    const { client: stripe, requestOptions } = await getGymStripeContext(lookup.memberGym);
+    // Deterministic, not random: the "already refunded" guard above is a
+    // plain SELECT with no lock, and only becomes true once podhq-client's
+    // webhook processes charge.refunded — asynchronously, after this call
+    // already created a real refund. A double-click or two staff acting on
+    // the same transaction within that window would otherwise both pass
+    // the guard and both reach Stripe. Keying on the payment intent makes
+    // Stripe itself dedupe any repeat call into the original refund
+    // instead of creating a second one.
     const refund = await stripe.refunds.create(
       { payment_intent: lookup.paymentIntentId },
-      stripeAccountId ? { stripeAccount: stripeAccountId } : undefined
+      { idempotencyKey: `refund:${lookup.paymentIntentId}`, ...requestOptions }
     );
 
     if (user.email) {

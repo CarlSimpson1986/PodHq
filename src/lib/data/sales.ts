@@ -5,17 +5,20 @@ import { logAuthEvent } from "@/lib/audit";
 import type { GymName } from "./types";
 import { getCatalogItemBySlug } from "./catalog";
 import { grantCreditToMember, type StaffActor } from "./pods";
-import { getStripeAccountId } from "./stripe-connect-config";
+import { getGymStripeContext, getStripeAccountId } from "./stripe-connect-config";
 
 /**
- * null for every gym without its own Stripe Connect account (the shared
- * platform account, unchanged from before Connect existed). A member's
- * saved stripe_customer_id is only ever meaningful under the same account
- * that created it — safe today because a Connect-enabled gym (Hove) has no
- * pre-Connect purchase history to strand on the platform account, but a
- * gym that connects *after* already having platform-account customers
- * would need a real migration, not just this lookup, before card-on-file
- * would work for its existing members.
+ * Kept only for createPackCheckoutSession/createMembershipCheckoutSession
+ * below — every other Stripe call site in this file uses
+ * getGymStripeContext instead (2026-09-05, see its own comment). Those two
+ * still can't switch: they create an *embedded* Checkout Session, and the
+ * client (sell-panel.tsx) loads Stripe.js with the platform publishable
+ * key + this same stripeAccountId as its only account override — a
+ * standalone gym has no publishable key stored at all today, so pointing
+ * the server at the gym's real (standalone) account here without also
+ * fixing the client would just trade a silent wrong-account charge for a
+ * loud embedded-checkout failure. Left as-is pending that client-side fix
+ * — see ROADMAP_HISTORY.md for the full writeup of this gap.
  */
 function stripeRequestOptions(stripeAccountId: string | null): { stripeAccount: string } | undefined {
   return stripeAccountId ? { stripeAccount: stripeAccountId } : undefined;
@@ -102,13 +105,14 @@ export async function getSavedPaymentMethod(memberId: number): Promise<SavedPaym
   if (!customerId) return null;
 
   const gym = await getMemberGym(memberId);
-  const stripeAccountId = gym ? await getStripeAccountId(gym) : null;
+  const { client: stripe, requestOptions } = gym
+    ? await getGymStripeContext(gym)
+    : { client: getStripeClient(), requestOptions: undefined };
 
-  const stripe = getStripeClient();
   const customer = await stripe.customers.retrieve(
     customerId,
     { expand: ["invoice_settings.default_payment_method"] },
-    stripeRequestOptions(stripeAccountId)
+    requestOptions
   );
   if (customer.deleted) return null;
 
@@ -445,9 +449,7 @@ export async function chargeSavedCardForPack(
   const customerId = await getMemberStripeCustomerId(memberId);
   if (!customerId) return { status: "no_saved_card" };
 
-  const stripeAccountId = await getStripeAccountId(gym);
-  const requestOptions = stripeRequestOptions(stripeAccountId);
-  const stripe = getStripeClient();
+  const { client: stripe, requestOptions } = await getGymStripeContext(gym);
   const customer = await stripe.customers.retrieve(customerId, { expand: ["invoice_settings.default_payment_method"] }, requestOptions);
   const pm = !customer.deleted ? customer.invoice_settings?.default_payment_method : null;
   const paymentMethodId = typeof pm === "object" && pm !== null ? pm.id : typeof pm === "string" ? pm : null;
@@ -515,9 +517,7 @@ export async function createMembershipWithSavedCard(
   const customerId = await getMemberStripeCustomerId(memberId);
   if (!customerId) return { status: "no_saved_card" };
 
-  const stripeAccountId = await getStripeAccountId(gym);
-  const requestOptions = stripeRequestOptions(stripeAccountId);
-  const stripe = getStripeClient();
+  const { client: stripe, requestOptions } = await getGymStripeContext(gym);
   const customer = await stripe.customers.retrieve(customerId, { expand: ["invoice_settings.default_payment_method"] }, requestOptions);
   const pm = !customer.deleted ? customer.invoice_settings?.default_payment_method : null;
   const paymentMethodId = typeof pm === "object" && pm !== null ? pm.id : typeof pm === "string" ? pm : null;
@@ -634,10 +634,11 @@ export interface CheckoutSessionStatus {
 /** Read back after the embedded Checkout's return_url redirect — memberId is checked against the session's own metadata so staff can't probe another member's/gym's session by guessing an id in the URL. */
 export async function getCheckoutSessionStatus(sessionId: string, memberId: number): Promise<CheckoutSessionStatus | null> {
   const gym = await getMemberGym(memberId);
-  const stripeAccountId = gym ? await getStripeAccountId(gym) : null;
+  const { client: stripe, requestOptions } = gym
+    ? await getGymStripeContext(gym)
+    : { client: getStripeClient(), requestOptions: undefined };
 
-  const stripe = getStripeClient();
-  const session = await stripe.checkout.sessions.retrieve(sessionId, { expand: ["subscription"] }, stripeRequestOptions(stripeAccountId));
+  const session = await stripe.checkout.sessions.retrieve(sessionId, { expand: ["subscription"] }, requestOptions);
 
   const sessionMemberId =
     session.metadata?.member_id ??
