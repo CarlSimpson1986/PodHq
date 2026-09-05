@@ -49,7 +49,7 @@ Full detail for each entry (bug, fix, live verification) is in `ROADMAP_HISTORY.
 33. **Hove Founding Member offer** — permanent staff-granted 20%-off flag, cleared on cancellation. Discount verified live 2026-08-22.
 34. **Promo code system** (renamed from "coupons" — collided with `gift_vouchers`) — gym-scoped codes, atomic `redeem_promo_code()` RPC. Live 2026-08-22.
 35. **`members` table wiped clean** — all 24 rows were QA/test data; full FK-ordered wipe run live 2026-08-22 to reset for a fresh test pass.
-36. **`cancel_booking()` window fixed 2hr→3hr** (`0046`, shared DB) — real GymFlow policy. Verified live 2026-08-30 (refund boundary confirmed both sides).
+36. **`cancel_booking()` window fixed 2hr→3hr** (`0046`, shared DB) — real GymFlow policy. Verified live 2026-08-30.
 37. **Chat Questions + Help FAQ** (`/chat-questions`) — review queue for unanswered POD-chat questions. `0063`, live 08-26.
 38. **Cross-gym PAYG booking + Access-log fix** — PAYG members can book/waitlist at any gym; fixed Access log filtering by home gym instead of where the event happened.
 39. **Cross-gym booking for members** (`0064`) — `create_booking()`/`cancel_booking()` spend/refund a network top-up for subscribers. Live.
@@ -68,7 +68,7 @@ Full detail for each entry (bug, fix, live verification) is in `ROADMAP_HISTORY.
 54. **Full security audit, both repos** (`0077`) — 2 parallel deep audits; one real gap found (missing RLS) and fixed same day.
 55. **Pod Assist** (`0078`) — owner/admin AI chat agent (tool-calling, never free-text SQL), floating widget, marketing-playbook tool, monthly digest cron. Verified live 2026-08-31 (fixed token-budget truncation, cron-auth bypass).
 56. **Standalone Stripe for owned gyms + Stripe-fed Revenue** (`0084`) — Hove/Berryfields are Carl's own; encrypted key/webhook-secret on `/setup`; webhook writes real purchases into `Revenue`; current-month clamp lifted. Live.
-57. **Booking credit double-spend race fixed** (`0086`) — create_booking()'s slot lock didn't cover one member's concurrent calls at different slots, letting 1 credit fund 2 bookings. Added per-member advisory lock, verified live. Same session: refund + 4 `sales.ts` Stripe calls lacked idempotency and used the wrong account for standalone gyms; fixed. Embedded-checkout sell flow still needs a client-side key fix — flagged.
+57. **Booking credit double-spend race fixed** (`0086`) — create_booking()'s slot lock didn't cover one member's concurrent calls at different slots, letting 1 credit fund 2 bookings. Added per-member advisory lock, verified live. Same session: refund + 4 `sales.ts` Stripe calls lacked idempotency and used the wrong account for standalone gyms; fixed. Embedded-checkout sell flow's client publishable-key gap (`0087`) fixed too, pending live verification.
 
 ## Database schema
 

@@ -12,5 +12,6 @@ export const upsertStripeStandaloneConfigSchema = z
     gym: z.enum(GYM_NAMES),
     apiKey: z.string().trim().min(10).max(500),
     webhookSecret: z.string().trim().min(10).max(500),
+    publishableKey: z.string().trim().min(10).max(500),
   })
   .strict();

@@ -91,7 +91,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await upsertStripeStandaloneConfig(parsed.data.gym, parsed.data.apiKey, parsed.data.webhookSecret, user.id);
+    const result = await upsertStripeStandaloneConfig(
+      parsed.data.gym,
+      parsed.data.apiKey,
+      parsed.data.webhookSecret,
+      parsed.data.publishableKey,
+      user.id
+    );
     if (result.status === "error") {
       console.error("[api/setup/stripe-standalone POST]", { userId: user.id, error: result.message });
       return NextResponse.json({ status: "error", message: "Could not save this config." }, { status: 500 });

@@ -12,6 +12,7 @@ const inputClass = "rounded-md border border-card-border bg-card px-2 py-1 text-
 interface StripeStandaloneConfigSummary {
   hasKey: boolean;
   updatedAt: string | null;
+  publishableKey: string | null;
 }
 
 // Admin-only, same reasoning as ResendConfigView/BrevoConfigView. For an
@@ -25,6 +26,7 @@ export function StripeStandaloneConfigView({ gym }: { gym: GymName | null }) {
   const [editing, setEditing] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [webhookSecret, setWebhookSecret] = useState("");
+  const [publishableKey, setPublishableKey] = useState("");
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(() => {
@@ -57,8 +59,8 @@ export function StripeStandaloneConfigView({ gym }: { gym: GymName | null }) {
 
   async function handleSave() {
     if (!gym) return;
-    if (!apiKey.trim() || !webhookSecret.trim()) {
-      setError("Enter both the secret key and the webhook signing secret.");
+    if (!apiKey.trim() || !webhookSecret.trim() || !publishableKey.trim()) {
+      setError("Enter the secret key, the webhook signing secret, and the publishable key.");
       return;
     }
     setError(null);
@@ -67,7 +69,12 @@ export function StripeStandaloneConfigView({ gym }: { gym: GymName | null }) {
       const res = await fetch("/api/setup/stripe-standalone", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gym, apiKey: apiKey.trim(), webhookSecret: webhookSecret.trim() }),
+        body: JSON.stringify({
+          gym,
+          apiKey: apiKey.trim(),
+          webhookSecret: webhookSecret.trim(),
+          publishableKey: publishableKey.trim(),
+        }),
       });
       const body = await res.json();
       if (body.status !== "ok") {
@@ -76,6 +83,7 @@ export function StripeStandaloneConfigView({ gym }: { gym: GymName | null }) {
       }
       setApiKey("");
       setWebhookSecret("");
+      setPublishableKey("");
       setEditing(false);
       load();
     } catch {
@@ -108,6 +116,9 @@ export function StripeStandaloneConfigView({ gym }: { gym: GymName | null }) {
                 {config?.hasKey ? (
                   <>
                     <p className="text-foreground">•••• configured</p>
+                    {config.publishableKey && (
+                      <p className="mt-0.5 text-xs text-muted-foreground">Publishable key: {config.publishableKey}</p>
+                    )}
                     {config.updatedAt && (
                       <p className="mt-0.5 text-xs text-muted-foreground">
                         Last updated {new Date(config.updatedAt).toLocaleDateString("en-GB")}
@@ -141,7 +152,19 @@ export function StripeStandaloneConfigView({ gym }: { gym: GymName | null }) {
                   autoComplete="off"
                   className={inputClass}
                 />
+                <input
+                  type="text"
+                  placeholder="Publishable key (pk_live_...)"
+                  value={publishableKey}
+                  onChange={(e) => setPublishableKey(e.target.value)}
+                  autoComplete="off"
+                  className={`${inputClass} sm:col-span-2`}
+                />
               </div>
+              <p className="text-xs text-muted-foreground">
+                Publishable key isn&apos;t secret — it&apos;s needed so the embedded checkout the member fills in loads
+                against this gym&apos;s own Stripe account, not the shared platform one.
+              </p>
               <div className="flex gap-2">
                 <button type="button" onClick={handleSave} disabled={saving} className={buttonClass}>
                   {saving ? "Saving..." : "Save"}
@@ -152,6 +175,7 @@ export function StripeStandaloneConfigView({ gym }: { gym: GymName | null }) {
                     setEditing(false);
                     setApiKey("");
                     setWebhookSecret("");
+                    setPublishableKey("");
                     setError(null);
                   }}
                   className={secondaryButtonClass}

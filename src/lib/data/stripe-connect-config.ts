@@ -96,34 +96,51 @@ export async function getStripeAccountId(gym: GymName): Promise<string | null> {
 export interface GymStripeContext {
   client: Stripe;
   requestOptions?: Stripe.RequestOptions;
+  // The publishable key the *client* must load Stripe.js with for an
+  // embedded Checkout Session created under this context to actually work.
+  // For Connect/platform, that's always the shared platform key (a
+  // stripeAccount header on it is enough); a standalone gym is a genuinely
+  // separate account, so its own publishable key is required, not just its
+  // own secret key server-side — added 2026-09-05 after the embedded
+  // sell-panel checkout was found silently mismatched for Hove/Berryfields.
+  publishableKey: string;
 }
 
-// Resolves which Stripe account a gym's payments actually go through —
-// checked in order: (1) a standalone gym (Carl's own, e.g. Hove) has its
-// own real account and its own key, used directly, no stripeAccount
-// header at all; (2) a franchisee gym that's completed Stripe Connect
-// onboarding gets the shared platform key + a stripeAccount request
-// option; (3) no config at all falls back to the shared platform
-// account, exactly as every gym behaved before Connect existed. Ported
-// from podhq-client's identical helper (src/lib/data/stripe-config.ts
-// there) — every route here that creates or reads a Stripe object for a
-// specific gym should go through this, not getStripeAccountId directly.
+const PLATFORM_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "";
+
+// Resolves which Stripe account — and which publishable key — a gym's
+// payments actually go through, checked in order: (1) a standalone gym
+// (Carl's own, e.g. Hove) has its own real account, its own secret key,
+// and its own publishable key, used directly, no stripeAccount header at
+// all; (2) a franchisee gym that's completed Stripe Connect onboarding
+// gets the shared platform key/account + a stripeAccount request option;
+// (3) no config at all falls back to the shared platform account, exactly
+// as every gym behaved before Connect existed. Ported from podhq-client's
+// identical helper (src/lib/data/stripe-config.ts there, minus the
+// publishable key — that app's Checkout is hosted/redirect-based, so it
+// never needed one client-side) — every route here that creates or reads
+// a Stripe object for a specific gym should go through this, not
+// getStripeAccountId directly.
 export async function getGymStripeContext(gym: GymName): Promise<GymStripeContext> {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("gym_stripe_config")
-    .select("stripe_account_id, onboarding_complete, api_key_encrypted")
+    .select("stripe_account_id, onboarding_complete, api_key_encrypted, publishable_key")
     .eq("gym", gym)
     .maybeSingle();
   if (error) throw error;
 
   if (data?.api_key_encrypted) {
-    return { client: new Stripe(decryptSecret(data.api_key_encrypted)) };
+    return { client: new Stripe(decryptSecret(data.api_key_encrypted)), publishableKey: data.publishable_key ?? "" };
   }
   if (data?.onboarding_complete && data.stripe_account_id) {
-    return { client: getStripeClient(), requestOptions: { stripeAccount: data.stripe_account_id } };
+    return {
+      client: getStripeClient(),
+      requestOptions: { stripeAccount: data.stripe_account_id },
+      publishableKey: PLATFORM_PUBLISHABLE_KEY,
+    };
   }
-  return { client: getStripeClient() };
+  return { client: getStripeClient(), publishableKey: PLATFORM_PUBLISHABLE_KEY };
 }
 
 export type CompleteReturnResult =
@@ -166,19 +183,23 @@ export async function completeStripeConnectReturn(gym: GymName): Promise<Complet
 export interface StripeStandaloneConfigSummary {
   hasKey: boolean;
   updatedAt: string | null;
+  // Not sensitive — a publishable key is meant to ship to the browser —
+  // so unlike the secret key/webhook secret, it's fine to return in full
+  // for the Setup UI to display back for confirmation.
+  publishableKey: string | null;
 }
 
-/** Masked view for the Setup UI — the real key/secret are never returned here. */
+/** Masked view for the Setup UI — the real secret key/webhook secret are never returned here (publishableKey is public, so it is). */
 export async function getStripeStandaloneConfigSummary(gym: GymName): Promise<StripeStandaloneConfigSummary> {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("gym_stripe_config")
-    .select("api_key_encrypted, updated_at")
+    .select("api_key_encrypted, updated_at, publishable_key")
     .eq("gym", gym)
     .maybeSingle();
   if (error) throw error;
-  if (!data?.api_key_encrypted) return { hasKey: false, updatedAt: null };
-  return { hasKey: true, updatedAt: data.updated_at };
+  if (!data?.api_key_encrypted) return { hasKey: false, updatedAt: null, publishableKey: null };
+  return { hasKey: true, updatedAt: data.updated_at, publishableKey: data.publishable_key ?? null };
 }
 
 export type UpsertStripeStandaloneConfigResult = { status: "ok" } | { status: "error"; message: string };
@@ -187,6 +208,7 @@ export async function upsertStripeStandaloneConfig(
   gym: GymName,
   apiKey: string,
   webhookSecret: string,
+  publishableKey: string,
   updatedBy: string
 ): Promise<UpsertStripeStandaloneConfigResult> {
   const admin = createAdminClient();
@@ -195,13 +217,14 @@ export async function upsertStripeStandaloneConfig(
       gym,
       api_key_encrypted: encryptSecret(apiKey),
       webhook_secret_encrypted: encryptSecret(webhookSecret),
+      publishable_key: publishableKey,
       updated_by: updatedBy,
       updated_at: new Date().toISOString(),
       // stripe_account_id is NOT NULL — a standalone gym has no Connect
       // account id, so this stays a harmless placeholder rather than
       // widening the column to nullable just for this one case. Never
       // read for a standalone gym (api_key_encrypted takes priority —
-      // see getGymStripeClient in both apps' data layers).
+      // see getGymStripeContext above).
       stripe_account_id: "standalone",
       onboarding_complete: false,
     },

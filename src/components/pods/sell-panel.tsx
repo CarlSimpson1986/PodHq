@@ -52,23 +52,28 @@ export function SellPanel({
   const [error, setError] = useState("");
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [stripeAccountId, setStripeAccountId] = useState<string | null>(null);
+  const [publishableKey, setPublishableKey] = useState<string | null>(null);
   const [savedCardCharged, setSavedCardCharged] = useState(false);
 
-  // Stripe.js itself needs to know which connected account a Checkout
-  // Session belongs to, separately from the server-side session creation —
-  // a session created against Hove's account via `stripeAccount` 404s here
-  // otherwise ("provided key does not have access to account..."), even
-  // though the server-side call succeeded. Memoized on stripeAccountId
-  // (only changes once, when a checkout starts) rather than recreated
-  // every render, per Stripe's own guidance not to call loadStripe() on
-  // every render.
+  // Stripe.js itself needs to know which account a Checkout Session
+  // belongs to, separately from the server-side session creation. Two
+  // distinct cases, both now told apart by the server (2026-09-05 — see
+  // ROADMAP_HISTORY.md, this used to always assume Connect): a franchisee
+  // gym on Stripe Connect uses the shared platform publishable key plus a
+  // stripeAccount override (a session created against Hove's account via
+  // `stripeAccount` 404s here otherwise — "provided key does not have
+  // access to account..." — even though the server-side call succeeded);
+  // an owned gym's standalone account (Hove/Berryfields) is a genuinely
+  // separate Stripe account, so it needs its *own* publishable key
+  // instead, with no stripeAccount override at all. Memoized on
+  // publishableKey/stripeAccountId (only change once, when a checkout
+  // starts) rather than recreated every render, per Stripe's own guidance
+  // not to call loadStripe() on every render.
   const stripePromise = useMemo(() => {
-    if (!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) return null;
-    return loadStripe(
-      process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
-      stripeAccountId ? { stripeAccount: stripeAccountId } : undefined
-    );
-  }, [stripeAccountId]);
+    const key = publishableKey ?? process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+    if (!key) return null;
+    return loadStripe(key, stripeAccountId ? { stripeAccount: stripeAccountId } : undefined);
+  }, [publishableKey, stripeAccountId]);
 
   const catalog = itemType === "credit_pack" ? creditPacks : membershipTiers;
   const selected = catalog.find((i) => i.itemId === itemId) ?? catalog[0];
@@ -147,6 +152,7 @@ export function SellPanel({
         return;
       }
       setStripeAccountId(body.stripeAccountId ?? null);
+      setPublishableKey(body.publishableKey ?? null);
       setClientSecret(body.clientSecret);
     } catch {
       setError("Something went wrong. Try again.");
@@ -192,6 +198,7 @@ export function SellPanel({
     setOpen(false);
     setClientSecret(null);
     setStripeAccountId(null);
+    setPublishableKey(null);
     setError("");
   }
 

@@ -5,24 +5,7 @@ import { logAuthEvent } from "@/lib/audit";
 import type { GymName } from "./types";
 import { getCatalogItemBySlug } from "./catalog";
 import { grantCreditToMember, type StaffActor } from "./pods";
-import { getGymStripeContext, getStripeAccountId } from "./stripe-connect-config";
-
-/**
- * Kept only for createPackCheckoutSession/createMembershipCheckoutSession
- * below — every other Stripe call site in this file uses
- * getGymStripeContext instead (2026-09-05, see its own comment). Those two
- * still can't switch: they create an *embedded* Checkout Session, and the
- * client (sell-panel.tsx) loads Stripe.js with the platform publishable
- * key + this same stripeAccountId as its only account override — a
- * standalone gym has no publishable key stored at all today, so pointing
- * the server at the gym's real (standalone) account here without also
- * fixing the client would just trade a silent wrong-account charge for a
- * loud embedded-checkout failure. Left as-is pending that client-side fix
- * — see ROADMAP_HISTORY.md for the full writeup of this gap.
- */
-function stripeRequestOptions(stripeAccountId: string | null): { stripeAccount: string } | undefined {
-  return stripeAccountId ? { stripeAccount: stripeAccountId } : undefined;
-}
+import { getGymStripeContext } from "./stripe-connect-config";
 
 export type DiscountMode = "ongoing" | "first_payment_only";
 
@@ -237,7 +220,7 @@ export async function compMembership(
 }
 
 export type CreateCheckoutResult =
-  | { status: "ok"; clientSecret: string; stripeAccountId: string | null }
+  | { status: "ok"; clientSecret: string; publishableKey: string; stripeAccountId: string | null }
   | { status: "not_found" }
   | { status: "already_active" }
   | { status: "unknown_item" }
@@ -258,8 +241,7 @@ export async function createPackCheckoutSession(
   const gymMatches = await verifyMemberGym(gym, memberId);
   if (!gymMatches) return { status: "not_found" };
 
-  const stripeAccountId = await getStripeAccountId(gym);
-  const stripe = getStripeClient();
+  const { client: stripe, requestOptions, publishableKey } = await getGymStripeContext(gym);
   try {
     const existingCustomerId = await getMemberStripeCustomerId(memberId);
 
@@ -296,8 +278,11 @@ export async function createPackCheckoutSession(
       // session created directly against it — same direct-charge pattern
       // as podhq-client's self-service checkout — so the money and the
       // resulting saved card both land in that gym's own account, not the
-      // shared platform account.
-      { idempotencyKey: crypto.randomUUID(), ...stripeRequestOptions(stripeAccountId) }
+      // shared platform account. A standalone gym (its own separate
+      // account entirely) needs no stripeAccount header at all — its own
+      // secret key already scopes the call, but the *client* still needs
+      // publishableKey below to match it.
+      { idempotencyKey: crypto.randomUUID(), ...requestOptions }
     );
 
     if (!session.client_secret) return { status: "error", message: "Could not start checkout." };
@@ -309,7 +294,7 @@ export async function createPackCheckoutSession(
       detail: JSON.stringify({ gym, memberId, itemId: packId, type: "credit_pack", priceGBP }),
     });
 
-    return { status: "ok", clientSecret: session.client_secret, stripeAccountId };
+    return { status: "ok", clientSecret: session.client_secret, publishableKey, stripeAccountId: requestOptions?.stripeAccount ?? null };
   } catch (err) {
     return { status: "error", message: err instanceof Error ? err.message : "Stripe error." };
   }
@@ -342,9 +327,7 @@ export async function createMembershipCheckoutSession(
   const existing = await getActiveMembershipForMember(memberId);
   if (existing) return { status: "already_active" };
 
-  const stripeAccountId = await getStripeAccountId(gym);
-  const requestOptions = stripeRequestOptions(stripeAccountId);
-  const stripe = getStripeClient();
+  const { client: stripe, requestOptions, publishableKey } = await getGymStripeContext(gym);
   try {
     const isFirstPaymentDiscount = discountMode === "first_payment_only" && priceGBP < tier.priceGBP;
     const recurringPriceGBP = isFirstPaymentDiscount ? tier.priceGBP : priceGBP;
@@ -411,7 +394,7 @@ export async function createMembershipCheckoutSession(
       detail: JSON.stringify({ gym, memberId, itemId: tierId, type: "membership", priceGBP, discountMode }),
     });
 
-    return { status: "ok", clientSecret: session.client_secret, stripeAccountId };
+    return { status: "ok", clientSecret: session.client_secret, publishableKey, stripeAccountId: requestOptions?.stripeAccount ?? null };
   } catch (err) {
     return { status: "error", message: err instanceof Error ? err.message : "Stripe error." };
   }
