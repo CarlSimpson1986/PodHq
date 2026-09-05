@@ -66,8 +66,9 @@ Full detail for each entry (bug, fix, live verification) is in `ROADMAP_HISTORY.
 52. **Session history + workout stats** (podhq-client) — `/training/history`, fixed HIIT mislabel bug.
 53. **Cardio equipment logging** (`0076`) — `/setup` names machines; `gym_cardio_equipment`/`member_cardio_logs`. Live 2026-08-30.
 54. **Full security audit, both repos** (`0077`) — 2 parallel deep audits; one real gap found (missing RLS) and fixed same day.
-55. **Pod Assist** (`0078`) — owner/admin AI chat agent, Claude tool-calling over existing data functions (never free-text SQL), floating widget w/ route-aware prompts, marketing-playbook tool, monthly digest via Vercel Cron. Full security-eval suite. Verified live end-to-end 2026-08-31 — caught & fixed 2 real bugs first (token-budget truncation, cron-auth routing bypass).
-56. **Standalone Stripe for owned gyms + Stripe-fed Revenue** (`0084`) — Hove/Berryfields are Carl's own, not franchisees; encrypted key/webhook-secret on `/setup`. Webhook writes real purchases into `Revenue` (GymFlow never sees app sales); current-month clamp lifted for these gyms. Verified live at Hove end to end.
+55. **Pod Assist** (`0078`) — owner/admin AI chat agent (tool-calling, never free-text SQL), floating widget, marketing-playbook tool, monthly digest cron. Verified live 2026-08-31 after fixing 2 bugs (token-budget truncation, cron-auth bypass).
+56. **Standalone Stripe for owned gyms + Stripe-fed Revenue** (`0084`) — Hove/Berryfields are Carl's own; encrypted key/webhook-secret on `/setup`; webhook writes real purchases into `Revenue`; current-month clamp lifted. Live.
+57. **Booking credit double-spend race fixed** (`0086`) — create_booking()'s slot lock didn't cover one member's concurrent calls at different slots, letting 1 credit fund 2 bookings. Added per-member advisory lock, verified live.
 
 ## Database schema
 
