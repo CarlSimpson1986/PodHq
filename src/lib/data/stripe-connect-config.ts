@@ -204,19 +204,46 @@ export async function getStripeStandaloneConfigSummary(gym: GymName): Promise<St
 
 export type UpsertStripeStandaloneConfigResult = { status: "ok" } | { status: "error"; message: string };
 
+export interface StripeStandaloneConfigFields {
+  apiKey?: string;
+  webhookSecret?: string;
+  publishableKey?: string;
+}
+
+// Partial update, not a strict overwrite — each field falls back to
+// whatever's already saved when the caller doesn't supply it. Added
+// 2026-09-05 after the original all-or-nothing upsert forced re-entering
+// a secret key nobody wanted to touch just to add the (non-sensitive)
+// publishable key. A gym with no existing row still needs apiKey and
+// webhookSecret supplied together the first time — there's nothing to
+// fall back to yet.
 export async function upsertStripeStandaloneConfig(
   gym: GymName,
-  apiKey: string,
-  webhookSecret: string,
-  publishableKey: string,
+  fields: StripeStandaloneConfigFields,
   updatedBy: string
 ): Promise<UpsertStripeStandaloneConfigResult> {
   const admin = createAdminClient();
+
+  const { data: existing, error: lookupError } = await admin
+    .from("gym_stripe_config")
+    .select("api_key_encrypted, webhook_secret_encrypted, publishable_key")
+    .eq("gym", gym)
+    .maybeSingle();
+  if (lookupError) return { status: "error", message: lookupError.message };
+
+  const apiKeyEncrypted = fields.apiKey ? encryptSecret(fields.apiKey) : existing?.api_key_encrypted;
+  const webhookSecretEncrypted = fields.webhookSecret ? encryptSecret(fields.webhookSecret) : existing?.webhook_secret_encrypted;
+  const publishableKey = fields.publishableKey ?? existing?.publishable_key ?? null;
+
+  if (!apiKeyEncrypted || !webhookSecretEncrypted) {
+    return { status: "error", message: "The secret key and webhook secret are required the first time this gym is configured." };
+  }
+
   const { error } = await admin.from("gym_stripe_config").upsert(
     {
       gym,
-      api_key_encrypted: encryptSecret(apiKey),
-      webhook_secret_encrypted: encryptSecret(webhookSecret),
+      api_key_encrypted: apiKeyEncrypted,
+      webhook_secret_encrypted: webhookSecretEncrypted,
       publishable_key: publishableKey,
       updated_by: updatedBy,
       updated_at: new Date().toISOString(),

@@ -93,9 +93,7 @@ export async function POST(request: NextRequest) {
 
     const result = await upsertStripeStandaloneConfig(
       parsed.data.gym,
-      parsed.data.apiKey,
-      parsed.data.webhookSecret,
-      parsed.data.publishableKey,
+      { apiKey: parsed.data.apiKey, webhookSecret: parsed.data.webhookSecret, publishableKey: parsed.data.publishableKey },
       user.id
     );
     if (result.status === "error") {

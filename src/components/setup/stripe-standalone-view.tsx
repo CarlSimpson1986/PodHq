@@ -59,8 +59,12 @@ export function StripeStandaloneConfigView({ gym }: { gym: GymName | null }) {
 
   async function handleSave() {
     if (!gym) return;
-    if (!apiKey.trim() || !webhookSecret.trim() || !publishableKey.trim()) {
-      setError("Enter the secret key, the webhook signing secret, and the publishable key.");
+    if (!apiKey.trim() && !webhookSecret.trim() && !publishableKey.trim()) {
+      setError("Enter at least one field to update.");
+      return;
+    }
+    if (!config?.hasKey && (!apiKey.trim() || !webhookSecret.trim())) {
+      setError("The secret key and webhook secret are required the first time this gym is configured.");
       return;
     }
     setError(null);
@@ -71,9 +75,9 @@ export function StripeStandaloneConfigView({ gym }: { gym: GymName | null }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           gym,
-          apiKey: apiKey.trim(),
-          webhookSecret: webhookSecret.trim(),
-          publishableKey: publishableKey.trim(),
+          ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
+          ...(webhookSecret.trim() ? { webhookSecret: webhookSecret.trim() } : {}),
+          ...(publishableKey.trim() ? { publishableKey: publishableKey.trim() } : {}),
         }),
       });
       const body = await res.json();
@@ -129,7 +133,14 @@ export function StripeStandaloneConfigView({ gym }: { gym: GymName | null }) {
                   <p className="text-muted-foreground">Not connected.</p>
                 )}
               </div>
-              <button type="button" onClick={() => setEditing(true)} className={secondaryButtonClass}>
+              <button
+                type="button"
+                onClick={() => {
+                  setPublishableKey(config?.publishableKey ?? "");
+                  setEditing(true);
+                }}
+                className={secondaryButtonClass}
+              >
                 {config?.hasKey ? "Replace key" : "Add key"}
               </button>
             </div>
@@ -138,7 +149,7 @@ export function StripeStandaloneConfigView({ gym }: { gym: GymName | null }) {
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <input
                   type="password"
-                  placeholder="Stripe secret key (sk_live_...)"
+                  placeholder={config?.hasKey ? "Secret key (leave blank to keep current)" : "Stripe secret key (sk_live_...)"}
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
                   autoComplete="off"
@@ -146,7 +157,7 @@ export function StripeStandaloneConfigView({ gym }: { gym: GymName | null }) {
                 />
                 <input
                   type="password"
-                  placeholder="Webhook signing secret (whsec_...)"
+                  placeholder={config?.hasKey ? "Webhook secret (leave blank to keep current)" : "Webhook signing secret (whsec_...)"}
                   value={webhookSecret}
                   onChange={(e) => setWebhookSecret(e.target.value)}
                   autoComplete="off"
@@ -164,6 +175,7 @@ export function StripeStandaloneConfigView({ gym }: { gym: GymName | null }) {
               <p className="text-xs text-muted-foreground">
                 Publishable key isn&apos;t secret — it&apos;s needed so the embedded checkout the member fills in loads
                 against this gym&apos;s own Stripe account, not the shared platform one.
+                {config?.hasKey && " Secret key and webhook secret are pre-existing — leave them blank to keep as-is."}
               </p>
               <div className="flex gap-2">
                 <button type="button" onClick={handleSave} disabled={saving} className={buttonClass}>
