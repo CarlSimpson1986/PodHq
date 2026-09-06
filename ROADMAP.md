@@ -68,7 +68,8 @@ Full detail for each entry (bug, fix, live verification) is in `ROADMAP_HISTORY.
 54. **Full security audit, both repos** (`0077`) — 2 parallel deep audits; one real gap found (missing RLS) and fixed same day.
 55. **Pod Assist** (`0078`) — owner/admin AI chat agent (tool-calling, never free-text SQL), floating widget, marketing-playbook tool, monthly digest cron. Verified live 2026-08-31 (fixed token-budget truncation, cron-auth bypass).
 56. **Standalone Stripe for owned gyms + Stripe-fed Revenue** (`0084`) — Hove/Berryfields are Carl's own; encrypted key/webhook-secret on `/setup`; webhook writes real purchases into `Revenue`; current-month clamp lifted. Live.
-57. **Booking credit double-spend race fixed** (`0086`) — create_booking()'s slot lock didn't cover one member's concurrent calls at different slots, letting 1 credit fund 2 bookings. Added per-member advisory lock, verified live. Same session: refund + 4 `sales.ts` Stripe calls lacked idempotency and used the wrong account for standalone gyms; fixed. Embedded-checkout sell flow's client publishable-key gap (`0087`) fixed, verified live. Webhook idempotency, rate limiter, and promo-code redemption independently verified race-safe.
+57. **Booking credit double-spend race fixed** (`0086`) — create_booking()'s slot lock missed one member's concurrent calls at different slots, letting 1 credit fund 2 bookings; per-member advisory lock added, verified live. Same session: refund/sales.ts idempotency + wrong-account fixes, publishable-key gap (`0087`) fixed. Webhook/rate-limiter/promo races independently verified safe.
+58. **Exercise video library filled (75) + catalog extended** — 22 new exercises, `pull_up_bar` equipment, warm-up/cool-down video support, Premium waiver clause. Draft safety tips need review.
 
 ## Database schema
 
