@@ -12,7 +12,7 @@ before moving to the next. Don't jump ahead to a later stage unprompted.
 
 ## Stage index
 
-Full detail for each entry (bug, fix, live verification) is in `ROADMAP_HISTORY.md`.
+Full detail in `ROADMAP_HISTORY.md`.
 
 1. **Scaffold** — Next.js/Tailwind/Supabase/PWA config. Done.
 2. **Auth** — login/MFA/lockout/magic-link. Done; hardened for a CSP hydration bug and a shared Auth Site-URL misconfig.
@@ -49,27 +49,30 @@ Full detail for each entry (bug, fix, live verification) is in `ROADMAP_HISTORY.
 33. **Hove Founding Member offer** — permanent staff-granted 20%-off flag, cleared on cancellation. Discount verified live 2026-08-22.
 34. **Promo code system** (renamed from "coupons" — collided with `gift_vouchers`) — gym-scoped codes, atomic `redeem_promo_code()` RPC. Live 2026-08-22.
 35. **`members` table wiped clean** — all 24 rows were QA/test data; full FK-ordered wipe run live 2026-08-22 to reset for a fresh test pass.
-36. **`cancel_booking()` window fixed 2hr→3hr** (`0046`, shared DB) — real GymFlow policy. Verified live 2026-08-30.
-37. **Chat Questions + Help FAQ** (`/chat-questions`) — review queue for unanswered POD-chat questions. `0063`, live 08-26.
+36. **`cancel_booking()` window fixed 2hr→3hr** (`0046`, shared DB) — real GymFlow policy. Live.
+37. **Chat Questions + Help FAQ** (`/chat-questions`) — review queue for unanswered POD-chat questions. `0063`. Live.
 38. **Cross-gym PAYG booking + Access-log fix** — PAYG members can book/waitlist at any gym; fixed Access log filtering by home gym instead of where the event happened.
 39. **Cross-gym booking for members** (`0064`) — `create_booking()`/`cancel_booking()` spend/refund a network top-up for subscribers. Live.
 40. **Network credit scoped to gym packs; chat hardened** (`0065`) — PT/Recovery excluded via `network_eligible`. Both LLM chats got injection resistance.
-41. **"Find a Professional" directory** (`/professionals`, `0066`) — admin PT profile CRUD + inquiries list, feeding podhq-client. Live 2026-08-28.
+41. **"Find a Professional" directory** (`/professionals`, `0066`) — admin PT profile CRUD + inquiries list, feeding podhq-client. Live.
 42. **Hypertrophy A/B/C workout templates** (`0067`) — keyed on `block_type`+`block_started_at`, not a block-row FK. Live.
 43. **Blank first-time exercise weight** (`0068`) — drops `workout_sets.weight_target_kg` NOT NULL. Live.
-44. **Daily activity level (`0069`) + `kettlebells` equipment type** — TDEE now occupational-activity-only. Verified live 2026-08-29.
-45. **Daily habit checklist** (`0070`, shared DB) — `member_habits`/`habit_logs`, insert-only ticks. Live — "Today's Mission" on podhq-client. `0082`: `member_habits.unit`; `0083`: `member_workout_manual_logs`.
-46-48. **Custom-workout formats** (`0071`-`0073`) — rest field, AMRAP (`format`/`time_cap_seconds`/`rounds_completed`), Rounds-For-Time (`target_rounds`/`elapsed_seconds`). Stages 1-3 of podhq-client's CrossFit-style work. Live.
+44. **Daily activity level (`0069`) + `kettlebells` equipment type** — TDEE now occupational-activity-only. Live.
+45. **Daily habit checklist** (`0070`, shared DB) — `member_habits`/`habit_logs`, insert-only ticks. "Today's Mission" on podhq-client. `0082`/`0083`: unit + manual-log tables.
+46-48. **Custom-workout formats** (`0071`-`0073`) — rest field, AMRAP, Rounds-For-Time. podhq-client's CrossFit-style work. Live.
 49. **Coaching review** (podhq-client) — injury-keyword, RPE-scaling, block-gate & check-in-pain fixes. See its ROADMAP.md.
 50. **HIIT interval timer + reps tally** (`0074`) — Stage 4 of custom formats. Live.
 51. **Weekly weigh-in + measurements** (`0075`) — `member_body_measurements`, syncs `coach_profiles.weight_kg`. Live.
 52. **Session history + workout stats** (podhq-client) — `/training/history`, fixed HIIT mislabel bug.
 53. **Cardio equipment logging** (`0076`) — `/setup` names machines; `gym_cardio_equipment`/`member_cardio_logs`. Live.
-54. **Full security audit, both repos** (`0077`) — 2 parallel deep audits; one real gap found (missing RLS) and fixed same day.
-55. **Pod Assist** (`0078`) — owner/admin AI chat agent (tool-calling, never free-text SQL), floating widget, marketing-playbook tool, monthly digest cron. Verified live 2026-08-31 (fixed token-budget truncation, cron-auth bypass).
-56. **Standalone Stripe for owned gyms + Stripe-fed Revenue** (`0084`) — Hove/Berryfields are Carl's own; encrypted key/webhook-secret on `/setup`; webhook writes real purchases into `Revenue`; current-month clamp lifted. Live.
-57. **Booking credit double-spend race fixed** (`0086`) — create_booking()'s slot lock missed one member's concurrent calls at different slots, letting 1 credit fund 2 bookings; per-member advisory lock added, verified live. Same session: refund/sales.ts idempotency + wrong-account fixes, publishable-key gap (`0087`) fixed. Webhook/rate-limiter/promo races independently verified safe.
-58. **Exercise video library filled (75) + catalog extended** — 22 new exercises, `pull_up_bar` equipment, warm-up/cool-down video support, Premium waiver clause. Draft safety tips need review.
+54. **Full security audit, both repos** (`0077`) — 2 parallel audits; one real gap found (missing RLS), fixed same day.
+55. **Pod Assist** (`0078`) — owner/admin AI chat agent (tool-calling, never free-text SQL), floating widget, marketing-playbook tool, digest cron. Live.
+56. **Standalone Stripe for owned gyms + Stripe-fed Revenue** (`0084`) — encrypted key/webhook-secret on `/setup`; webhook writes purchases into `Revenue`; current-month clamp lifted. Live.
+57. **Booking credit double-spend race fixed** (`0086`) — per-member advisory lock closes a gap letting 1 credit fund 2 bookings; verified via wargaming. Same session: refund idempotency, wrong-account, publishable-key (`0087`) fixes.
+58. **Exercise video library filled (75) + catalog extended** — 22 new exercises, `pull_up_bar` equipment, warm-up/cool-down video, waiver clause. Draft safety tips need review.
+59. **Workout "why" explainability + redesign** (`0088`) — `weight_change_reason`, plain-English RPE readout; fixed a swap-history progression bug. Live.
+60. **Exercise-avoid memory + readiness check** (`0089`-`0090`) — persistent "never suggest again," wearable-driven readiness adjustment; chat safety audit (Pod Coach gaps fixed). Live.
+61. **podhq-client pre-launch audit** (`0091`-`0092`) — medical-emergency chat detection (panic-button-aware), waitlist/webhook/voucher/booking race fixes, error boundaries. Claude-judge eval suite, 11/11 live.
 
 ## Database schema
 
@@ -206,8 +209,8 @@ Software/Subscriptions, Cleaning, Card/Merchant Fees, Other. Excludes
 **Marketing** — captured via `ad_spend` instead, to avoid double-entry.
 
 **Out of scope for v1**: push notifications, churn rate, automated
-ad-spend ingestion, multi-language, gym-to-gym owner comparisons. (Stripe
-billing/light theme/PDF export were later built anyway.)
+ad-spend ingestion, multi-language, gym-to-gym owner comparisons (Stripe
+billing/light theme/PDF export were later built anyway).
 
 **Non-functional**: <2s dashboard load, WCAG 2.1 AA + colour-blind-safe
 charts + data-table alternative for every chart, GBP formatting (2dp,
