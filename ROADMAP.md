@@ -68,11 +68,12 @@ Full detail in `ROADMAP_HISTORY.md`.
 54. **Full security audit, both repos** (`0077`) — 2 parallel audits; one real gap found (missing RLS), fixed same day.
 55. **Pod Assist** (`0078`) — owner/admin AI chat agent (tool-calling, never free-text SQL), floating widget, marketing-playbook tool, digest cron. Live.
 56. **Standalone Stripe for owned gyms + Stripe-fed Revenue** (`0084`) — encrypted key/webhook-secret on `/setup`; webhook writes purchases into `Revenue`; current-month clamp lifted. Live.
-57. **Booking credit double-spend race fixed** (`0086`) — per-member advisory lock closes a gap letting 1 credit fund 2 bookings; verified via wargaming. Same session: refund idempotency, wrong-account, publishable-key (`0087`) fixes.
-58. **Exercise video library filled (75) + catalog extended** — 22 new exercises, `pull_up_bar` equipment, warm-up/cool-down video, waiver clause. Draft safety tips need review.
-59. **Workout "why" explainability + redesign** (`0088`) — `weight_change_reason`, plain-English RPE readout; fixed a swap-history progression bug. Live.
-60. **Exercise-avoid memory + readiness check** (`0089`-`0090`) — persistent "never suggest again," wearable-driven readiness adjustment; chat safety audit (Pod Coach gaps fixed). Live.
-61. **podhq-client pre-launch audit** (`0091`-`0092`) — medical-emergency chat detection (panic-button-aware), waitlist/webhook/voucher/booking race fixes, error boundaries. Claude-judge eval suite, 11/11 live.
+57. **Booking credit double-spend race fixed** (`0086`) — per-member advisory lock closes a gap letting 1 credit fund 2 bookings; verified via wargaming. Same session: refund/account/publishable-key (`0087`) fixes.
+58. **Exercise video library filled (75) + catalog extended** — 22 new exercises, `pull_up_bar` equipment, waiver clause. Draft safety tips need review.
+59. **Workout "why" explainability + redesign** (`0088`) — `weight_change_reason`, plain-English RPE readout. Live.
+60. **Exercise-avoid memory + readiness check** (`0089`-`0090`) — persistent "never suggest again," self-reported readiness; chat safety audit. Live.
+61. **podhq-client pre-launch audit** (`0091`-`0092`) — medical-emergency chat detection, waitlist/webhook/voucher/booking race fixes, error boundaries. Claude-judge eval suite, 11/11 live.
+62. **Rest-timer/session-timer/duration-feedback loops** (`0093`) — universal rest timer, door-unlock-tied session timer + auto-nav, accessory-sets duration feedback (core lifts protected). Email rebrand, Android geofix.
 
 ## Database schema
 
