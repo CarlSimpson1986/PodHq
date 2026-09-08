@@ -71,7 +71,7 @@ Full detail in `ROADMAP_HISTORY.md`.
 60. **Exercise-avoid memory + readiness check** (`0089`-`0090`) — persistent "never suggest again," self-reported readiness; chat safety audit. Live.
 61. **podhq-client pre-launch audit** (`0091`-`0092`) — medical-emergency detection, waitlist/webhook/voucher/booking fixes, error boundaries, eval suite 11/11 live.
 62. **Rest-timer/session-timer/duration-feedback loops** (`0093`) — universal rest timer, door-unlock-tied session timer + auto-nav, accessory-sets duration feedback (core lifts protected). Email rebrand, Android geofix.
-63. **Decline-detection** (`0094`, podhq-client) — e1RM (Epley) + RPE trend check flags a declining compound lift with a dismissible banner. Built & tested; migration not yet applied live.
+63. **Decline-detection** (`0094`, podhq-client) — e1RM (Epley)+RPE trend check flags a declining lift with a dismissible banner. Verified live 2026-09-08.
 
 ## Database schema
 
