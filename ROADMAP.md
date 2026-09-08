@@ -43,15 +43,12 @@ Full detail in `ROADMAP_HISTORY.md`.
 27. **Revenue month drill-down** (`/revenue`) — GymFlow-style date-range dropdown. Verified live 2026-08-22.
 28. **Setup gym pickers merged** — plus `SECRET_ENCRYPTION_KEY` missing from Vercel Production found & fixed.
 29. **Stripe Connect — Hove pilot** — per-gym Connect accounts, direct charges. Verified live end-to-end 2026-08-20.
-30. **Hove pricing catalog uploaded** — 22 items from real spreadsheet, combo pricing allocated proportionally.
-31. **Hove hours set 6am–10pm** — Calendar grid made resource-aware.
-32. **Combo memberships fixed** — was two linked items; now one product via `credits_secondary`.
-33. **Hove Founding Member offer** — permanent staff-granted 20%-off flag, cleared on cancellation. Discount verified live 2026-08-22.
+30-33. **Hove setup** — pricing catalog (22 items), 6am–10pm hours (resource-aware calendar), combo memberships fixed via `credits_secondary`, Founding Member 20%-off flag. All live.
 34. **Promo code system** (renamed from "coupons" — collided with `gift_vouchers`) — gym-scoped codes, atomic `redeem_promo_code()` RPC. Live 2026-08-22.
-35. **`members` table wiped clean** — all 24 rows were QA/test data; full FK-ordered wipe run live 2026-08-22 to reset for a fresh test pass.
+35. **`members` table wiped clean** — all 24 rows were QA/test data; FK-ordered wipe run live 2026-08-22 for a fresh test pass.
 36. **`cancel_booking()` window fixed 2hr→3hr** (`0046`, shared DB) — real GymFlow policy. Live.
 37. **Chat Questions + Help FAQ** (`/chat-questions`) — review queue for unanswered POD-chat questions. `0063`. Live.
-38. **Cross-gym PAYG booking + Access-log fix** — PAYG members can book/waitlist at any gym; fixed Access log filtering by home gym instead of where the event happened.
+38. **Cross-gym PAYG booking + Access-log fix** — PAYG members can book/waitlist anywhere; fixed Access log's home-gym-only filter.
 39. **Cross-gym booking for members** (`0064`) — `create_booking()`/`cancel_booking()` spend/refund a network top-up for subscribers. Live.
 40. **Network credit scoped to gym packs; chat hardened** (`0065`) — PT/Recovery excluded via `network_eligible`. Both LLM chats got injection resistance.
 41. **"Find a Professional" directory** (`/professionals`, `0066`) — admin PT profile CRUD + inquiries list, feeding podhq-client. Live.
@@ -72,8 +69,9 @@ Full detail in `ROADMAP_HISTORY.md`.
 58. **Exercise video library filled (75) + catalog extended** — 22 new exercises, `pull_up_bar` equipment, waiver clause. Draft safety tips need review.
 59. **Workout "why" explainability + redesign** (`0088`) — `weight_change_reason`, plain-English RPE readout. Live.
 60. **Exercise-avoid memory + readiness check** (`0089`-`0090`) — persistent "never suggest again," self-reported readiness; chat safety audit. Live.
-61. **podhq-client pre-launch audit** (`0091`-`0092`) — medical-emergency chat detection, waitlist/webhook/voucher/booking race fixes, error boundaries. Claude-judge eval suite, 11/11 live.
+61. **podhq-client pre-launch audit** (`0091`-`0092`) — medical-emergency detection, waitlist/webhook/voucher/booking fixes, error boundaries, eval suite 11/11 live.
 62. **Rest-timer/session-timer/duration-feedback loops** (`0093`) — universal rest timer, door-unlock-tied session timer + auto-nav, accessory-sets duration feedback (core lifts protected). Email rebrand, Android geofix.
+63. **Decline-detection** (`0094`, podhq-client) — e1RM (Epley) + RPE trend check flags a declining compound lift with a dismissible banner. Built & tested; migration not yet applied live.
 
 ## Database schema
 
