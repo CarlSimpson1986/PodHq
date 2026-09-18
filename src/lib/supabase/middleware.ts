@@ -23,7 +23,13 @@ const PUBLIC_API_PREFIXES = ["/api/auth/"];
 // with no/wrong Authorization header returned 307, not the route's own
 // 401). Exact path, not a prefix on /api/assist, so /api/assist itself
 // (the real chat endpoint, which must stay session-gated) is unaffected.
-const PUBLIC_API_EXACT_PATHS = ["/api/health", "/api/assist/digest"];
+//
+// /api/pdk/webhook and /api/pdk/unlock are the same class of bug, found
+// live 2026-09-18: PDK's cloud and podhq-client's server both call these
+// with no browser session, and this gate 307'd them to /login before
+// their own signature/shared-secret checks ever ran — a real member's
+// unlock attempt silently failed this way before being caught.
+const PUBLIC_API_EXACT_PATHS = ["/api/health", "/api/assist/digest", "/api/pdk/webhook", "/api/pdk/unlock"];
 
 function isPublicPath(pathname: string) {
   if (PUBLIC_PATHS.includes(pathname)) return true;
