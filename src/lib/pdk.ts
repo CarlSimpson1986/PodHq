@@ -14,7 +14,26 @@ const ACCESS_GROUP_NAME = "Booking Access";
 
 const TIMEOUT_MS = 10000;
 
+// Every unlock used to fetch two fresh tokens (OAuth, then system) before
+// touching the door — two extra round trips a member waits through at
+// the door each time. Cached per system for a few minutes in the warm
+// serverless instance: short enough to sit well inside any sane token
+// lifetime, and dropped on a 401 (see virtualRead) so a token revoked
+// early costs one failed unlock, not minutes of them.
+const TOKEN_CACHE_MS = 5 * 60 * 1000;
+const systemTokenCache = new Map<string, { token: string; expiresAt: number }>();
+
 export async function getSystemToken(systemId: string): Promise<string> {
+  const cached = systemTokenCache.get(systemId);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.token;
+  }
+  const token = await fetchSystemToken(systemId);
+  systemTokenCache.set(systemId, { token, expiresAt: Date.now() + TOKEN_CACHE_MS });
+  return token;
+}
+
+async function fetchSystemToken(systemId: string): Promise<string> {
   const clientId = process.env.PDK_CLIENT_ID;
   const clientSecret = process.env.PDK_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
@@ -146,5 +165,8 @@ export async function virtualRead(
       signal: AbortSignal.timeout(TIMEOUT_MS),
     }
   );
+  if (res.status === 401) {
+    systemTokenCache.delete(ids.systemId);
+  }
   return { ok: res.ok, detail: res.ok ? "" : `${res.status}: ${await res.text()}` };
 }

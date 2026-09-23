@@ -67,11 +67,14 @@ export async function POST(request: NextRequest) {
       // taken out of the access group (GymFlow manages it too) — re-add
       // (a no-op if already there) and retry once. The 2s wait is
       // unverified live as of writing.
+      // Re-fetched: a 401 drops the cached token (see virtualRead), so
+      // this gets a fresh one instead of retrying with the stale one.
+      const retryToken = await getSystemToken(systemId);
       if (!linked) {
-        await addToAccessGroup(systemId, systemToken, holderId!);
+        await addToAccessGroup(systemId, retryToken, holderId!);
       }
       await new Promise((resolve) => setTimeout(resolve, 2000));
-      result = await virtualRead(systemToken, ids);
+      result = await virtualRead(retryToken, ids);
     }
 
     if (!result.ok) {
