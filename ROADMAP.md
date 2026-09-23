@@ -72,7 +72,7 @@ Full detail in `ROADMAP_HISTORY.md`.
 61. **podhq-client pre-launch audit** (`0091`-`0092`) — medical-emergency detection, waitlist/webhook/voucher/booking fixes, error boundaries, eval suite 11/11 live.
 62. **Rest-timer/session-timer/duration-feedback loops** (`0093`) — universal rest timer, door-unlock-tied session timer + auto-nav, accessory-sets duration feedback (core lifts protected). Email rebrand, Android geofix.
 63. **Decline-detection** (`0094`, podhq-client) — e1RM+RPE trend flags a declining lift. Live.
-64. **PDK auto-link on first unlock** (`src/lib/pdk.ts`) — holder matched by email or created, added to Booking Access. Untested live.
+64. **PDK auto-link on first unlock** (`src/lib/pdk.ts`) — holder matched by email or created, added to Booking Access. Live.
 
 ## Database schema
 
