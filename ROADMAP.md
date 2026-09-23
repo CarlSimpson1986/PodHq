@@ -73,6 +73,7 @@ Full detail in `ROADMAP_HISTORY.md`.
 62. **Rest-timer/session-timer/duration-feedback loops** (`0093`) — universal rest timer, door-unlock-tied session timer + auto-nav, accessory-sets duration feedback (core lifts protected). Email rebrand, Android geofix.
 63. **Decline-detection** (`0094`, podhq-client) — e1RM+RPE trend flags a declining lift. Live.
 64. **PDK auto-link on first unlock** (`src/lib/pdk.ts`) — holder matched by email or created, added to Booking Access. Live.
+65. **Staff "Delete member"** (`0096`-`0097`) — cascade delete + auth user removal, gym-scoped, audit-logged. PDK holder not removed.
 
 ## Database schema
 

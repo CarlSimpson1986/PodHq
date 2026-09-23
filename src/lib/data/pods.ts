@@ -596,6 +596,44 @@ export async function setFoundingMember(gym: GymName, memberId: number, founding
   return { status: "ok" };
 }
 
+export type DeleteMemberResult = { status: "ok" } | { status: "not_found" } | { status: "error"; message: string };
+
+/**
+ * Deletes a member and everything that references them — every dependent
+ * table this needed was hand-discovered via repeated FK-violation errors
+ * doing this by hand in the SQL editor (see 0097_delete_member_cascade_function.sql
+ * for the full list). The DB function handles every public-schema row;
+ * the auth.users row is deleted separately here via the Admin API, which
+ * also cleans up sessions/identities that a raw SQL delete wouldn't touch.
+ */
+export async function deleteMemberAccount(gym: GymName, memberId: number, actor: StaffActor): Promise<DeleteMemberResult> {
+  const admin = createAdminClient();
+  const { data: member, error: lookupError } = await admin
+    .from("members")
+    .select("id, auth_user_id")
+    .eq("id", memberId)
+    .eq("gym", gym)
+    .maybeSingle();
+
+  if (lookupError) return { status: "error", message: lookupError.message };
+  if (!member) return { status: "not_found" };
+
+  const { error: cascadeError } = await admin.rpc("delete_member_cascade", { p_member_id: memberId });
+  if (cascadeError) return { status: "error", message: cascadeError.message };
+
+  const { error: authDeleteError } = await admin.auth.admin.deleteUser(member.auth_user_id);
+  if (authDeleteError) return { status: "error", message: authDeleteError.message };
+
+  await logAuthEvent({
+    email: actor.email,
+    userId: actor.userId,
+    eventType: "staff_member_deleted",
+    detail: JSON.stringify({ gym, memberId }),
+  });
+
+  return { status: "ok" };
+}
+
 export type CancelBookingResult =
   | { status: "ok"; refunded: boolean }
   | { status: "not_found" }

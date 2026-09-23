@@ -63,6 +63,13 @@ export const setFoundingMemberSchema = z
   })
   .strict();
 
+export const deleteMemberSchema = z
+  .object({
+    gym: z.enum(GYM_NAMES).optional(),
+    memberId: z.number().int().positive(),
+  })
+  .strict();
+
 export const podSettingsQuerySchema = z
   .object({
     gym: z.enum(GYM_NAMES).optional(),

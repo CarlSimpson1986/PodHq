@@ -15,6 +15,7 @@ export type AuthEventType =
   | "admin_account_deleted"
   | "staff_credit_grant"
   | "staff_founding_member_set"
+  | "staff_member_deleted"
   | "staff_membership_comp"
   | "staff_checkout_session_created"
   | "staff_saved_card_charge"

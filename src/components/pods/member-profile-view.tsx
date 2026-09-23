@@ -67,6 +67,9 @@ export function MemberProfileView({
   const [foundingMember, setFoundingMemberState] = useState(profile.foundingMember);
   const [settingFounding, setSettingFounding] = useState(false);
   const [foundingError, setFoundingError] = useState("");
+  const [deleteConfirming, setDeleteConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   function rowKey(t: RefundableTransaction) {
     return `${t.type}:${t.id}`;
@@ -116,6 +119,29 @@ export function MemberProfileView({
       setFoundingError("Something went wrong. Try again.");
     } finally {
       setSettingFounding(false);
+    }
+  }
+
+  async function handleDeleteMember() {
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      const res = await fetch(`/api/pods/members/${profile.id}/delete-account`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gym: profile.gym, memberId: profile.id }),
+      });
+      const body = await res.json();
+      if (body.status !== "ok") {
+        setDeleteError(body.message ?? "Could not delete this member.");
+        return;
+      }
+      router.push("/pods/members");
+      router.refresh();
+    } catch {
+      setDeleteError("Something went wrong. Try again.");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -213,6 +239,33 @@ export function MemberProfileView({
           </button>
         </div>
         {foundingError && <p className="mt-1 text-right text-xs text-danger">{foundingError}</p>}
+        <div className="mt-3 flex items-center justify-end gap-2 border-t border-card-border pt-3">
+          {deleteConfirming ? (
+            <>
+              <span className="text-xs text-warning">Permanently delete this member and all their data?</span>
+              <button type="button" onClick={handleDeleteMember} disabled={deleting} className={dangerButtonClass}>
+                {deleting ? "Deleting..." : "Confirm delete"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeleteConfirming(false)}
+                disabled={deleting}
+                className={ghostButtonClass}
+              >
+                Cancel
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setDeleteConfirming(true)}
+              className="text-xs text-danger underline decoration-dotted hover:text-danger/80"
+            >
+              Delete member
+            </button>
+          )}
+        </div>
+        {deleteError && <p className="mt-1 text-right text-xs text-danger">{deleteError}</p>}
       </div>
 
       <div className="flex justify-end">
