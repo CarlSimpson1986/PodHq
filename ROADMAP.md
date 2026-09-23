@@ -71,7 +71,8 @@ Full detail in `ROADMAP_HISTORY.md`.
 60. **Exercise-avoid memory + readiness check** (`0089`-`0090`) — persistent "never suggest again," self-reported readiness; chat safety audit. Live.
 61. **podhq-client pre-launch audit** (`0091`-`0092`) — medical-emergency detection, waitlist/webhook/voucher/booking fixes, error boundaries, eval suite 11/11 live.
 62. **Rest-timer/session-timer/duration-feedback loops** (`0093`) — universal rest timer, door-unlock-tied session timer + auto-nav, accessory-sets duration feedback (core lifts protected). Email rebrand, Android geofix.
-63. **Decline-detection** (`0094`, podhq-client) — e1RM (Epley)+RPE trend check flags a declining lift with a dismissible banner. Verified live 2026-09-08.
+63. **Decline-detection** (`0094`, podhq-client) — e1RM+RPE trend flags a declining lift. Live.
+64. **PDK auto-link on first unlock** (`src/lib/pdk.ts`) — holder matched by email or created, added to Booking Access. Untested live.
 
 ## Database schema
 
@@ -211,6 +212,5 @@ Software/Subscriptions, Cleaning, Card/Merchant Fees, Other. Excludes
 ad-spend ingestion, multi-language, gym-to-gym owner comparisons (Stripe
 billing/light theme/PDF export were later built anyway).
 
-**Non-functional**: <2s dashboard load, WCAG 2.1 AA + colour-blind-safe
-charts + data-table alternative for every chart, GBP formatting (2dp,
-thousands separator) throughout.
+**Non-functional**: <2s dashboard load, WCAG 2.1 AA, data-table
+alternative per chart, GBP (2dp, thousands separator).

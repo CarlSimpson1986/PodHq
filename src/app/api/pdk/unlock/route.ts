@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { timingSafeEqual } from "crypto";
+import { addToAccessGroup, ensureAccessHolder, getSystemToken, virtualRead, type NewHolder } from "@/lib/pdk";
 
 // Internal server-to-server endpoint, called by podhq-client's own
 // unlock route — not by any browser. PDK's client_id/client_secret live
@@ -26,67 +27,68 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: "error", message: "Unauthorized." }, { status: 401 });
   }
 
-  let body: { systemId?: string; cloudNodeId?: string; deviceId?: string; holderId?: string };
+  let body: {
+    systemId?: string;
+    cloudNodeId?: string;
+    deviceId?: string;
+    holderId?: string;
+    newHolder?: NewHolder;
+  };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ status: "error", message: "Invalid request." }, { status: 400 });
   }
 
-  const { systemId, cloudNodeId, deviceId, holderId } = body;
-  if (!systemId || !cloudNodeId || !deviceId || !holderId) {
+  // Either an existing holderId, or newHolder details for a member who
+  // hasn't been linked to PDK yet — matched by email or created here on
+  // their first unlock (see ensureAccessHolder), and the ID returned so
+  // podhq-client can save it to members.pdk_holder_id.
+  const { systemId, cloudNodeId, deviceId, newHolder } = body;
+  if (!systemId || !cloudNodeId || !deviceId || (!body.holderId && !newHolder?.firstName)) {
     return NextResponse.json({ status: "error", message: "Missing required fields." }, { status: 400 });
   }
 
-  const clientId = process.env.PDK_CLIENT_ID;
-  const clientSecret = process.env.PDK_CLIENT_SECRET;
-  if (!clientId || !clientSecret) {
-    return NextResponse.json({ status: "error", message: "PDK not configured." }, { status: 500 });
-  }
-
+  let holderId = body.holderId;
   try {
-    const basic = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
-    const tokenRes = await fetch("https://accounts.pdk.io/oauth2/token", {
-      method: "POST",
-      headers: { Authorization: `Basic ${basic}`, "Content-Type": "application/x-www-form-urlencoded" },
-      body: "grant_type=client_credentials",
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!tokenRes.ok) {
-      return NextResponse.json({ status: "error", message: `PDK token request failed: ${tokenRes.status}` }, { status: 502 });
-    }
-    const { id_token: idToken } = await tokenRes.json();
+    const systemToken = await getSystemToken(systemId);
 
-    const sysTokenRes = await fetch(`https://accounts.pdk.io/api/systems/${systemId}/token`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${idToken}` },
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!sysTokenRes.ok) {
-      return NextResponse.json({ status: "error", message: `PDK system token request failed: ${sysTokenRes.status}` }, { status: 502 });
+    let linked = false;
+    if (!holderId && newHolder) {
+      holderId = await ensureAccessHolder(systemId, systemToken, newHolder);
+      linked = true;
     }
-    const { token: systemToken } = await sysTokenRes.json();
 
-    const readRes = await fetch(
-      `https://systems.pdk.io/${systemId}/cloud-nodes/${cloudNodeId}/devices/${deviceId}/virtual-read`,
-      {
-        method: "POST",
-        headers: { Authorization: `Bearer ${systemToken}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ holderId }),
-        signal: AbortSignal.timeout(10000),
+    const ids = { systemId, cloudNodeId, deviceId, holderId: holderId! };
+    let result = await virtualRead(systemToken, ids);
+    if (!result.ok) {
+      // Either a just-linked holder's group membership hasn't reached
+      // PDK's access evaluation yet, or an already-linked holder was
+      // taken out of the access group (GymFlow manages it too) — re-add
+      // (a no-op if already there) and retry once. The 2s wait is
+      // unverified live as of writing.
+      if (!linked) {
+        await addToAccessGroup(systemId, systemToken, holderId!);
       }
-    );
-
-    if (!readRes.ok) {
-      const detail = await readRes.text();
-      return NextResponse.json({ status: "error", message: `${readRes.status}: ${detail}` }, { status: 502 });
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      result = await virtualRead(systemToken, ids);
     }
 
-    return NextResponse.json({ status: "ok" });
+    if (!result.ok) {
+      return NextResponse.json({ status: "error", message: result.detail, holderId }, { status: 502 });
+    }
+    return NextResponse.json({ status: "ok", holderId });
   } catch (err) {
     const timedOut = err instanceof Error && err.name === "TimeoutError";
     return NextResponse.json(
-      { status: "error", message: timedOut ? "PDK request timed out." : "PDK request failed." },
+      {
+        status: "error",
+        message: timedOut ? "PDK request timed out." : err instanceof Error ? err.message : "PDK request failed.",
+        // Returned even on failure — if the holder was created before a
+        // later step failed, podhq-client still saves it rather than
+        // creating a duplicate on the member's retry.
+        holderId,
+      },
       { status: 502 }
     );
   }
