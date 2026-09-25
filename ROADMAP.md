@@ -63,17 +63,18 @@ Full detail in `ROADMAP_HISTORY.md`.
 52. **Session history + workout stats** (podhq-client) — `/training/history`, fixed HIIT mislabel bug.
 53. **Cardio equipment logging** (`0076`) — `/setup` names machines; `gym_cardio_equipment`/`member_cardio_logs`. Live.
 54. **Full security audit, both repos** (`0077`) — 2 parallel audits; one real gap found (missing RLS), fixed same day.
-55. **Pod Assist** (`0078`) — owner/admin AI chat agent (tool-calling, never free-text SQL), floating widget, marketing-playbook tool, digest cron. Live.
+55. **Pod Assist** (`0078`) — owner/admin AI chat agent (tool-calling only), marketing-playbook tool, digest cron. Live.
 56. **Standalone Stripe for owned gyms + Stripe-fed Revenue** (`0084`) — encrypted key/webhook-secret on `/setup`; webhook writes purchases into `Revenue`; current-month clamp lifted. Live.
 57. **Booking credit double-spend race fixed** (`0086`) — per-member advisory lock closes a gap letting 1 credit fund 2 bookings; verified via wargaming. Same session: refund/account/publishable-key (`0087`) fixes.
-58. **Exercise video library filled (75) + catalog extended** — 22 new exercises, `pull_up_bar` equipment, waiver clause. Draft safety tips need review.
+58. **Exercise video library (75) + catalog** — 22 new exercises, `pull_up_bar`, waiver clause. Safety tips need review.
 59. **Workout "why" explainability + redesign** (`0088`) — `weight_change_reason`, plain-English RPE readout. Live.
 60. **Exercise-avoid memory + readiness check** (`0089`-`0090`) — persistent "never suggest again," self-reported readiness; chat safety audit. Live.
-61. **podhq-client pre-launch audit** (`0091`-`0092`) — medical-emergency detection, waitlist/webhook/voucher/booking fixes, error boundaries, eval suite 11/11 live.
-62. **Rest-timer/session-timer/duration-feedback loops** (`0093`) — universal rest timer, door-unlock-tied session timer + auto-nav, accessory-sets duration feedback (core lifts protected). Email rebrand, Android geofix.
+61. **podhq-client pre-launch audit** (`0091`-`0092`) — emergency detection, waitlist/webhook/voucher/booking fixes, eval suite 11/11.
+62. **Rest/session timers + duration feedback** (`0093`) — rest timer, unlock-tied session timer, accessory-set feedback. Email rebrand, Android geofix.
 63. **Decline-detection** (`0094`, podhq-client) — e1RM+RPE trend flags a declining lift. Live.
 64. **PDK auto-link on first unlock** (`src/lib/pdk.ts`) — holder matched by email or created, added to Booking Access. Live.
-65. **Staff "Delete member"** (`0096`-`0097`) — cascade delete + auth user removal, gym-scoped, audit-logged. PDK holder not removed.
+65. **Staff "Delete member"** (`0096`-`0097`) — cascade delete + auth user removal, gym-scoped, audit-logged. PDK holder not removed. `0104` revokes public EXECUTE on the cascade function.
+66. **Door Traffic** (`0102`-`0103`, `/door-traffic`) — Kisi + PDK entry history cached monthly into `door_entries` (cron + backfill), charts per gym. Step 1 of replacing the attendance CSV.
 
 ## Database schema
 

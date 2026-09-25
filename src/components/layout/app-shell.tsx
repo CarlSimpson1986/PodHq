@@ -94,6 +94,17 @@ const NAV_ITEMS = [
     ),
   },
   {
+    href: "/door-traffic",
+    label: "Door Traffic",
+    icon: (
+      <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.5}>
+        <path d="M5 17V4.5A1.5 1.5 0 0 1 6.5 3h7A1.5 1.5 0 0 1 15 4.5V17" strokeLinejoin="round" />
+        <path d="M3 17h14" strokeLinecap="round" />
+        <circle cx="12" cy="10.5" r="0.75" fill="currentColor" stroke="none" />
+      </svg>
+    ),
+  },
+  {
     href: "/chat-questions",
     label: "Chat Questions",
     icon: (

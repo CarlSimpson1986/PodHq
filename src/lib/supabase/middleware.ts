@@ -29,7 +29,9 @@ const PUBLIC_API_PREFIXES = ["/api/auth/"];
 // with no browser session, and this gate 307'd them to /login before
 // their own signature/shared-secret checks ever ran — a real member's
 // unlock attempt silently failed this way before being caught.
-const PUBLIC_API_EXACT_PATHS = ["/api/health", "/api/assist/digest", "/api/pdk/webhook", "/api/pdk/unlock"];
+// /api/door-history/sync: monthly Vercel Cron, same reason as
+// /api/assist/digest.
+const PUBLIC_API_EXACT_PATHS = ["/api/health", "/api/assist/digest", "/api/pdk/webhook", "/api/pdk/unlock", "/api/door-history/sync"];
 
 function isPublicPath(pathname: string) {
   if (PUBLIC_PATHS.includes(pathname)) return true;

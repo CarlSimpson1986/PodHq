@@ -3,6 +3,10 @@
     {
       "path": "/api/assist/digest",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/door-history/sync",
+      "schedule": "0 4 1 * *"
     }
   ]
 }
