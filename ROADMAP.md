@@ -75,6 +75,7 @@ Full detail in `ROADMAP_HISTORY.md`.
 64. **PDK auto-link on first unlock** (`src/lib/pdk.ts`) — holder matched by email or created, added to Booking Access. Live.
 65. **Staff "Delete member"** (`0096`-`0097`) — cascade delete + auth user removal, gym-scoped, audit-logged. PDK holder not removed. `0104` revokes public EXECUTE on the cascade function.
 66. **Door Traffic** (`0102`-`0103`, `/door-traffic`) — Kisi + PDK entry history cached monthly into `door_entries` (cron + backfill), charts per gym. Step 1 of replacing the attendance CSV.
+67. **Exercise video bulk replace** (`/exercise-videos`) — multi-file upload matched by filename. 2026-10-03.
 
 ## Database schema
 

@@ -3,11 +3,21 @@
 import { useMemo, useState } from "react";
 import { EXERCISE_LIST } from "@/lib/data/exercise-list";
 import { uploadToSignedUrl } from "@/lib/supabase/browser-storage-upload";
+import { exerciseKeyFromFilename } from "@/lib/exercise-video-filename";
 
 const buttonClass =
   "rounded-md bg-gradient-to-r from-accent to-accent-hover px-3 py-1.5 text-xs font-medium text-accent-foreground disabled:opacity-50";
 const secondaryButtonClass =
   "rounded-md border border-card-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-background disabled:opacity-50";
+
+interface BulkProgress {
+  done: number;
+  total: number;
+  succeeded: number;
+  failed: string[];
+  unmatched: string[];
+  running: boolean;
+}
 
 interface OverrideSummary {
   exerciseKey: string;
@@ -29,6 +39,7 @@ export function ExerciseVideosView({ initialOverrides }: { initialOverrides: Ove
   const [search, setSearch] = useState("");
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [bulk, setBulk] = useState<BulkProgress | null>(null);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -36,44 +47,89 @@ export function ExerciseVideosView({ initialOverrides }: { initialOverrides: Ove
     return [...list].sort((a, b) => a.name.localeCompare(b.name));
   }, [search]);
 
+  // One file through the existing signed-upload flow (upload-url → direct
+  // upload → confirm). Returns an error message, or null on success —
+  // shared by the per-row Replace button and Bulk replace below.
+  async function uploadOne(exerciseKey: string, file: File): Promise<string | null> {
+    const urlRes = await fetch("/api/exercise-videos/upload-url", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ exerciseKey }),
+    });
+    const urlBody = await urlRes.json();
+    if (urlBody.status !== "ok") return urlBody.message ?? "Could not start upload.";
+
+    await uploadToSignedUrl(urlBody.path, urlBody.token, file);
+
+    const confirmRes = await fetch("/api/exercise-videos/confirm", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ exerciseKey, path: urlBody.path }),
+    });
+    const confirmBody = await confirmRes.json();
+    if (confirmBody.status !== "ok") return confirmBody.message ?? "Upload finished but could not be saved. Try again.";
+    return null;
+  }
+
+  async function refreshOverrides() {
+    const listRes = await fetch("/api/exercise-videos");
+    const listBody = await listRes.json();
+    if (listBody.status === "ok") {
+      setOverrides(new Map(listBody.overrides.map((o: OverrideSummary) => [o.exerciseKey, o])));
+    }
+  }
+
   async function handleUpload(exerciseKey: string, file: File) {
     setError(null);
     setBusyKey(exerciseKey);
     try {
-      const urlRes = await fetch("/api/exercise-videos/upload-url", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ exerciseKey }),
-      });
-      const urlBody = await urlRes.json();
-      if (urlBody.status !== "ok") {
-        setError(urlBody.message ?? "Could not start upload.");
+      const uploadError = await uploadOne(exerciseKey, file);
+      if (uploadError) {
+        setError(uploadError);
         return;
       }
-
-      await uploadToSignedUrl(urlBody.path, urlBody.token, file);
-
-      const confirmRes = await fetch("/api/exercise-videos/confirm", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ exerciseKey, path: urlBody.path }),
-      });
-      const confirmBody = await confirmRes.json();
-      if (confirmBody.status !== "ok") {
-        setError(confirmBody.message ?? "Upload finished but could not be saved. Try again.");
-        return;
-      }
-
-      const listRes = await fetch("/api/exercise-videos");
-      const listBody = await listRes.json();
-      if (listBody.status === "ok") {
-        setOverrides(new Map(listBody.overrides.map((o: OverrideSummary) => [o.exerciseKey, o])));
-      }
+      await refreshOverrides();
     } catch {
       setError("Something went wrong uploading that video. Try again.");
     } finally {
       setBusyKey(null);
     }
+  }
+
+  // Bulk replace (2026-10-03) — pick many files at once, each matched to
+  // an exercise by filename (see exerciseKeyFromFilename). Sequential, not parallel, so a
+  // big batch stays well inside the 100/min per-route rate limit; a 429 is
+  // waited out and retried once rather than failing the rest of the batch.
+  async function handleBulkUpload(files: File[]) {
+    setError(null);
+    const validKeys = new Set(EXERCISE_LIST.map((e) => e.key));
+    const matched: { key: string; file: File }[] = [];
+    const unmatched: string[] = [];
+    for (const file of files) {
+      const key = exerciseKeyFromFilename(file.name, validKeys);
+      if (key) matched.push({ key, file });
+      else unmatched.push(file.name);
+    }
+
+    const failed: string[] = [];
+    let succeeded = 0;
+    setBulk({ done: 0, total: matched.length, succeeded: 0, failed: [], unmatched, running: true });
+    for (const [i, { key, file }] of matched.entries()) {
+      try {
+        let uploadError = await uploadOne(key, file);
+        if (uploadError === "Too many requests.") {
+          await new Promise((r) => setTimeout(r, 61_000));
+          uploadError = await uploadOne(key, file);
+        }
+        if (uploadError) failed.push(`${file.name}: ${uploadError}`);
+        else succeeded++;
+      } catch {
+        failed.push(`${file.name}: upload failed`);
+      }
+      setBulk({ done: i + 1, total: matched.length, succeeded, failed: [...failed], unmatched, running: true });
+    }
+    setBulk({ done: matched.length, total: matched.length, succeeded, failed, unmatched, running: false });
+    await refreshOverrides().catch(() => undefined);
   }
 
   async function handleRemove(exerciseKey: string) {
@@ -114,6 +170,50 @@ export function ExerciseVideosView({ initialOverrides }: { initialOverrides: Ove
         className="mt-4 w-full max-w-sm rounded-md border border-card-border bg-card px-3 py-1.5 text-sm text-foreground"
       />
 
+      <div className="mt-4 rounded-md border border-card-border p-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-muted-foreground">
+            Bulk replace — select many videos at once. Each file must be named after its exercise key, e.g.{" "}
+            <span className="font-mono text-xs">barbell_squat.mp4</span>.
+          </p>
+          <label className={`${secondaryButtonClass} flex-none cursor-pointer`}>
+            {bulk?.running ? "Uploading..." : "Bulk replace"}
+            <input
+              type="file"
+              accept="video/*"
+              multiple
+              disabled={bulk?.running || busyKey !== null}
+              className="hidden"
+              onChange={(e) => {
+                const files = Array.from(e.target.files ?? []);
+                e.target.value = "";
+                if (files.length > 0) handleBulkUpload(files);
+              }}
+            />
+          </label>
+        </div>
+        {bulk && (
+          <div className="mt-2 text-sm" aria-live="polite">
+            <p className="text-foreground">
+              {bulk.running ? `Uploading ${bulk.done} of ${bulk.total}...` : `Done — ${bulk.succeeded} of ${bulk.total} uploaded.`}
+            </p>
+            {bulk.unmatched.length > 0 && (
+              <p className="mt-1 text-danger">
+                Skipped {bulk.unmatched.length} file{bulk.unmatched.length === 1 ? "" : "s"} not matching any exercise:{" "}
+                {bulk.unmatched.join(", ")}
+              </p>
+            )}
+            {bulk.failed.length > 0 && (
+              <ul className="mt-1 list-disc pl-5 text-danger">
+                {bulk.failed.map((f) => (
+                  <li key={f}>{f}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
+
       {error && <p className="mt-2 text-sm text-danger">{error}</p>}
 
       <ul className="mt-4 space-y-2">
@@ -141,7 +241,7 @@ export function ExerciseVideosView({ initialOverrides }: { initialOverrides: Ove
                   <input
                     type="file"
                     accept="video/*"
-                    disabled={busy}
+                    disabled={busy || bulk?.running}
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
@@ -153,7 +253,7 @@ export function ExerciseVideosView({ initialOverrides }: { initialOverrides: Ove
                 {override && (
                   <button
                     type="button"
-                    disabled={busy}
+                    disabled={busy || bulk?.running}
                     onClick={() => handleRemove(exercise.key)}
                     className={buttonClass}
                   >
