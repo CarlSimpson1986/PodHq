@@ -59,7 +59,7 @@ export function ExerciseVideosView({ initialOverrides }: { initialOverrides: Ove
     const urlBody = await urlRes.json();
     if (urlBody.status !== "ok") return urlBody.message ?? "Could not start upload.";
 
-    await uploadToSignedUrl(urlBody.path, urlBody.token, file);
+    await uploadToSignedUrl(urlBody.supabaseUrl, urlBody.anonKey, urlBody.path, urlBody.token, file);
 
     const confirmRes = await fetch("/api/exercise-videos/confirm", {
       method: "POST",

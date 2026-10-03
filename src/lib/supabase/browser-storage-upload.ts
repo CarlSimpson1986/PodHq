@@ -13,14 +13,21 @@ import { createClient } from "@supabase/supabase-js";
 // expose by design), and isn't a general-purpose "browser Supabase client"
 // to reach for anywhere else — if a future feature seems to need one,
 // that's a sign to route it through an API route instead, not extend this.
-export async function uploadToSignedUrl(path: string, token: string, file: File): Promise<void> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) {
-    throw new Error("NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY are not configured");
-  }
-
-  const client = createClient(url, anonKey);
+//
+// The project URL + anon key come from the upload-url API response, not
+// NEXT_PUBLIC_* build-time vars (2026-10-03): podHq's Vercel project only
+// has the server-side SUPABASE_URL/SUPABASE_ANON_KEY, so the NEXT_PUBLIC_
+// versions were undefined in production and every upload threw before
+// starting. The anon key is public by design; the route only returns it
+// to a signed-in admin alongside the single-use token.
+export async function uploadToSignedUrl(
+  supabaseUrl: string,
+  anonKey: string,
+  path: string,
+  token: string,
+  file: File
+): Promise<void> {
+  const client = createClient(supabaseUrl, anonKey);
   const { error } = await client.storage.from("exercise-videos").uploadToSignedUrl(path, token, file);
   if (error) throw error;
 }

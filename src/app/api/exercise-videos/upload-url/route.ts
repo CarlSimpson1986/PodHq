@@ -46,7 +46,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: "error", message: "Could not start upload." }, { status: 500 });
     }
 
-    return NextResponse.json({ status: "ok", signedUrl: result.signedUrl, token: result.token, path: result.path });
+    // Browser-side upload needs the project URL + public anon key — served
+    // here rather than via NEXT_PUBLIC_* build vars, which podHq's Vercel
+    // project doesn't have (see browser-storage-upload.ts).
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const anonKey = process.env.SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !anonKey) {
+      console.error("[api/exercise-videos/upload-url]", { userId: user.id, error: "SUPABASE_URL/SUPABASE_ANON_KEY not configured" });
+      return NextResponse.json({ status: "error", message: "Could not start upload." }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      status: "ok",
+      signedUrl: result.signedUrl,
+      token: result.token,
+      path: result.path,
+      supabaseUrl,
+      anonKey,
+    });
   } catch (err) {
     console.error("[api/exercise-videos/upload-url]", { userId: user.id, error: err instanceof Error ? err.message : err });
     return NextResponse.json({ status: "error", message: "Something went wrong. Try again." }, { status: 500 });
