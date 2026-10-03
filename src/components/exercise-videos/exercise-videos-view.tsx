@@ -123,8 +123,8 @@ export function ExerciseVideosView({ initialOverrides }: { initialOverrides: Ove
         }
         if (uploadError) failed.push(`${file.name}: ${uploadError}`);
         else succeeded++;
-      } catch {
-        failed.push(`${file.name}: upload failed`);
+      } catch (err) {
+        failed.push(`${file.name}: ${err instanceof Error ? err.message : "upload failed"}`);
       }
       setBulk({ done: i + 1, total: matched.length, succeeded, failed: [...failed], unmatched, running: true });
     }

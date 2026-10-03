@@ -33,7 +33,10 @@ function buildCsp(nonce: string) {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https://*.stripe.com",
     "font-src 'self' data:",
-    "connect-src 'self' https://challenges.cloudflare.com https://api.stripe.com https://checkout.stripe.com",
+    // Supabase origin (2026-10-03): /exercise-videos uploads straight from
+    // the browser to a signed Storage URL (browser-storage-upload.ts) — without
+    // it here, every upload was blocked by CSP before it left the browser.
+    `connect-src 'self' https://challenges.cloudflare.com https://api.stripe.com https://checkout.stripe.com ${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""}`,
     "frame-src https://challenges.cloudflare.com https://js.stripe.com https://*.js.stripe.com https://checkout.stripe.com https://hooks.stripe.com",
     "frame-ancestors 'none'",
     "base-uri 'self'",
