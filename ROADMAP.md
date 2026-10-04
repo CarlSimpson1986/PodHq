@@ -44,7 +44,7 @@ Full detail in `ROADMAP_HISTORY.md`.
 28. **Setup gym pickers merged** — plus `SECRET_ENCRYPTION_KEY` missing from Vercel Production found & fixed.
 29. **Stripe Connect — Hove pilot** — per-gym Connect accounts, direct charges. Verified live end-to-end 2026-08-20.
 30-33. **Hove setup** — pricing catalog (22 items), 6am–10pm hours (resource-aware calendar), combo memberships fixed via `credits_secondary`, Founding Member 20%-off flag. All live.
-34. **Promo code system** (renamed from "coupons" — collided with `gift_vouchers`) — gym-scoped codes, atomic `redeem_promo_code()` RPC. Live 2026-08-22.
+34. **Promo codes** — gym-scoped, atomic `redeem_promo_code()` RPC. Live 2026-08-22.
 35. **`members` table wiped clean** — all 24 rows were QA/test data; FK-ordered wipe run live 2026-08-22 for a fresh test pass.
 36. **`cancel_booking()` window fixed 2hr→3hr** (`0046`, shared DB) — real GymFlow policy. Live.
 37. **Chat Questions + Help FAQ** (`/chat-questions`) — review queue for unanswered POD-chat questions. `0063`. Live.
@@ -65,7 +65,7 @@ Full detail in `ROADMAP_HISTORY.md`.
 54. **Full security audit, both repos** (`0077`) — 2 parallel audits; one real gap found (missing RLS), fixed same day.
 55. **Pod Assist** (`0078`) — owner/admin AI chat agent (tool-calling only), marketing-playbook tool, digest cron. Live.
 56. **Standalone Stripe for owned gyms + Stripe-fed Revenue** (`0084`) — encrypted key/webhook-secret on `/setup`; webhook writes purchases into `Revenue`; current-month clamp lifted. Live.
-57. **Booking credit double-spend race fixed** (`0086`) — per-member advisory lock closes a gap letting 1 credit fund 2 bookings; verified via wargaming. Same session: refund/account/publishable-key (`0087`) fixes.
+57. **Booking credit double-spend race fixed** (`0086`) — per-member advisory lock. Plus refund/account/publishable-key fixes (`0087`).
 58. **Exercise video library (75) + catalog** — 22 new exercises, `pull_up_bar`, waiver clause. Safety tips need review.
 59. **Workout "why" explainability + redesign** (`0088`) — `weight_change_reason`, plain-English RPE readout. Live.
 60. **Exercise-avoid memory + readiness check** (`0089`-`0090`) — persistent "never suggest again," self-reported readiness; chat safety audit. Live.
@@ -73,9 +73,10 @@ Full detail in `ROADMAP_HISTORY.md`.
 62. **Rest/session timers + duration feedback** (`0093`) — rest timer, unlock-tied session timer, accessory-set feedback. Email rebrand, Android geofix.
 63. **Decline-detection** (`0094`, podhq-client) — e1RM+RPE trend flags a declining lift. Live.
 64. **PDK auto-link on first unlock** (`src/lib/pdk.ts`) — holder matched by email or created, added to Booking Access. Live.
-65. **Staff "Delete member"** (`0096`-`0097`) — cascade delete + auth user removal, gym-scoped, audit-logged. PDK holder not removed. `0104` revokes public EXECUTE on the cascade function.
+65. **Staff "Delete member"** (`0096`-`0097`, `0104`) — cascade delete + auth user removal, gym-scoped, audit-logged. PDK holder not removed.
 66. **Door Traffic** (`0102`-`0103`, `/door-traffic`) — Kisi + PDK entry history cached monthly into `door_entries` (cron + backfill), charts per gym. Step 1 of replacing the attendance CSV.
 67. **Exercise video bulk replace** (`/exercise-videos`) — multi-file upload matched by filename. 2026-10-03.
+68. **PDK live at Hove + two-door unlock** (`0105`) — main door + gym/recovery doors; Hove bookings show "Open main door" + "Open <room> door". History #69.
 
 ## Database schema
 
@@ -197,9 +198,9 @@ than silently producing a misleadingly low aggregate. (A similar Aylesbury
 Berryfields `Revenue` gap **was** resolved 2026-07-28 — upstream re-run,
 confirmed not app-caused. Full notes in `ROADMAP_HISTORY.md`.)
 
-**Future system change:** moving from Kisi to **PDK (ProdataKey)** for door
-access — richer data than the current monthly GymFlow CSV. Don't
-over-invest working around the CSV's limits.
+**Door access:** PDK at Fairford Leys and Hove, Kisi elsewhere — door
+entries already cached in `door_entries` (Stage 66). Don't over-invest
+working around the attendance CSV's limits.
 
 ## Feature specs — key fixed lists
 
@@ -211,9 +212,8 @@ comparable): Rent/Lease, Staff Wages, Utilities, Insurance, Equipment,
 Software/Subscriptions, Cleaning, Card/Merchant Fees, Other. Excludes
 **Marketing** — captured via `ad_spend` instead, to avoid double-entry.
 
-**Out of scope for v1**: push notifications, churn rate, automated
-ad-spend ingestion, multi-language, gym-to-gym owner comparisons (Stripe
-billing/light theme/PDF export were later built anyway).
+**Out of scope for v1**: churn rate, automated ad-spend ingestion,
+multi-language, gym-to-gym owner comparisons.
 
 **Non-functional**: <2s dashboard load, WCAG 2.1 AA, data-table
 alternative per chart, GBP (2dp, thousands separator).
