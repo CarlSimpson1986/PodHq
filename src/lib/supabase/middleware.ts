@@ -30,8 +30,16 @@ const PUBLIC_API_PREFIXES = ["/api/auth/"];
 // their own signature/shared-secret checks ever ran — a real member's
 // unlock attempt silently failed this way before being caught.
 // /api/door-history/sync: monthly Vercel Cron, same reason as
-// /api/assist/digest.
-const PUBLIC_API_EXACT_PATHS = ["/api/health", "/api/assist/digest", "/api/pdk/webhook", "/api/pdk/unlock", "/api/door-history/sync"];
+// /api/assist/digest. /api/brevo/lead: podhq-client's server, shared
+// secret, same as /api/pdk/unlock.
+const PUBLIC_API_EXACT_PATHS = [
+  "/api/health",
+  "/api/assist/digest",
+  "/api/pdk/webhook",
+  "/api/pdk/unlock",
+  "/api/door-history/sync",
+  "/api/brevo/lead",
+];
 
 function isPublicPath(pathname: string) {
   if (PUBLIC_PATHS.includes(pathname)) return true;

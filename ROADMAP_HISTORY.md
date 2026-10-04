@@ -2452,3 +2452,17 @@ Carl: "PDK is now live for Hove." Hove's two `pod_resources` (Gym, Recovery Room
 **Verified locally (localhost, live shared DB, no button tapped):** tsc/eslint clean, vitest 220/220 (3 new for the door schema). As Dev Test Member (member 151, Hove), booked 11:00 Gym + 11:30 Recovery Room: at 11:20 the gym booking showed both buttons on `/bookings` and the Home card while the recovery booking showed "Unlock opens 5 minutes before your session" (Carl's Scenario B). At 11:25 the recovery booking switched to "Open main door" / "Open recovery room door". Side finding, not fixed: member 151's `pod` ledger was at −4 before the test (five 6–8 Sep `booking_used` rows with no matching grants — likely an earlier cleanup removed only the grants); Carl added +1 then +5 `pod` and +1 `recovery` manual grants for this test.
 
 **Outstanding:** live unlock at Hove (main door then room door) on production; cleanup of member 151's test bookings and today's credit rows.
+
+## 70. App lead nurture via Brevo — 2026-10-04
+
+Carl: "have we done lead nurture emails?" — no: only Marketing CSV uploads reached Brevo (`syncLeadsToBrevo`); app signups landed in `leads` and were never sent anywhere, so non-buyers got no follow-up. His rule: **a lead = signed up in the app; any purchase = member; nurture stops.** Staff comps/grants don't count as a purchase (his call); no backfill of existing signups (his call). Consent: unticked-by-default signup box (recommended over a notice-only soft opt-in — app downloaders are a grey area for soft opt-in, and a timestamp proves consent); service emails (bookings, receipts, password resets via Resend) are unaffected — Carl checked.
+
+**`0106_member_lead_nurture.sql`** (applied by Carl before deploy — signup inserts the new column): `members.marketing_consent_at`, `brevo_lead_synced_at`, `first_purchase_at`.
+
+**podHq:** `/api/brevo/lead` (internal, shared-secret — `src/lib/internal-auth.ts` reuses `PDK_PROXY_SECRET` rather than a second secret needing Vercel parity; on the middleware public-path allowlist) with `add`/`remove`; `addAppLeadToBrevo`/`removeAppLeadFromBrevo` in `src/lib/marketing/brevo.ts` use the gym's `gym_brevo_config`; no config → `no_config`, not an error. Remove treats Brevo's 400 ("already off the list") as done. Schema test, 4 cases.
+
+**podhq-client:** signup box ("Email me tips and offers from My Fit Pod <gym>. Unsubscribe any time.") → `marketing_consent_at`; `complete-callback` calls `syncConsentedLeadToBrevo` on any confirmed email-link sign-in — claims `brevo_lead_synced_at` in the same UPDATE that checks consent/not-yet-synced/no purchase, releases it if podHQ/Brevo fails so the next sign-in retries; Stripe webhook calls `markFirstPurchase` inside each fresh-insert gate (gift voucher, credit-pack checkout, staff saved-card sale, membership invoice) — sets `first_purchase_at` once and only that call removes the contact from the list.
+
+**Brevo side (Carl, per gym):** workflow triggers on contact added to the list, exits when removed from it. Aylesbury's Brevo is connected; Hove's unknown.
+
+**Verified:** tsc/eslint/vitest clean both repos (podHq 17, podhq-client 220); signup page renders the box unticked (checked via server HTML — local Chrome session wouldn't sign out). **Not yet verified live:** a consenting signup reaching a Brevo list, and a purchase removing it. **Known gap:** signups via the existing-account magic-link path (email already has an auth user, e.g. a staff login) aren't offered consent. A failed Brevo removal on purchase is logged, not retried.

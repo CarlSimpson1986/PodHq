@@ -55,7 +55,7 @@ Full detail in `ROADMAP_HISTORY.md`.
 42. **Hypertrophy A/B/C workout templates** (`0067`) — keyed on `block_type`+`block_started_at`, not a block-row FK. Live.
 43. **Blank first-time exercise weight** (`0068`) — drops `workout_sets.weight_target_kg` NOT NULL. Live.
 44. **Daily activity level (`0069`) + `kettlebells` equipment type** — TDEE now occupational-activity-only. Live.
-45. **Daily habit checklist** (`0070`, shared DB) — `member_habits`/`habit_logs`, insert-only ticks. "Today's Mission" on podhq-client. `0082`/`0083`: unit + manual-log tables.
+45. **Daily habit checklist** (`0070`, `0082`-`0083`) — `member_habits`/`habit_logs`; "Today's Mission" on podhq-client.
 46-48. **Custom-workout formats** (`0071`-`0073`) — rest field, AMRAP, Rounds-For-Time. podhq-client's CrossFit-style work. Live.
 49. **Coaching review** (podhq-client) — injury-keyword, RPE-scaling, block-gate & check-in-pain fixes. See its ROADMAP.md.
 50. **HIIT interval timer + reps tally** (`0074`) — Stage 4 of custom formats. Live.
@@ -64,19 +64,20 @@ Full detail in `ROADMAP_HISTORY.md`.
 53. **Cardio equipment logging** (`0076`) — `/setup` names machines; `gym_cardio_equipment`/`member_cardio_logs`. Live.
 54. **Full security audit, both repos** (`0077`) — 2 parallel audits; one real gap found (missing RLS), fixed same day.
 55. **Pod Assist** (`0078`) — owner/admin AI chat agent (tool-calling only), marketing-playbook tool, digest cron. Live.
-56. **Standalone Stripe for owned gyms + Stripe-fed Revenue** (`0084`) — encrypted key/webhook-secret on `/setup`; webhook writes purchases into `Revenue`; current-month clamp lifted. Live.
+56. **Standalone Stripe + Stripe-fed Revenue** (`0084`) — per-gym key on `/setup`; webhook writes purchases into `Revenue`. Live.
 57. **Booking credit double-spend race fixed** (`0086`) — per-member advisory lock. Plus refund/account/publishable-key fixes (`0087`).
-58. **Exercise video library (75) + catalog** — 22 new exercises, `pull_up_bar`, waiver clause. Safety tips need review.
+58. **Exercise video library (75)** — 22 new exercises, `pull_up_bar`, waiver clause. Safety tips need review.
 59. **Workout "why" explainability + redesign** (`0088`) — `weight_change_reason`, plain-English RPE readout. Live.
 60. **Exercise-avoid memory + readiness check** (`0089`-`0090`) — persistent "never suggest again," self-reported readiness; chat safety audit. Live.
 61. **podhq-client pre-launch audit** (`0091`-`0092`) — emergency detection, waitlist/webhook/voucher/booking fixes, eval suite 11/11.
-62. **Rest/session timers + duration feedback** (`0093`) — rest timer, unlock-tied session timer, accessory-set feedback. Email rebrand, Android geofix.
+62. **Rest/session timers + duration feedback** (`0093`) — rest + unlock-tied session timers. Email rebrand, Android geofix.
 63. **Decline-detection** (`0094`, podhq-client) — e1RM+RPE trend flags a declining lift. Live.
 64. **PDK auto-link on first unlock** (`src/lib/pdk.ts`) — holder matched by email or created, added to Booking Access. Live.
 65. **Staff "Delete member"** (`0096`-`0097`, `0104`) — cascade delete + auth user removal, gym-scoped, audit-logged. PDK holder not removed.
 66. **Door Traffic** (`0102`-`0103`, `/door-traffic`) — Kisi + PDK entry history cached monthly into `door_entries` (cron + backfill), charts per gym. Step 1 of replacing the attendance CSV.
 67. **Exercise video bulk replace** (`/exercise-videos`) — multi-file upload matched by filename. 2026-10-03.
-68. **PDK live at Hove + two-door unlock** (`0105`) — main door + gym/recovery doors; Hove bookings show "Open main door" + "Open <room> door". History #69.
+68. **PDK live at Hove + two-door unlock** (`0105`) — main/gym/recovery doors; "Open main door" + "Open <room> door". History #69.
+69. **App lead nurture via Brevo** (`0106`, `/api/brevo/lead`) — consenting app signups → gym's Brevo list; first purchase removes them. History #70.
 
 ## Database schema
 

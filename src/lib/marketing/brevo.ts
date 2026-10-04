@@ -53,3 +53,57 @@ export async function syncLeadsToBrevo(gym: GymName, leads: LeadDraft[]): Promis
     console.error("[brevo-sync] failed to sync some leads", { gym, failedCount, totalCount: leads.length });
   }
 }
+
+export interface AppLeadContact {
+  email: string;
+  firstName: string;
+  lastName: string;
+}
+
+export type AppLeadSyncResult = "synced" | "no_config" | "failed";
+
+/**
+ * One member-app signup who ticked marketing consent, added to that gym's
+ * Brevo list so its nurture workflow starts. Same upsert as the CSV path.
+ * Called from /api/brevo/lead (podhq-client server only).
+ */
+export async function addAppLeadToBrevo(gym: GymName, contact: AppLeadContact): Promise<AppLeadSyncResult> {
+  const config = await getDecryptedBrevoConfig(gym);
+  if (!config) return "no_config";
+
+  const res = await fetch(BREVO_CONTACTS_URL, {
+    method: "POST",
+    headers: { "api-key": config.apiKey, "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({
+      email: contact.email,
+      attributes: { FIRSTNAME: contact.firstName, LASTNAME: contact.lastName },
+      listIds: [config.listId],
+      updateEnabled: true,
+    }),
+  });
+  if (res.ok) return "synced";
+  console.error("[brevo-sync] failed to add app lead", { gym, status: res.status });
+  return "failed";
+}
+
+/**
+ * Takes a lead off the gym's list once they've bought something — the
+ * Brevo workflow is set to exit contacts who leave the list, which is what
+ * stops the nurture emails. The contact itself stays in Brevo (only the
+ * list membership goes), so their unsubscribe status is kept. Brevo
+ * answers 400 when the contact is already off the list; that's the end
+ * state we want, so it counts as done.
+ */
+export async function removeAppLeadFromBrevo(gym: GymName, email: string): Promise<AppLeadSyncResult> {
+  const config = await getDecryptedBrevoConfig(gym);
+  if (!config) return "no_config";
+
+  const res = await fetch(`https://api.brevo.com/v3/contacts/lists/${config.listId}/contacts/remove`, {
+    method: "POST",
+    headers: { "api-key": config.apiKey, "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ emails: [email] }),
+  });
+  if (res.ok || res.status === 400) return "synced";
+  console.error("[brevo-sync] failed to remove app lead", { gym, status: res.status });
+  return "failed";
+}
