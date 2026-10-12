@@ -32,7 +32,7 @@ Full detail in `ROADMAP_HISTORY.md`.
 16. **Other income** — `gym_other_income`, feeds P&L + Revenue combined card, kept out of GymFlow Revenue.
 17. **Staff refunds** — Stripe refund API, ledger corrected via `charge.refunded` webhook. Verified live 2026-08-14.
 18. **`/pods`→"Access"** — live Kisi door-unlock log, 15s polling on today only.
-19. **Member profiles + Calendar** — `/pods/members/[id]`, `/pods/calendar` (grid, slot detail, cancel). Book/detail/cancel flow verified live 2026-08-22.
+19. **Member profiles + Calendar** — `/pods/members/[id]`, `/pods/calendar`. Verified live 2026-08-22.
 20. **Light theme** — content area dark→light w/ WCAG fixes; sidebar reverted to black same day.
 21. **Staff sell/comp + card-on-file + catalog** (`/setup`) — embedded Stripe Checkout, live `catalog_items` table.
 22. **OWASP audit** — critical IDOR fix, Stripe idempotency, TOCTOU fix, atomic rate limiter, dep patches.
@@ -43,7 +43,7 @@ Full detail in `ROADMAP_HISTORY.md`.
 27. **Revenue month drill-down** (`/revenue`) — GymFlow-style date-range dropdown. Verified live 2026-08-22.
 28. **Setup gym pickers merged** — plus `SECRET_ENCRYPTION_KEY` missing from Vercel Production found & fixed.
 29. **Stripe Connect — Hove pilot** — per-gym Connect accounts, direct charges. Verified live end-to-end 2026-08-20.
-30-33. **Hove setup** — pricing catalog (22 items), 6am–10pm hours (resource-aware calendar), combo memberships fixed via `credits_secondary`, Founding Member 20%-off flag. All live.
+30-33. **Hove setup** — pricing catalog, 6am–10pm hours, combo memberships (`credits_secondary`), Founding Member flag. Live.
 34. **Promo codes** — gym-scoped, atomic `redeem_promo_code()` RPC. Live 2026-08-22.
 35. **`members` table wiped clean** — all 24 rows were QA/test data; FK-ordered wipe run live 2026-08-22 for a fresh test pass.
 36. **`cancel_booking()` window fixed 2hr→3hr** (`0046`, shared DB) — real GymFlow policy. Live.
@@ -74,7 +74,7 @@ Full detail in `ROADMAP_HISTORY.md`.
 63. **Decline-detection** (`0094`, podhq-client) — e1RM+RPE trend flags a declining lift. Live.
 64. **PDK auto-link on first unlock** (`src/lib/pdk.ts`) — holder matched by email or created, added to Booking Access. Live.
 65. **Staff "Delete member"** (`0096`-`0097`, `0104`) — cascade delete + auth user removal, gym-scoped, audit-logged. PDK holder not removed.
-66. **Door Traffic** (`0102`-`0103`, `/door-traffic`) — Kisi + PDK entry history cached monthly into `door_entries` (cron + backfill), charts per gym. Step 1 of replacing the attendance CSV.
+66. **Door Traffic** (`0102`-`0103`, `/door-traffic`) — Kisi + PDK entry history cached monthly into `door_entries` (cron + backfill), charts per gym. Kisi sync broken until 2026-10-12 (missing Vercel key, fixed).
 67. **Exercise video bulk replace** (`/exercise-videos`) — multi-file upload matched by filename. 2026-10-03.
 68. **PDK live at Hove + two-door unlock** (`0105`) — main/gym/recovery doors; "Open main door" + "Open <room> door". History #69.
 69. **App lead nurture via Brevo** (`0106`, `/api/brevo/lead`) — consenting app signups → gym's Brevo list; first purchase removes them. History #70.
