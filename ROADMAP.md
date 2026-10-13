@@ -25,7 +25,7 @@ Full detail in `ROADMAP_HISTORY.md`.
 9. **Admin** (`/admin`) — user list, one-time-password owner creation, deactivate/delete (14). Done.
 10. **Owner restrictions** — gym-scoping audit, all routes/pages. No gaps found (2026-08-02).
 11. **PWA** — descoped 2026-08-06 to podhq-client; `next-pwa` removed.
-12. **Deploy** — live at podhq.vercel.app. Two cert-error red herrings resolved.
+12. **Deploy** — live at podhq.vercel.app. Done.
 13. **Admin PDF export** — per-gym P&L PDF for a date range. Done 2026-08-06.
 14. **Permanent account deletion** (admin) — type-to-confirm UI, audit-logged, FK fix. Verified live.
 15. **Pods backend** (`/pods`) — manual booking, per-gym capacity/hours. RPC verified; UI click-tested live 2026-08-22 (see Stage 19).
@@ -74,10 +74,11 @@ Full detail in `ROADMAP_HISTORY.md`.
 63. **Decline-detection** (`0094`, podhq-client) — e1RM+RPE trend flags a declining lift. Live.
 64. **PDK auto-link on first unlock** (`src/lib/pdk.ts`) — holder matched by email or created, added to Booking Access. Live.
 65. **Staff "Delete member"** (`0096`-`0097`, `0104`) — cascade delete + auth user removal, gym-scoped, audit-logged. PDK holder not removed.
-66. **Door Traffic** (`0102`-`0103`, `/door-traffic`) — Kisi + PDK entry history cached monthly into `door_entries` (cron + backfill), charts per gym. Kisi sync broken until 2026-10-12 (missing Vercel key, fixed).
+66. **Door Traffic** (`0102`-`0103`, `/door-traffic`) — Kisi + PDK entry history cached monthly into `door_entries` (cron + backfill), charts per gym.
 67. **Exercise video bulk replace** (`/exercise-videos`) — multi-file upload matched by filename. 2026-10-03.
 68. **PDK live at Hove + two-door unlock** (`0105`) — main/gym/recovery doors; "Open main door" + "Open <room> door". History #69.
 69. **App lead nurture via Brevo** (`0106`, `/api/brevo/lead`) — consenting app signups → gym's Brevo list; first purchase removes them. History #70.
+70. **Hove unlock fix + booking-length PDK access** (`0107`) — missing "Booking Access" group created; at Hove members leave the group 5 min after their slot (cron). History #71.
 
 ## Database schema
 

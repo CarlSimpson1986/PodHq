@@ -31,13 +31,15 @@ const PUBLIC_API_PREFIXES = ["/api/auth/"];
 // unlock attempt silently failed this way before being caught.
 // /api/door-history/sync: monthly Vercel Cron, same reason as
 // /api/assist/digest. /api/brevo/lead: podhq-client's server, shared
-// secret, same as /api/pdk/unlock.
+// secret, same as /api/pdk/unlock. /api/pdk/expire-access: 5-minute
+// Vercel Cron (CRON_SECRET), same reason as /api/door-history/sync.
 const PUBLIC_API_EXACT_PATHS = [
   "/api/health",
   "/api/assist/digest",
   "/api/pdk/webhook",
   "/api/pdk/unlock",
   "/api/door-history/sync",
+  "/api/pdk/expire-access",
   "/api/brevo/lead",
 ];
 

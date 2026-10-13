@@ -1,6 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { timingSafeEqual } from "crypto";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { addToAccessGroup, ensureAccessHolder, getSystemToken, virtualRead, type NewHolder } from "@/lib/pdk";
+
+// Used when podhq-client doesn't send accessUntil (an older client build):
+// long enough to cover any slot plus its grace period, still time-limited.
+const DEFAULT_GRANT_MS = 90 * 60 * 1000;
 
 // Internal server-to-server endpoint, called by podhq-client's own
 // unlock route — not by any browser. PDK's client_id/client_secret live
@@ -33,6 +38,9 @@ export async function POST(request: NextRequest) {
     deviceId?: string;
     holderId?: string;
     newHolder?: NewHolder;
+    // End of the booking's unlock window (ISO) — when the member comes
+    // back out of the access group at app-managed gyms (0107).
+    accessUntil?: string;
   };
   try {
     body = await request.json();
@@ -49,13 +57,45 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: "error", message: "Missing required fields." }, { status: 400 });
   }
 
+  const accessUntilMs = body.accessUntil ? Date.parse(body.accessUntil) : NaN;
+  const expiresAt = new Date(Number.isNaN(accessUntilMs) ? Date.now() + DEFAULT_GRANT_MS : accessUntilMs);
+
+  const admin = createAdminClient();
+  const { data: mapping, error: mappingError } = await admin
+    .from("gym_pdk_mapping")
+    .select("app_manages_access_group")
+    .eq("system_id", systemId)
+    .maybeSingle();
+  if (mappingError) {
+    return NextResponse.json({ status: "error", message: "Could not look up PDK system." }, { status: 500 });
+  }
+  // Our app owns the group here (Hove), so it adds before every unlock and
+  // the expire-access cron takes them out after. Elsewhere (Fairford Leys)
+  // GymFlow owns the group's membership — unchanged behaviour.
+  const appManagesGroup = mapping?.app_manages_access_group === true;
+
   let holderId = body.holderId;
   try {
     const systemToken = await getSystemToken(systemId);
 
     let linked = false;
     if (!holderId && newHolder) {
-      holderId = await ensureAccessHolder(systemId, systemToken, newHolder);
+      holderId = await ensureAccessHolder(systemId, systemToken, newHolder, { addToGroup: !appManagesGroup });
+      linked = true;
+    }
+
+    if (appManagesGroup) {
+      // Recorded before the add, so a member is never in the group without
+      // a removal time on record.
+      const { error: grantError } = await admin.rpc("upsert_pdk_access_grant", {
+        p_system_id: systemId,
+        p_holder_id: holderId!,
+        p_expires_at: expiresAt.toISOString(),
+      });
+      if (grantError) {
+        throw new Error(`Could not record access grant: ${grantError.message}`);
+      }
+      await addToAccessGroup(systemId, systemToken, holderId!);
       linked = true;
     }
 

@@ -102,6 +102,21 @@ export async function addToAccessGroup(systemId: string, systemToken: string, ho
   }
 }
 
+// Removes a holder from the access group when their booking's unlock
+// window has ended, at gyms where our app (not GymFlow) owns the group —
+// see 0107 and /api/pdk/expire-access. A 404 means they're already out.
+export async function removeFromAccessGroup(systemId: string, systemToken: string, holderId: string): Promise<void> {
+  const groupId = await findAccessGroupId(systemId, systemToken);
+  const res = await fetch(`https://systems.pdk.io/${systemId}/holders/${holderId}/groups/${groupId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${systemToken}` },
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
+  if (!res.ok && res.status !== 404) {
+    throw new Error(`PDK remove-from-group failed: ${res.status}: ${await res.text()}`);
+  }
+}
+
 // Links a member to their PDK holder, reusing an existing one (e.g. from
 // GymFlow) when the email matches exactly, otherwise creating one — then
 // makes sure it's in the access group. Holders at these gyms carry no
@@ -109,7 +124,15 @@ export async function addToAccessGroup(systemId: string, systemToken: string, ho
 // GymFlow's own), so group membership alone can only ever open a door
 // via an API virtual-read, and podhq-client's unlock route already
 // enforces the booking window before calling that.
-export async function ensureAccessHolder(systemId: string, systemToken: string, holder: NewHolder): Promise<string> {
+// `addToGroup: false` leaves the group add to the caller — the unlock
+// route records a time-limited grant first at app-managed gyms (0107), so
+// nobody is ever in the group without a removal time on record.
+export async function ensureAccessHolder(
+  systemId: string,
+  systemToken: string,
+  holder: NewHolder,
+  { addToGroup = true }: { addToGroup?: boolean } = {}
+): Promise<string> {
   const base = `https://systems.pdk.io/${systemId}`;
   const auth = { Authorization: `Bearer ${systemToken}` };
 
@@ -148,7 +171,9 @@ export async function ensureAccessHolder(systemId: string, systemToken: string, 
     holderId = ((await createRes.json()) as { id: string }).id;
   }
 
-  await addToAccessGroup(systemId, systemToken, holderId);
+  if (addToGroup) {
+    await addToAccessGroup(systemId, systemToken, holderId);
+  }
   return holderId;
 }
 
