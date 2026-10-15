@@ -70,15 +70,15 @@ Full detail in `ROADMAP_HISTORY.md`.
 59. **Workout "why" explainability + redesign** (`0088`) — `weight_change_reason`, plain-English RPE readout. Live.
 60. **Exercise-avoid memory + readiness check** (`0089`-`0090`) — persistent "never suggest again," self-reported readiness; chat safety audit. Live.
 61. **podhq-client pre-launch audit** (`0091`-`0092`) — emergency detection, waitlist/webhook/voucher/booking fixes, eval suite 11/11.
-62. **Rest/session timers + duration feedback** (`0093`) — rest + unlock-tied session timers. Email rebrand, Android geofix.
+62. **Rest/session timers** (`0093`) — rest + unlock-tied session timers, duration feedback. Email rebrand, Android geofix.
 63. **Decline-detection** (`0094`, podhq-client) — e1RM+RPE trend flags a declining lift. Live.
 64. **PDK auto-link on first unlock** (`src/lib/pdk.ts`) — holder matched by email or created, added to Booking Access. Live.
-65. **Staff "Delete member"** (`0096`-`0097`, `0104`) — cascade delete + auth user removal, gym-scoped, audit-logged. PDK holder not removed.
-66. **Door Traffic** (`0102`-`0103`, `/door-traffic`) — Kisi + PDK entry history cached monthly into `door_entries` (cron + backfill), charts per gym.
+65. **Staff "Delete member"** (`0096`-`0097`, `0104`) — cascade + auth user delete, gym-scoped, audited. PDK holder not removed.
+66. **Door Traffic** (`0102`-`0103`) — Kisi + PDK entries cached monthly in `door_entries`, charts per gym.
 67. **Exercise video bulk replace** (`/exercise-videos`) — multi-file upload matched by filename. 2026-10-03.
 68. **PDK live at Hove + two-door unlock** (`0105`) — main/gym/recovery doors; "Open main door" + "Open <room> door". History #69.
-69. **App lead nurture via Brevo** (`0106`, `/api/brevo/lead`) — consenting app signups → gym's Brevo list; first purchase removes them. History #70.
-70. **Hove unlock fix + booking-length PDK access** (`0107`) — missing "Booking Access" group created; at Hove members leave the group 5 min after their slot (cron). History #71.
+69. **App lead nurture via Brevo** (`0106`) — consenting signups → gym Brevo list; purchase removes. #70.
+70. **Hove PDK unlock + booking-length access** (`0107`) — group + (10-15) its missing access rule; cron drops members 5 min post-slot. Live test pending. #71.
 
 ## Database schema
 
