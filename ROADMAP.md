@@ -78,7 +78,7 @@ Full detail in `ROADMAP_HISTORY.md`.
 67. **Exercise video bulk replace** (`/exercise-videos`) — multi-file upload matched by filename. 2026-10-03.
 68. **PDK live at Hove + two-door unlock** (`0105`) — main/gym/recovery doors; "Open main door" + "Open <room> door". History #69.
 69. **App lead nurture via Brevo** (`0106`) — consenting signups → gym Brevo list; purchase removes. #70.
-70. **Hove PDK unlock + booking-length access** (`0107`) — group + (10-15) its missing access rule; cron drops members 5 min post-slot. Live test pending. #71.
+70. **Hove PDK unlock + booking-length access** (`0107`) — group + (10-15) its missing access rule; cron drops members 5 min post-slot. (10-16) re-add 400 broke later taps; fixed. Live test pending. #71.
 
 ## Database schema
 

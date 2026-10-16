@@ -86,10 +86,15 @@ async function findAccessGroupId(systemId: string, systemToken: string): Promise
   return group.id;
 }
 
-// Idempotent — PDK's single-group PUT adds without touching the holder's
-// other groups, and re-adding an existing member is a no-op. Also used to
-// re-add a linked holder whose unlock failed: GymFlow manages this same
-// group's membership dynamically and may have removed them from it.
+// PDK's single-group PUT adds without touching the holder's other groups.
+// Also used to re-add a linked holder whose unlock failed: GymFlow manages
+// this same group's membership dynamically and may have removed them.
+// Re-adding a holder already in the group is NOT a no-op on PDK's side —
+// it returns 400 "Group already contains holder." That's the outcome we
+// want, so it counts as success. Found live 2026-10-16: at Hove (0107) the
+// unlock route adds before every tap, so a member's first tap worked and
+// every later one (second door, retry) failed on this 400 before the door
+// was ever asked to open.
 export async function addToAccessGroup(systemId: string, systemToken: string, holderId: string): Promise<void> {
   const groupId = await findAccessGroupId(systemId, systemToken);
   const res = await fetch(`https://systems.pdk.io/${systemId}/holders/${holderId}/groups/${groupId}`, {
@@ -97,9 +102,10 @@ export async function addToAccessGroup(systemId: string, systemToken: string, ho
     headers: { Authorization: `Bearer ${systemToken}` },
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
-  if (!res.ok) {
-    throw new Error(`PDK add-to-group failed: ${res.status}: ${await res.text()}`);
-  }
+  if (res.ok) return;
+  const detail = await res.text();
+  if (res.status === 400 && /already contains holder/i.test(detail)) return;
+  throw new Error(`PDK add-to-group failed: ${res.status}: ${detail}`);
 }
 
 // Removes a holder from the access group when their booking's unlock
