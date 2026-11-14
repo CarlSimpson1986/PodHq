@@ -94,6 +94,7 @@ async function fetchActiveAttendanceRows(
       .select("gym, user_member_id, first_name, last_name, attendance, last_attended")
       .eq("report_month", month)
       .gt("attendance", 0)
+      .order("id", { ascending: true })
       .range(from, from + PAGE_SIZE - 1);
     const query = gym ? base.eq("gym", gym) : base;
 
@@ -140,6 +141,7 @@ async function getAttendanceCompleteness(
       .from("attendance")
       .select("gym")
       .eq("report_month", month)
+      .order("id", { ascending: true })
       .range(from, from + PAGE_SIZE - 1);
     if (error) throw error;
 
@@ -173,6 +175,7 @@ export async function fetchAllRevenueForLtv(
     const base = admin
       .from("Revenue")
       .select("gym, sold_to, amount_inc_tax, report_month")
+      .order("id", { ascending: true })
       .range(from, from + PAGE_SIZE - 1);
     const query = gym ? base.eq("gym", gym) : base;
 
@@ -313,6 +316,7 @@ export async function getAtRiskMembers(gym: GymName | null, month: string): Prom
       .select("gym, user_member_id, first_name, last_name, last_attended")
       .gte("report_month", earliestMonth)
       .lte("report_month", month)
+      .order("id", { ascending: true })
       .range(from, from + PAGE_SIZE - 1);
     const query = gym ? base.eq("gym", gym) : base;
 
@@ -516,6 +520,7 @@ async function fetchCustomerTransactions(
       .eq("gym", gym)
       .eq("sold_to", name)
       .order("date", { ascending: false })
+      .order("id", { ascending: true })
       .range(from, from + PAGE_SIZE - 1);
     if (error) throw error;
 
@@ -572,6 +577,7 @@ async function fetchCustomerAttendance(
       .eq("first_name", firstName)
       .eq("last_name", lastName)
       .order("report_month", { ascending: false })
+      .order("id", { ascending: true })
       .range(from, from + PAGE_SIZE - 1);
     if (error) throw error;
 

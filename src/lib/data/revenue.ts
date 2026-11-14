@@ -134,6 +134,7 @@ async function fetchRevenueRowsForRange<T>(
       .select(columns)
       .gte("report_month", range.start)
       .lte("report_month", range.end)
+      .order("id", { ascending: true })
       .range(from, from + PAGE_SIZE - 1);
     const query = gym ? base.eq("gym", gym) : base;
 

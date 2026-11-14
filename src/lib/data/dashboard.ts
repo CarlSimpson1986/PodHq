@@ -89,6 +89,7 @@ export async function sumRevenue(gym: GymName | null, month: string): Promise<nu
       .from("Revenue")
       .select("amount_inc_tax")
       .eq("report_month", month)
+      .order("id", { ascending: true })
       .range(from, from + PAGE_SIZE - 1);
     const query = gym ? base.eq("gym", gym) : base;
 
@@ -142,6 +143,7 @@ export async function getRevenueByGym(month: string): Promise<GymRevenue[]> {
       .from("Revenue")
       .select("gym, amount_inc_tax")
       .eq("report_month", month)
+      .order("id", { ascending: true })
       .range(from, from + PAGE_SIZE - 1);
     if (error) throw error;
 
@@ -175,12 +177,16 @@ async function getPayingCustomersByGym(month: string): Promise<Map<GymName, numb
       .from("Revenue")
       .select("gym, sold_to")
       .eq("report_month", month)
+      .order("id", { ascending: true })
       .range(from, from + PAGE_SIZE - 1);
     if (error) throw error;
 
-    const rows = (data ?? []) as { gym: GymName; sold_to: string }[];
+    const rows = (data ?? []) as { gym: GymName; sold_to: string | null }[];
     for (const row of rows) {
-      customersByGym.get(row.gym)?.add(row.sold_to);
+      // A blank sold_to isn't a customer — counting it added one phantom
+      // paying customer per gym that had any (2026-11-14 review).
+      const customer = row.sold_to?.trim();
+      if (customer) customersByGym.get(row.gym)?.add(customer);
     }
 
     if (rows.length < PAGE_SIZE) break;
@@ -202,6 +208,7 @@ async function getGymsWithNoAttendanceData(month: string): Promise<GymName[]> {
       .from("attendance")
       .select("gym")
       .eq("report_month", month)
+      .order("id", { ascending: true })
       .range(from, from + PAGE_SIZE - 1);
     if (error) throw error;
 
