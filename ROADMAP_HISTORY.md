@@ -2486,7 +2486,7 @@ Carl: "have we done lead nurture emails?" — no: only Marketing CSV uploads rea
 
 **Follow-up 2026-10-16 — Fairford Leys app members never left the group:** at Fairford Leys (`app_manages_access_group` false) our unlock route still adds a member to Booking Access on their first unlock and on a retry, but nothing removed them — GymFlow only manages its own bookings. Carl: members who use our app stop using GymFlow, so our app should own their removal there too. **`0108`** flips the flag on for Fairford Leys — no code change; the 0107 grant table + expire-access cron only ever remove holders our app recorded, never GymFlow-added ones. **Needs Carl to apply 0108.** Not live-tested at Fairford Leys.
 
-## 71. Stable paging order + blank `sold_to` — 2026-11-14
+## 72. Stable paging order + blank `sold_to` — 2026-11-14
 
 From a high-effort code review. 9 of 11 paged `Revenue`/`attendance` loops (`src/lib/data/dashboard.ts`, `members.ts`, `revenue.ts`) used `.range()` with no `.order()` — Postgres doesn't guarantee row order between requests, so once a query spans more than one 1000-row page (one all-gym month is ~926 rows already) rows could be skipped or repeated. All 11 now order by `id` (as the tie-breaker where they already sorted by `date`/`report_month`). `getPayingCustomersByGym` (dashboard ARPM denominator) no longer counts a null/blank `sold_to` as a customer. Verified: tsc clean, vitest 21/21 on the committed tree. Not verified live (no visible change expected while months stay under 1000 rows).
 

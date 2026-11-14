@@ -79,7 +79,7 @@ Full detail in `ROADMAP_HISTORY.md`.
 68. **PDK live at Hove + two-door unlock** (`0105`) — main/gym/recovery doors; "Open main door" + "Open <room> door". History #69.
 69. **App lead nurture via Brevo** (`0106`) — consenting signups → gym Brevo list; purchase removes. #70.
 70. **Hove PDK unlock + booking-length access** (`0107`) — group + (10-15) its missing access rule; cron drops members 5 min post-slot. (10-16) re-add 400 fixed; `0108` same for Fairford Leys. Live test pending. #71.
-71. **Stable paging order** — all paged Revenue/attendance loops `.order("id")`; blank `sold_to` not counted. Pod Assist door-system tools fixed but uncommitted. #71.
+71. **Stable paging order** — paged Revenue/attendance loops `.order("id")`; blank `sold_to` skipped. #72.
 
 ## Database schema
 
